@@ -23,17 +23,14 @@ class SessionManager {
             .input('sessionToken', sql.NVarChar, sessionToken)
             .input('userId', sql.Int, userId)
             .input('accessToken', sql.NVarChar, azureTokens.accessToken)
-            .input('refreshToken', sql.NVarChar, azureTokens.refreshToken || null)
             .input('expiresAt', sql.DateTime, expiresAt)
             .query(`
                 INSERT INTO Sessions (
-                    session_token, user_id, azure_access_token,
-                    azure_refresh_token, expires_at
+                    SessionId, UserId, Token, ExpiresAt
                 )
                 OUTPUT INSERTED.*
                 VALUES (
-                    @sessionToken, @userId, @accessToken,
-                    @refreshToken, @expiresAt
+                    @sessionToken, @userId, @accessToken, @expiresAt
                 )
             `);
         
@@ -51,33 +48,27 @@ class SessionManager {
             .input('sessionToken', sql.NVarChar, sessionToken)
             .query(`
                 SELECT 
-                    s.id AS session_id,
-                    s.session_token,
-                    s.user_id,
-                    s.azure_access_token,
-                    s.azure_refresh_token,
-                    s.expires_at,
-                    s.created_at AS session_created_at,
-                    s.last_activity,
-                    u.id AS user_db_id,
-                    u.azure_user_id,
-                    u.email,
-                    u.display_name,
-                    u.photo_url,
-                    u.job_title,
-                    u.department,
-                    u.role,
-                    u.assigned_stores,
-                    u.assigned_department,
-                    u.is_active,
-                    u.is_approved,
-                    u.created_at AS user_created_at,
-                    u.last_login
+                    s.Id AS session_id,
+                    s.SessionId AS session_token,
+                    s.UserId AS user_id,
+                    s.Token AS azure_access_token,
+                    s.ExpiresAt AS expires_at,
+                    s.CreatedAt AS session_created_at,
+                    u.Id AS user_db_id,
+                    u.AzureOid AS azure_user_id,
+                    u.Email AS email,
+                    u.DisplayName AS display_name,
+                    r.RoleName AS role,
+                    u.IsActive AS is_active,
+                    u.IsApproved AS is_approved,
+                    u.CreatedAt AS user_created_at,
+                    u.LastLoginAt AS last_login
                 FROM Sessions s
-                INNER JOIN Users u ON s.user_id = u.id
-                WHERE s.session_token = @sessionToken
-                AND s.expires_at > GETDATE()
-                AND u.is_active = 1
+                INNER JOIN Users u ON s.UserId = u.Id
+                LEFT JOIN UserRoles r ON u.RoleId = r.Id
+                WHERE s.SessionId = @sessionToken
+                AND s.ExpiresAt > GETDATE()
+                AND u.IsActive = 1
             `);
         
         return result.recordset[0] || null;
@@ -89,13 +80,8 @@ class SessionManager {
     static async updateActivity(sessionToken) {
         const pool = await sql.connect(config.database);
         
-        await pool.request()
-            .input('sessionToken', sql.NVarChar, sessionToken)
-            .query(`
-                UPDATE Sessions
-                SET last_activity = GETDATE()
-                WHERE session_token = @sessionToken
-            `);
+        // Sessions table doesn't have last_activity column, skip this update
+        // Can be added later if needed
     }
     
     /**
@@ -106,7 +92,7 @@ class SessionManager {
         
         await pool.request()
             .input('sessionToken', sql.NVarChar, sessionToken)
-            .query('DELETE FROM Sessions WHERE session_token = @sessionToken');
+            .query('DELETE FROM Sessions WHERE SessionId = @sessionToken');
         
         console.log('✅ Session deleted');
     }
@@ -118,7 +104,7 @@ class SessionManager {
         const pool = await sql.connect(config.database);
         
         const result = await pool.request()
-            .query('DELETE FROM Sessions WHERE expires_at < GETDATE()');
+            .query('DELETE FROM Sessions WHERE ExpiresAt < GETDATE()');
         
         const count = result.rowsAffected[0];
         if (count > 0) {

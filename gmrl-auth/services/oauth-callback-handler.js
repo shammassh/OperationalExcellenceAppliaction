@@ -67,8 +67,8 @@ class OAuthCallbackHandler {
             // Store returnUrl in res.locals for redirection
             res.locals.returnUrl = returnUrl;
             
-            // Set session cookie
-            res.cookie('auth_token', session.session_token, {
+            // Set session cookie (SessionId is the column name in the database)
+            res.cookie('auth_token', session.SessionId, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
                 maxAge: 24 * 60 * 60 * 1000 // 24 hours
@@ -232,17 +232,14 @@ class OAuthCallbackHandler {
             .input('sessionToken', sql.NVarChar, sessionToken)
             .input('userId', sql.Int, user.id)
             .input('accessToken', sql.NVarChar, tokenResponse.accessToken)
-            .input('refreshToken', sql.NVarChar, tokenResponse.refreshToken || null)
             .input('expiresAt', sql.DateTime, expiresAt)
             .query(`
                 INSERT INTO Sessions (
-                    session_token, user_id, azure_access_token,
-                    azure_refresh_token, expires_at
+                    SessionId, UserId, Token, ExpiresAt
                 )
                 OUTPUT INSERTED.*
                 VALUES (
-                    @sessionToken, @userId, @accessToken,
-                    @refreshToken, @expiresAt
+                    @sessionToken, @userId, @accessToken, @expiresAt
                 )
             `);
         

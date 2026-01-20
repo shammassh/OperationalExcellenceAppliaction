@@ -8,9 +8,13 @@ const router = express.Router();
 
 // Import sub-modules
 const theftDashboard = require('./theft-dashboard');
+const systemSettings = require('./system-settings');
+const extraCleaningReview = require('./extra-cleaning-review');
 
 // Mount sub-routes
 router.use('/theft-dashboard', theftDashboard);
+router.use('/system-settings', systemSettings);
+router.use('/extra-cleaning-review', extraCleaningReview);
 
 // Landing page
 router.get('/', (req, res) => {
@@ -167,6 +171,54 @@ router.get('/', (req, res) => {
                 </div>
                 
                 <div class="cards-grid">
+                    <!-- Extra Cleaning Review -->
+                    <a href="/operational-excellence/extra-cleaning-review" class="card" style="border-left: 4px solid #17a2b8;">
+                        <div class="card-icon">🧹</div>
+                        <div class="card-title">Extra Cleaning Review</div>
+                        <div class="card-desc">
+                            Review and approve extra cleaning agent requests from stores. 
+                            Track approvals and manage third-party cleaning services.
+                        </div>
+                        <div class="card-stats">
+                            <div class="stat">
+                                <div class="stat-value" id="cleaningPending" style="color: #ffc107;">-</div>
+                                <div class="stat-label">Pending</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" id="cleaningToday" style="color: #17a2b8;">-</div>
+                                <div class="stat-label">Today</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" id="cleaningMonth" style="color: #28a745;">-</div>
+                                <div class="stat-label">This Month</div>
+                            </div>
+                        </div>
+                    </a>
+                    
+                    <!-- System Settings -->
+                    <a href="/operational-excellence/system-settings" class="card" style="border-left: 4px solid #667eea;">
+                        <div class="card-icon">⚙️</div>
+                        <div class="card-title">System Settings</div>
+                        <div class="card-desc">
+                            Manage global settings: Stores, Cleaning Categories, and Third Party Providers 
+                            used across all modules.
+                        </div>
+                        <div class="card-stats">
+                            <div class="stat">
+                                <div class="stat-value" style="color: #667eea;">🏪</div>
+                                <div class="stat-label">Stores</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" style="color: #667eea;">📁</div>
+                                <div class="stat-label">Categories</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" style="color: #667eea;">🏢</div>
+                                <div class="stat-label">Providers</div>
+                            </div>
+                        </div>
+                    </a>
+                    
                     <!-- Theft Incident Dashboard -->
                     <a href="/operational-excellence/theft-dashboard" class="card theft">
                         <div class="card-icon">🚨</div>
@@ -235,7 +287,19 @@ router.get('/', (req, res) => {
                         document.getElementById('monthCount').textContent = data.month || 0;
                     })
                     .catch(err => {
-                        console.error('Error loading stats:', err);
+                        console.error('Error loading theft stats:', err);
+                    });
+                
+                // Load stats for extra cleaning review card
+                fetch('/operational-excellence/extra-cleaning-review/api/stats')
+                    .then(r => r.json())
+                    .then(data => {
+                        document.getElementById('cleaningPending').textContent = data.pending || 0;
+                        document.getElementById('cleaningToday').textContent = data.today || 0;
+                        document.getElementById('cleaningMonth').textContent = data.thisMonth || 0;
+                    })
+                    .catch(err => {
+                        console.error('Error loading cleaning stats:', err);
                     });
             </script>
         </body>

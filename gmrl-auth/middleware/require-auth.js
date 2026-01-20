@@ -47,15 +47,10 @@ async function requireAuth(req, res, next) {
             azureUserId: session.azure_user_id,
             email: session.email,
             displayName: session.display_name,
-            photoUrl: session.photo_url,
-            jobTitle: session.job_title,
-            department: session.department,
             role: session.role,
-            assignedStores: session.assigned_stores ? JSON.parse(session.assigned_stores) : [],
-            assignedDepartment: session.assigned_department,
             isActive: session.is_active,
             isApproved: session.is_approved,
-            accessToken: session.azure_access_token // Add user's Azure access token
+            accessToken: session.azure_access_token
         };
         
         req.sessionToken = sessionToken;
