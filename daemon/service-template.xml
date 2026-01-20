@@ -1,0 +1,42 @@
+﻿<!-- 
+  Windows Service Template
+  Replace placeholders: YOUR_APP_NAME, YOUR_APP_PATH
+  
+  To create service:
+  1. Copy WinSW.exe to your app folder as yourapp.exe
+  2. Copy this template as yourapp.xml
+  3. Run: yourapp.exe install
+  4. Run: yourapp.exe start
+-->
+<service>
+    <id>yourapp.exe</id>
+    <name>YOUR_APP_NAME</name>
+    <description>YOUR_APP_NAME Application</description>
+    <executable>C:\Program Files\nodejs\node.exe</executable>
+    <argument>--harmony</argument>
+    <argument>YOUR_APP_PATH\node_modules\node-windows\lib\wrapper.js</argument>
+    <argument>--file</argument>
+    <argument>YOUR_APP_PATH\app.js</argument>
+    <argument>--scriptoptions=</argument>
+    <argument>--log</argument>
+    <argument>YOUR_APP_NAME wrapper</argument>
+    <argument>--grow</argument>
+    <argument>0.25</argument>
+    <argument>--wait</argument>
+    <argument>1</argument>
+    <argument>--maxrestarts</argument>
+    <argument>3</argument>
+    <argument>--abortonerror</argument>
+    <argument>n</argument>
+    <argument>--stopparentfirst</argument>
+    <argument>undefined</argument>
+    <logmode>rotate</logmode>
+    <stoptimeout>30sec</stoptimeout>
+    <env name="NODE_ENV" value="production"/>
+    <serviceaccount>
+        <domain>PAPPS</domain>
+        <user>LocalSystem</user>
+        <password></password>
+    </serviceaccount>
+    <workingdirectory>YOUR_APP_PATH</workingdirectory>
+</service>

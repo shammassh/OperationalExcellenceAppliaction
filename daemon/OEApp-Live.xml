@@ -1,0 +1,55 @@
+<!-- 
+  Operational Excellence App - LIVE/Production Windows Service
+  URL: https://oeapp.gmrlapps.com
+  
+  Setup Instructions:
+  1. Copy WinSW.exe to this folder as OEApp-Live.exe
+  2. Run as Administrator: OEApp-Live.exe install
+  3. Run: OEApp-Live.exe start
+  
+  Commands:
+    OEApp-Live.exe install   - Install the service
+    OEApp-Live.exe uninstall - Remove the service
+    OEApp-Live.exe start     - Start the service
+    OEApp-Live.exe stop      - Stop the service
+    OEApp-Live.exe restart   - Restart the service
+    OEApp-Live.exe status    - Check service status
+-->
+<service>
+    <id>OEApp-Live</id>
+    <name>Operational Excellence App</name>
+    <description>Operational Excellence Application - Production (https://oeapp.gmrlapps.com)</description>
+    <executable>C:\Program Files\nodejs\node.exe</executable>
+    <argument>--harmony</argument>
+    <argument>F:\Operational Excellence Appliaction\node_modules\node-windows\lib\wrapper.js</argument>
+    <argument>--file</argument>
+    <argument>F:\Operational Excellence Appliaction\app.js</argument>
+    <argument>--scriptoptions=</argument>
+    <argument>--log</argument>
+    <argument>OEApp-Live wrapper</argument>
+    <argument>--grow</argument>
+    <argument>0.25</argument>
+    <argument>--wait</argument>
+    <argument>1</argument>
+    <argument>--maxrestarts</argument>
+    <argument>3</argument>
+    <argument>--abortonerror</argument>
+    <argument>n</argument>
+    <argument>--stopparentfirst</argument>
+    <argument>undefined</argument>
+    <logpath>F:\Operational Excellence Appliaction\logs</logpath>
+    <logmode>rotate</logmode>
+    <stoptimeout>30sec</stoptimeout>
+    <env name="NODE_ENV" value="production"/>
+    <env name="PORT" value="3011"/>
+    <env name="APP_NAME" value="Operational Excellence App"/>
+    <env name="APP_URL" value="https://oeapp.gmrlapps.com"/>
+    <env name="REDIRECT_URI" value="https://oeapp.gmrlapps.com/auth/callback"/>
+    <env name="SQL_DATABASE" value="OEApp_Live"/>
+    <serviceaccount>
+        <domain>PAPPS</domain>
+        <user>LocalSystem</user>
+        <password></password>
+    </serviceaccount>
+    <workingdirectory>F:\Operational Excellence Appliaction</workingdirectory>
+</service>

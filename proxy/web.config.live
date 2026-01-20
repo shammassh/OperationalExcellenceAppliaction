@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  IIS Reverse Proxy Configuration for Operational Excellence App - LIVE
+  
+  This web.config should be placed in the IIS site root folder.
+  
+  Prerequisites:
+  1. Install URL Rewrite Module: https://www.iis.net/downloads/microsoft/url-rewrite
+  2. Install Application Request Routing (ARR)
+  3. Enable ARR proxy in IIS Manager
+  
+  Site Bindings:
+  - Live: https://oeapp.gmrlapps.com -> localhost:3011
+-->
+<configuration>
+    <system.webServer>
+        <rewrite>
+            <rules>
+                <rule name="ReverseProxyToNode" stopProcessing="true">
+                    <match url="(.*)" />
+                    <conditions>
+                        <add input="{CACHE_URL}" pattern="^(https?)://" />
+                    </conditions>
+                    <action type="Rewrite" url="{C:1}://localhost:3011/{R:1}" />
+                    <serverVariables>
+                        <set name="HTTP_X_FORWARDED_HOST" value="{HTTP_HOST}" />
+                        <set name="HTTP_X_FORWARDED_PROTO" value="{C:1}" />
+                        <set name="HTTP_X_ORIGINAL_URL" value="{REQUEST_URI}" />
+                    </serverVariables>
+                </rule>
+            </rules>
+        </rewrite>
+        
+        <httpProtocol>
+            <customHeaders>
+                <add name="X-Content-Type-Options" value="nosniff" />
+                <add name="X-Frame-Options" value="SAMEORIGIN" />
+                <add name="X-XSS-Protection" value="1; mode=block" />
+            </customHeaders>
+        </httpProtocol>
+        
+        <security>
+            <requestFiltering>
+                <requestLimits maxAllowedContentLength="104857600" />
+            </requestFiltering>
+        </security>
+    </system.webServer>
+</configuration>

@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management - FS Monitoring</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .back-btn {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+        }
+
+        .page-title {
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 500;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .card-header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .sync-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .sync-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .sync-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .sync-btn.syncing svg {
+            animation: spin 1s linear infinite;
+        }
+        
+        .sync-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .sync-btn.sharepoint {
+            background: rgba(0, 120, 212, 0.3);
+            border-color: rgba(0, 120, 212, 0.6);
+        }
+        
+        .sync-btn.sharepoint:hover {
+            background: rgba(0, 120, 212, 0.5);
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .card-body {
+            padding: 2rem;
+        }
+
+        .search-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 0.75rem 1rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .filter-select {
+            padding: 0.75rem 1rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            min-width: 150px;
+            cursor: pointer;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .user-name {
+            font-weight: 500;
+        }
+
+        .user-email {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .role-select {
+            padding: 0.5rem 1rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            background: white;
+            min-width: 130px;
+        }
+
+        .role-select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .action-btn {
+            padding: 0.4rem 0.8rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-activate {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-activate:hover {
+            background: #218838;
+        }
+
+        .btn-deactivate {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-deactivate:hover {
+            background: #c82333;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e0e0e0;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 1rem 1.5rem;
+            border-radius: 10px;
+            color: white;
+            font-weight: 500;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success {
+            background: #28a745;
+        }
+
+        .toast.error {
+            background: #dc3545;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 1rem;
+            border-radius: 10px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .stat-card.clickable {
+            cursor: pointer;
+        }
+
+        .stat-card.clickable:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .stat-card.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .stat-card.active .stat-value,
+        .stat-card.active .stat-label {
+            color: white;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        @media (max-width: 768px) {
+            .card-header {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .search-bar {
+                flex-direction: column;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            th, td {
+                padding: 0.75rem;
+                font-size: 0.9rem;
+            }
+
+            .user-avatar {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <a href="/dashboard" class="back-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                Back
+            </a>
+            <span class="logo">🍽️ FS Monitoring</span>
+        </div>
+        <span class="page-title">User Management</span>
+    </header>
+
+    <div class="container">
+        <div class="card">
+            <div class="card-header">
+                <h1>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                    User Management
+                </h1>
+                <div class="sync-buttons">
+                    <button class="sync-btn sharepoint" id="sync-sp-btn" onclick="syncFromSharePoint()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 4v6h-6"/>
+                            <path d="M1 20v-6h6"/>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                        </svg>
+                        Sync SharePoint
+                    </button>
+                    <button class="sync-btn" id="sync-btn" onclick="syncFromAzureAD()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 4v6h-6"/>
+                            <path d="M1 20v-6h6"/>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                        </svg>
+                        Sync Azure AD
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="stats" id="stats">
+                    <div class="stat-card clickable" onclick="filterByCard('all')" data-filter="all">
+                        <div class="stat-value" id="stat-total">-</div>
+                        <div class="stat-label">Total Users</div>
+                    </div>
+                    <div class="stat-card clickable" onclick="filterByCard('SuperAuditor')" data-filter="SuperAuditor">
+                        <div class="stat-value" id="stat-superauditor">-</div>
+                        <div class="stat-label">Super Auditors</div>
+                    </div>
+                    <div class="stat-card clickable" onclick="filterByCard('Admin')" data-filter="Admin">
+                        <div class="stat-value" id="stat-admin">-</div>
+                        <div class="stat-label">Admins</div>
+                    </div>
+                    <div class="stat-card clickable" onclick="filterByCard('Auditor')" data-filter="Auditor">
+                        <div class="stat-value" id="stat-auditor">-</div>
+                        <div class="stat-label">Auditors</div>
+                    </div>
+                    <div class="stat-card clickable" onclick="filterByCard('Pending')" data-filter="Pending">
+                        <div class="stat-value" id="stat-pending">-</div>
+                        <div class="stat-label">Pending</div>
+                    </div>
+                    <div class="stat-card clickable" onclick="filterByCard('active')" data-filter="active">
+                        <div class="stat-value" id="stat-active">-</div>
+                        <div class="stat-label">Active</div>
+                    </div>
+                    <div class="stat-card clickable" onclick="filterByCard('inactive')" data-filter="inactive">
+                        <div class="stat-value" id="stat-inactive">-</div>
+                        <div class="stat-label">Inactive</div>
+                    </div>
+                </div>
+
+                <div class="search-bar">
+                    <input type="text" class="search-input" id="search-input" placeholder="Search by name or email...">
+                    <select class="filter-select" id="role-filter">
+                        <option value="">All Roles</option>
+                        <option value="SuperAuditor">Super Auditor</option>
+                        <option value="Admin">Admin</option>
+                        <option value="Auditor">Auditor</option>
+                        <option value="Pending">Pending</option>
+                    </select>
+                    <select class="filter-select" id="status-filter">
+                        <option value="">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Last Login</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table">
+                            <tr>
+                                <td colspan="5">
+                                    <div class="loading">
+                                        <div class="loading-spinner"></div>
+                                        Loading users...
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        let allUsers = [];
+        let filteredUsers = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadUsers();
+            
+            document.getElementById('search-input').addEventListener('input', filterUsers);
+            document.getElementById('role-filter').addEventListener('change', filterUsers);
+            document.getElementById('status-filter').addEventListener('change', filterUsers);
+        });
+
+        async function loadUsers() {
+            try {
+                const res = await fetch('/api/admin/users');
+                if (!res.ok) throw new Error('Failed to load users');
+                
+                const data = await res.json();
+                allUsers = data.users || [];
+                filteredUsers = [...allUsers];
+                
+                updateStats();
+                renderUsers();
+            } catch (error) {
+                console.error('Error loading users:', error);
+                document.getElementById('users-table').innerHTML = `
+                    <tr>
+                        <td colspan="5">
+                            <div class="empty-state">
+                                <p>Failed to load users. Please try again.</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        function updateStats() {
+            const stats = {
+                total: allUsers.length,
+                superauditor: allUsers.filter(u => u.role === 'SuperAuditor').length,
+                admin: allUsers.filter(u => u.role === 'Admin').length,
+                auditor: allUsers.filter(u => u.role === 'Auditor').length,
+                pending: allUsers.filter(u => u.role === 'Pending' || !u.role).length,
+                active: allUsers.filter(u => u.is_active).length,
+                inactive: allUsers.filter(u => !u.is_active).length
+            };
+
+            document.getElementById('stat-total').textContent = stats.total;
+            document.getElementById('stat-superauditor').textContent = stats.superauditor;
+            document.getElementById('stat-admin').textContent = stats.admin;
+            document.getElementById('stat-auditor').textContent = stats.auditor;
+            document.getElementById('stat-pending').textContent = stats.pending;
+            document.getElementById('stat-active').textContent = stats.active;
+            document.getElementById('stat-inactive').textContent = stats.inactive;
+        }
+
+        function filterByCard(filter) {
+            // Remove active class from all cards
+            document.querySelectorAll('.stat-card').forEach(card => card.classList.remove('active'));
+            
+            // Add active class to clicked card
+            const clickedCard = document.querySelector(`.stat-card[data-filter="${filter}"]`);
+            if (clickedCard) clickedCard.classList.add('active');
+            
+            // Reset dropdown filters
+            document.getElementById('role-filter').value = '';
+            document.getElementById('status-filter').value = '';
+            document.getElementById('search-input').value = '';
+            
+            // Apply filter
+            if (filter === 'all') {
+                filteredUsers = [...allUsers];
+            } else if (filter === 'active') {
+                filteredUsers = allUsers.filter(u => u.is_active);
+            } else if (filter === 'inactive') {
+                filteredUsers = allUsers.filter(u => !u.is_active);
+            } else if (filter === 'Pending') {
+                filteredUsers = allUsers.filter(u => u.role === 'Pending' || !u.role);
+            } else {
+                // Filter by role (Admin, Auditor, SuperAuditor)
+                filteredUsers = allUsers.filter(u => u.role === filter);
+            }
+            
+            renderUsers();
+        }
+
+        function filterUsers() {
+            // Remove active class from cards when using manual filters
+            document.querySelectorAll('.stat-card').forEach(card => card.classList.remove('active'));
+            
+            const search = document.getElementById('search-input').value.toLowerCase();
+            const roleFilter = document.getElementById('role-filter').value;
+            const statusFilter = document.getElementById('status-filter').value;
+
+            filteredUsers = allUsers.filter(user => {
+                const matchesSearch = !search || 
+                    (user.display_name || '').toLowerCase().includes(search) ||
+                    (user.email || '').toLowerCase().includes(search);
+                
+                const matchesRole = !roleFilter || user.role === roleFilter || 
+                    (roleFilter === 'Pending' && (!user.role || user.role === 'Pending'));
+                
+                const matchesStatus = !statusFilter || 
+                    (statusFilter === 'active' && user.is_active) ||
+                    (statusFilter === 'inactive' && !user.is_active);
+                
+                return matchesSearch && matchesRole && matchesStatus;
+            });
+
+            renderUsers();
+        }
+
+        function renderUsers() {
+            const tbody = document.getElementById('users-table');
+
+            if (filteredUsers.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5">
+                            <div class="empty-state">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <line x1="12" y1="8" x2="12" y2="12"/>
+                                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                                </svg>
+                                <p>No users found</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = filteredUsers.map(user => `
+                <tr>
+                    <td>
+                        <div class="user-info">
+                            <div class="user-avatar">${(user.display_name || user.email || 'U').charAt(0).toUpperCase()}</div>
+                            <div>
+                                <div class="user-name">${user.display_name || 'Unknown'}</div>
+                                <div class="user-email">${user.email || ''}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <select class="role-select" onchange="updateUserRole(${user.id}, this.value)">
+                            <option value="Pending" ${user.role === 'Pending' || !user.role ? 'selected' : ''}>Pending</option>
+                            <option value="Auditor" ${user.role === 'Auditor' ? 'selected' : ''}>Auditor</option>
+                            <option value="Admin" ${user.role === 'Admin' ? 'selected' : ''}>Admin</option>
+                            <option value="SuperAuditor" ${user.role === 'SuperAuditor' ? 'selected' : ''}>Super Auditor</option>
+                        </select>
+                    </td>
+                    <td>
+                        <span class="status-badge status-${user.is_active ? 'active' : (user.is_approved ? 'inactive' : 'pending')}">
+                            ${user.is_active ? '✓ Active' : (user.is_approved ? '✕ Inactive' : '⏳ Pending')}
+                        </span>
+                    </td>
+                    <td>${user.last_login ? formatDate(user.last_login) : 'Never'}</td>
+                    <td>
+                        ${user.is_active 
+                            ? `<button class="action-btn btn-deactivate" onclick="updateUserStatus(${user.id}, false)">Deactivate</button>`
+                            : `<button class="action-btn btn-activate" onclick="updateUserStatus(${user.id}, true)">Activate</button>`
+                        }
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return 'Never';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        async function updateUserRole(userId, newRole) {
+            try {
+                const res = await fetch(`/api/admin/users/${userId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ role: newRole })
+                });
+
+                if (!res.ok) throw new Error('Failed to update role');
+
+                showToast('Role updated successfully', 'success');
+                
+                // Update local data
+                const user = allUsers.find(u => u.id === userId);
+                if (user) user.role = newRole;
+                updateStats();
+            } catch (error) {
+                console.error('Error updating role:', error);
+                showToast('Failed to update role', 'error');
+                loadUsers(); // Reload to reset state
+            }
+        }
+
+        async function updateUserStatus(userId, isActive) {
+            try {
+                const res = await fetch(`/api/admin/users/${userId}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ is_active: isActive })
+                });
+
+                if (!res.ok) throw new Error('Failed to update status');
+
+                showToast('Status updated successfully', 'success');
+                loadUsers(); // Reload to refresh the table
+            } catch (error) {
+                console.error('Error updating status:', error);
+                showToast('Failed to update status', 'error');
+            }
+        }
+
+        async function syncFromSharePoint() {
+            const btn = document.getElementById('sync-sp-btn');
+            btn.disabled = true;
+            btn.classList.add('syncing');
+            btn.innerHTML = `
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 4v6h-6"/>
+                    <path d="M1 20v-6h6"/>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+                Syncing...
+            `;
+
+            try {
+                const res = await fetch('/api/admin/sync-sharepoint', {
+                    method: 'POST'
+                });
+
+                const data = await res.json();
+                
+                if (!res.ok) {
+                    throw new Error(data.error || 'Failed to sync users from SharePoint');
+                }
+
+                const count = (data.newUsers || 0) + (data.updatedUsers || 0);
+                if (count === 0) {
+                    showToast(data.message || 'No users found in SharePoint site.', 'error');
+                } else {
+                    showToast(`Synced ${count} users from SharePoint (${data.newUsers || 0} new, ${data.updatedUsers || 0} updated)`, 'success');
+                }
+                loadUsers(); // Reload the user list
+            } catch (error) {
+                console.error('Error syncing from SharePoint:', error);
+                showToast('Error: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('syncing');
+                btn.innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 4v6h-6"/>
+                        <path d="M1 20v-6h6"/>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                    </svg>
+                    Sync SharePoint
+                `;
+            }
+        }
+
+        async function syncFromAzureAD() {
+            const btn = document.getElementById('sync-btn');
+            btn.disabled = true;
+            btn.classList.add('syncing');
+            btn.innerHTML = `
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 4v6h-6"/>
+                    <path d="M1 20v-6h6"/>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+                Syncing...
+            `;
+
+            try {
+                const res = await fetch('/api/admin/sync-graph', {
+                    method: 'POST'
+                });
+
+                const data = await res.json();
+                
+                if (!res.ok) {
+                    throw new Error(data.error || 'Failed to sync users');
+                }
+
+                const count = (data.newUsers || 0) + (data.updatedUsers || 0);
+                if (count === 0) {
+                    showToast('No new users found in Azure AD. Make sure User.Read.All permission is granted.', 'error');
+                } else {
+                    showToast(`Synced ${count} users from Azure AD (${data.newUsers || 0} new, ${data.updatedUsers || 0} updated)`, 'success');
+                }
+                loadUsers(); // Reload the user list
+            } catch (error) {
+                console.error('Error syncing from Azure AD:', error);
+                showToast('Error: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('syncing');
+                btn.innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 4v6h-6"/>
+                        <path d="M1 20v-6h6"/>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                    </svg>
+                    Sync from Azure AD
+                `;
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type} show`;
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
