@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const sql = require('mssql');
+const emailService = require('../../../services/email-service');
 
 // Database configuration
 const dbConfig = {
@@ -18,6 +19,68 @@ const dbConfig = {
         trustServerCertificate: process.env.SQL_TRUST_CERT === 'true'
     }
 };
+
+/**
+ * Build dynamic approval chain based on category and rules
+ * Default flow: Area Manager → Head of Operations → OE Dashboard
+ * If category contains "Happy" → SKIP Area Manager
+ * If category = "Helper" → ADD HR at the end
+ */
+async function buildApprovalChain(pool, category) {
+    // Get approval settings (emails)
+    const settingsResult = await pool.request()
+        .query(`SELECT SettingKey, SettingValue FROM ApprovalSettings WHERE Module = 'ExtraCleaning'`);
+    
+    const settings = {};
+    settingsResult.recordset.forEach(s => {
+        settings[s.SettingKey] = s.SettingValue;
+    });
+    
+    // Get active approval rules for Extra Cleaning
+    const rulesResult = await pool.request()
+        .query(`SELECT * FROM ApprovalRules WHERE Module = 'ExtraCleaning' AND IsActive = 1 ORDER BY Priority`);
+    
+    const rules = rulesResult.recordset;
+    
+    // Default approval chain: AM → HO
+    let chain = [
+        { role: 'AreaManager', email: settings.AREA_MANAGER_EMAIL || '' },
+        { role: 'HeadOfOperations', email: settings.HEAD_OF_OPERATIONS_EMAIL || '' }
+    ];
+    
+    // Apply rules based on category
+    for (const rule of rules) {
+        let matches = false;
+        
+        // Check if rule condition matches
+        if (rule.TriggerField === 'Category') {
+            if (rule.TriggerOperator === 'contains') {
+                matches = category && category.toLowerCase().includes(rule.TriggerValue.toLowerCase());
+            } else if (rule.TriggerOperator === 'equals') {
+                matches = category && category.toLowerCase() === rule.TriggerValue.toLowerCase();
+            }
+        }
+        
+        if (matches) {
+            if (rule.ActionType === 'skip') {
+                // Remove the target approver from chain
+                chain = chain.filter(a => a.role !== rule.TargetApprover);
+            } else if (rule.ActionType === 'add') {
+                // Add the target approver at the end (before OE Dashboard)
+                const approverEmail = rule.TargetApprover === 'HR' 
+                    ? settings.HR_MANAGER_EMAIL 
+                    : settings[rule.TargetApprover.toUpperCase() + '_EMAIL'] || '';
+                    
+                chain.push({ role: rule.TargetApprover, email: approverEmail });
+            }
+        }
+    }
+    
+    // Filter out approvers with no email configured
+    chain = chain.filter(a => a.email && a.email.trim() !== '');
+    
+    return chain;
+}
 
 // Main form page
 router.get('/', async (req, res) => {
@@ -489,6 +552,11 @@ router.post('/submit', async (req, res) => {
         // Debug: log current user info
         console.log('📋 Submit request - Current user:', JSON.stringify(req.currentUser));
         console.log('📋 User ID:', req.currentUser?.userId);
+        console.log('📋 Category:', req.body.category);
+        
+        // Build the dynamic approval chain based on category
+        const approvalChain = await buildApprovalChain(pool, req.body.category);
+        console.log('📋 Approval Chain:', JSON.stringify(approvalChain));
         
         // Format time values (HTML time input gives HH:MM, SQL needs HH:MM:SS)
         const formatTime = (timeStr) => {
@@ -498,6 +566,13 @@ router.post('/submit', async (req, res) => {
                 ? timeStr + ':00' 
                 : timeStr;
         };
+        
+        // Serialize approval chain for storage
+        const approvalChainJson = JSON.stringify(approvalChain);
+        const firstApprover = approvalChain.length > 0 ? approvalChain[0] : null;
+        
+        // Determine initial status based on chain
+        const initialStatus = firstApprover ? 'PendingApproval' : 'FullyApproved';
         
         const result = await pool.request()
             .input('store', sql.NVarChar, req.body.store)
@@ -513,20 +588,69 @@ router.post('/submit', async (req, res) => {
             .input('endTimeFrom', sql.NVarChar, formatTime(req.body.endTimeFrom))
             .input('endTimeTo', sql.NVarChar, formatTime(req.body.endTimeTo))
             .input('createdBy', sql.Int, req.currentUser.userId)
+            .input('createdByEmail', sql.NVarChar, req.currentUser?.email || null)
+            .input('approvalChain', sql.NVarChar, approvalChainJson)
+            .input('currentStep', sql.Int, 0)
+            .input('currentApproverEmail', sql.NVarChar, firstApprover?.email || null)
+            .input('currentApproverRole', sql.NVarChar, firstApprover?.role || null)
+            .input('overallStatus', sql.NVarChar, initialStatus)
             .query(`
                 INSERT INTO ExtraCleaningRequests (
                     Store, Category, ThirdParty, NumberOfAgents, Description,
                     StartDate, StartTimeFrom, StartTimeTo, ShiftHours,
-                    EndDate, EndTimeFrom, EndTimeTo, CreatedBy
+                    EndDate, EndTimeFrom, EndTimeTo, CreatedBy, CreatedByEmail,
+                    ApprovalChain, CurrentApprovalStep, CurrentApproverEmail, CurrentApproverRole, OverallStatus
                 ) VALUES (
                     @store, @category, @thirdParty, @numberOfAgents, @description,
                     @startDate, @startTimeFrom, @startTimeTo, @shiftHours,
-                    @endDate, @endTimeFrom, @endTimeTo, @createdBy
+                    @endDate, @endTimeFrom, @endTimeTo, @createdBy, @createdByEmail,
+                    @approvalChain, @currentStep, @currentApproverEmail, @currentApproverRole, @overallStatus
                 );
                 SELECT SCOPE_IDENTITY() as Id;
             `);
         
         const requestId = result.recordset[0].Id;
+        
+        // Log the approval chain that will be used
+        console.log('✅ Request #' + requestId + ' created with approval chain:', approvalChain.map(a => a.role).join(' → '));
+        
+        // Send email to first approver
+        if (firstApprover && firstApprover.email) {
+            console.log('📧 Sending approval email to:', firstApprover.role, '-', firstApprover.email);
+            
+            // Determine the app URL based on environment
+            const appUrl = process.env.NODE_ENV === 'live' 
+                ? 'https://oeapp.gmrlapps.com' 
+                : 'https://oeapp-uat.gmrlapps.com';
+            
+            // Get request details for email
+            const requestDetails = {
+                Id: requestId,
+                Store: req.body.store,
+                Category: req.body.category,
+                SubmittedBy: req.session?.user?.displayName || req.session?.user?.email || 'Unknown',
+                DateRequired: req.body.start_date,
+                Description: req.body.description
+            };
+            
+            // Send email using user's access token (don't await - let it send in background)
+            emailService.sendApprovalRequestEmail({
+                approverEmail: firstApprover.email,
+                approverRole: firstApprover.role,
+                request: requestDetails,
+                appUrl: appUrl,
+                accessToken: req.currentUser?.accessToken
+            }).then(result => {
+                if (result.success) {
+                    console.log('📧 ✅ Approval email sent to', firstApprover.email);
+                } else {
+                    console.error('📧 ❌ Failed to send approval email:', result.error);
+                }
+            }).catch(err => {
+                console.error('📧 ❌ Email error:', err.message);
+            });
+        }
+        
         await pool.close();
         
         res.redirect(`/stores/extra-cleaning/success/${requestId}`);
@@ -542,40 +666,100 @@ router.post('/submit', async (req, res) => {
     }
 });
 
-// Success page
+// Success page - shows the dynamic approval chain for this request
 router.get('/success/:id', async (req, res) => {
-    res.send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Request Submitted - ${process.env.APP_NAME}</title>
-            <style>
-                body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f6fa; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-                .success-card { background: white; padding: 50px; border-radius: 16px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 500px; }
-                .success-icon { font-size: 64px; margin-bottom: 20px; }
-                h2 { color: #28a745; margin-bottom: 15px; }
-                p { color: #666; margin-bottom: 25px; }
-                .request-id { background: #e8f7f9; padding: 15px 30px; border-radius: 8px; font-size: 18px; font-weight: 600; color: #17a2b8; margin-bottom: 25px; display: inline-block; }
-                .btn { display: inline-block; padding: 12px 25px; border-radius: 8px; text-decoration: none; margin: 5px; }
-                .btn-primary { background: #17a2b8; color: white; }
-                .btn-secondary { background: #6c757d; color: white; }
-            </style>
-        </head>
-        <body>
-            <div class="success-card">
-                <div class="success-icon">✅</div>
-                <h2>Request Submitted Successfully!</h2>
-                <div class="request-id">Request #ECR-${req.params.id}</div>
-                <p>Your extra cleaning agents request has been submitted and is pending approval.</p>
-                <p style="font-size:14px;color:#888;">Approval workflow: Area Manager → Head Office → HR Manager</p>
-                <div style="margin-top:20px;">
-                    <a href="/stores/extra-cleaning" class="btn btn-primary">New Request</a>
-                    <a href="/stores/extra-cleaning/my-requests" class="btn btn-secondary">View My Requests</a>
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        // Get the request to show the approval chain
+        const requestResult = await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query(`SELECT ApprovalChain, Category FROM ExtraCleaningRequests WHERE Id = @id`);
+        
+        await pool.close();
+        
+        let approvalChainHtml = 'Area Manager → Head of Operations';
+        if (requestResult.recordset.length > 0 && requestResult.recordset[0].ApprovalChain) {
+            const chain = JSON.parse(requestResult.recordset[0].ApprovalChain);
+            approvalChainHtml = chain.map(a => {
+                const roleLabels = {
+                    'AreaManager': 'Area Manager',
+                    'HeadOfOperations': 'Head of Operations',
+                    'HR': 'HR Manager'
+                };
+                return roleLabels[a.role] || a.role;
+            }).join(' → ');
+            
+            if (approvalChainHtml) {
+                approvalChainHtml += ' → OE Dashboard';
+            }
+        }
+        
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Request Submitted - ${process.env.APP_NAME}</title>
+                <style>
+                    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f6fa; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+                    .success-card { background: white; padding: 50px; border-radius: 16px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 550px; }
+                    .success-icon { font-size: 64px; margin-bottom: 20px; }
+                    h2 { color: #28a745; margin-bottom: 15px; }
+                    p { color: #666; margin-bottom: 25px; }
+                    .request-id { background: #e8f7f9; padding: 15px 30px; border-radius: 8px; font-size: 18px; font-weight: 600; color: #17a2b8; margin-bottom: 25px; display: inline-block; }
+                    .approval-chain { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #17a2b8; text-align: left; }
+                    .approval-chain .label { font-weight: 600; color: #333; margin-bottom: 5px; }
+                    .approval-chain .flow { color: #667eea; font-weight: 500; }
+                    .btn { display: inline-block; padding: 12px 25px; border-radius: 8px; text-decoration: none; margin: 5px; }
+                    .btn-primary { background: #17a2b8; color: white; }
+                    .btn-secondary { background: #6c757d; color: white; }
+                </style>
+            </head>
+            <body>
+                <div class="success-card">
+                    <div class="success-icon">✅</div>
+                    <h2>Request Submitted Successfully!</h2>
+                    <div class="request-id">Request #ECR-${req.params.id}</div>
+                    <p>Your extra cleaning agents request has been submitted and is pending approval.</p>
+                    <div class="approval-chain">
+                        <div class="label">📋 Approval Workflow:</div>
+                        <div class="flow">${approvalChainHtml}</div>
+                    </div>
+                    <div style="margin-top:20px;">
+                        <a href="/stores/extra-cleaning" class="btn btn-primary">New Request</a>
+                        <a href="/stores/extra-cleaning/my-requests" class="btn btn-secondary">View My Requests</a>
+                    </div>
                 </div>
-            </div>
-        </body>
-        </html>
-    `);
+            </body>
+            </html>
+        `);
+    } catch (err) {
+        console.error('Error loading success page:', err);
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Request Submitted - ${process.env.APP_NAME}</title>
+                <style>
+                    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f6fa; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+                    .success-card { background: white; padding: 50px; border-radius: 16px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 500px; }
+                    .success-icon { font-size: 64px; margin-bottom: 20px; }
+                    h2 { color: #28a745; margin-bottom: 15px; }
+                    .btn { display: inline-block; padding: 12px 25px; border-radius: 8px; text-decoration: none; margin: 5px; }
+                    .btn-primary { background: #17a2b8; color: white; }
+                </style>
+            </head>
+            <body>
+                <div class="success-card">
+                    <div class="success-icon">✅</div>
+                    <h2>Request Submitted!</h2>
+                    <p>Request #ECR-${req.params.id} has been submitted.</p>
+                    <a href="/stores/extra-cleaning" class="btn btn-primary">New Request</a>
+                </div>
+            </body>
+            </html>
+        `);
+    }
 });
 
 // My Requests page
@@ -686,6 +870,497 @@ router.get('/my-requests', async (req, res) => {
     } catch (err) {
         console.error('Error loading requests:', err);
         res.status(500).send('Error loading requests');
+    }
+});
+
+// GET: Approval page from email link
+router.get('/approve/:id', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const requestId = parseInt(req.params.id);
+        const action = req.query.action; // 'approve' or 'reject' from email link
+        
+        // Get the request details
+        const result = await pool.request()
+            .input('id', sql.Int, requestId)
+            .query(`SELECT r.*, u.DisplayName as CreatedByName 
+                    FROM ExtraCleaningRequests r
+                    LEFT JOIN Users u ON r.CreatedBy = u.Id
+                    WHERE r.Id = @id`);
+        
+        await pool.close();
+        
+        if (result.recordset.length === 0) {
+            return res.status(404).send(`
+                <div style="text-align:center;padding:50px;font-family:Arial,sans-serif;">
+                    <h2 style="color:#dc3545;">❌ Request Not Found</h2>
+                    <p>The request you're looking for doesn't exist or has been deleted.</p>
+                </div>
+            `);
+        }
+        
+        const request = result.recordset[0];
+        const approvalChain = JSON.parse(request.ApprovalChain || '[]');
+        const currentApprover = approvalChain[request.CurrentApprovalStep] || {};
+        
+        // Check if already fully approved or rejected
+        if (request.OverallStatus === 'FullyApproved') {
+            return res.send(`
+                <div style="text-align:center;padding:50px;font-family:Arial,sans-serif;">
+                    <h2 style="color:#28a745;">✅ Already Approved</h2>
+                    <p>This request has already been fully approved.</p>
+                    <a href="/stores/extra-cleaning" style="color:#667eea;">← Back to Extra Cleaning</a>
+                </div>
+            `);
+        }
+        
+        if (request.OverallStatus === 'Rejected') {
+            return res.send(`
+                <div style="text-align:center;padding:50px;font-family:Arial,sans-serif;">
+                    <h2 style="color:#dc3545;">❌ Already Rejected</h2>
+                    <p>This request has already been rejected.</p>
+                    <a href="/stores/extra-cleaning" style="color:#667eea;">← Back to Extra Cleaning</a>
+                </div>
+            `);
+        }
+        
+        const roleNames = {
+            'AreaManager': 'Area Manager',
+            'HeadOfOperations': 'Head of Operations',
+            'HR': 'HR Manager'
+        };
+        
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Approve Request - Extra Cleaning</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                    * { box-sizing: border-box; }
+                    body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+                    .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden; }
+                    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; text-align: center; }
+                    .header h1 { margin: 0; font-size: 24px; }
+                    .header p { margin: 10px 0 0 0; opacity: 0.9; }
+                    .content { padding: 25px; }
+                    .detail-row { display: flex; padding: 12px 0; border-bottom: 1px solid #eee; }
+                    .detail-label { font-weight: 600; width: 140px; color: #666; }
+                    .detail-value { flex: 1; }
+                    .status-badge { display: inline-block; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+                    .status-pending { background: #fff3cd; color: #856404; }
+                    .approval-section { margin-top: 25px; padding: 20px; background: #f8f9fa; border-radius: 8px; }
+                    .approval-section h3 { margin-top: 0; color: #333; }
+                    .form-group { margin-bottom: 15px; }
+                    .form-group label { display: block; margin-bottom: 5px; font-weight: 600; }
+                    .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; min-height: 80px; font-family: inherit; }
+                    .buttons { display: flex; gap: 10px; margin-top: 20px; }
+                    .btn { flex: 1; padding: 14px 20px; border: none; border-radius: 6px; font-size: 16px; font-weight: 600; cursor: pointer; text-align: center; }
+                    .btn-approve { background: #28a745; color: white; }
+                    .btn-approve:hover { background: #218838; }
+                    .btn-reject { background: #dc3545; color: white; }
+                    .btn-reject:hover { background: #c82333; }
+                    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+                    .chain { margin-top: 15px; padding: 15px; background: #e9ecef; border-radius: 6px; }
+                    .chain-step { display: inline-block; padding: 5px 10px; margin: 2px; border-radius: 4px; font-size: 12px; }
+                    .chain-done { background: #28a745; color: white; }
+                    .chain-current { background: #667eea; color: white; }
+                    .chain-pending { background: #ddd; color: #666; }
+                    .toast { position: fixed; top: 20px; right: 20px; padding: 15px 25px; border-radius: 6px; color: white; font-weight: 600; display: none; z-index: 1000; }
+                    .toast-success { background: #28a745; }
+                    .toast-error { background: #dc3545; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>🧹 Extra Cleaning Request</h1>
+                        <p>Pending your approval as ${roleNames[request.CurrentApproverRole] || request.CurrentApproverRole}</p>
+                    </div>
+                    <div class="content">
+                        <div class="detail-row">
+                            <span class="detail-label">Request ID:</span>
+                            <span class="detail-value">#${request.Id}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Store:</span>
+                            <span class="detail-value">${request.Store || 'N/A'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Category:</span>
+                            <span class="detail-value">${request.Category || 'N/A'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Third Party:</span>
+                            <span class="detail-value">${request.ThirdParty || 'N/A'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">No. of Agents:</span>
+                            <span class="detail-value">${request.NumberOfAgents || 'N/A'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Start Date:</span>
+                            <span class="detail-value">${request.StartDate ? new Date(request.StartDate).toLocaleDateString() : 'N/A'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">End Date:</span>
+                            <span class="detail-value">${request.EndDate ? new Date(request.EndDate).toLocaleDateString() : 'N/A'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Requested By:</span>
+                            <span class="detail-value">${request.CreatedByName || 'Unknown'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Description:</span>
+                            <span class="detail-value">${request.Description || 'No description provided'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Status:</span>
+                            <span class="detail-value"><span class="status-badge status-pending">⏳ Pending Approval</span></span>
+                        </div>
+                        
+                        <div class="chain">
+                            <strong>Approval Chain:</strong><br>
+                            ${approvalChain.map((step, idx) => {
+                                let cls = 'chain-pending';
+                                if (idx < request.CurrentApprovalStep) cls = 'chain-done';
+                                else if (idx === request.CurrentApprovalStep) cls = 'chain-current';
+                                return '<span class="chain-step ' + cls + '">' + (roleNames[step.role] || step.role) + '</span>';
+                            }).join(' → ')}
+                        </div>
+                        
+                        <div class="approval-section">
+                            <h3>Your Decision</h3>
+                            <div class="form-group">
+                                <label for="comments">Comments (optional):</label>
+                                <textarea id="comments" placeholder="Add any comments about your decision..."></textarea>
+                            </div>
+                            <div class="buttons">
+                                <button class="btn btn-approve" onclick="submitApproval('approve')">✅ Approve</button>
+                                <button class="btn btn-reject" onclick="submitApproval('reject')">❌ Reject</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="toast" class="toast"></div>
+                
+                <script>
+                    function showToast(message, type) {
+                        const toast = document.getElementById('toast');
+                        toast.textContent = message;
+                        toast.className = 'toast toast-' + type;
+                        toast.style.display = 'block';
+                        setTimeout(() => { toast.style.display = 'none'; }, 3000);
+                    }
+                    
+                    async function submitApproval(action) {
+                        const comments = document.getElementById('comments').value;
+                        const buttons = document.querySelectorAll('.btn');
+                        buttons.forEach(b => b.disabled = true);
+                        
+                        try {
+                            const res = await fetch('/stores/extra-cleaning/api/approve/${requestId}', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action, comments })
+                            });
+                            
+                            const data = await res.json();
+                            
+                            if (res.ok && data.success) {
+                                showToast(data.message, 'success');
+                                setTimeout(() => {
+                                    window.location.href = '/stores/extra-cleaning/approval-success?action=' + action + '&status=' + data.status;
+                                }, 1500);
+                            } else {
+                                showToast(data.error || 'Failed to process', 'error');
+                                buttons.forEach(b => b.disabled = false);
+                            }
+                        } catch (err) {
+                            showToast('Error: ' + err.message, 'error');
+                            buttons.forEach(b => b.disabled = false);
+                        }
+                    }
+                    
+                    // Auto-show action if from email link
+                    ${action === 'approve' ? "document.querySelector('.btn-approve').style.animation = 'pulse 1s infinite';" : ''}
+                    ${action === 'reject' ? "document.querySelector('.btn-reject').style.animation = 'pulse 1s infinite';" : ''}
+                </script>
+            </body>
+            </html>
+        `);
+    } catch (err) {
+        console.error('Error loading approval page:', err);
+        res.status(500).send(`
+            <div style="text-align:center;padding:50px;font-family:Arial,sans-serif;">
+                <h2 style="color:#dc3545;">❌ Error</h2>
+                <p>${err.message}</p>
+            </div>
+        `);
+    }
+});
+
+// Success page after approval
+router.get('/approval-success', (req, res) => {
+    const action = req.query.action;
+    const status = req.query.status;
+    
+    const isApproved = action === 'approve';
+    const isFullyApproved = status === 'FullyApproved';
+    
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>${isApproved ? 'Approved' : 'Rejected'} - Extra Cleaning</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 50px 20px; background: #f5f5f5; text-align: center; }
+                .container { max-width: 500px; margin: 0 auto; background: white; border-radius: 10px; padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                .icon { font-size: 64px; margin-bottom: 20px; }
+                h1 { color: ${isApproved ? '#28a745' : '#dc3545'}; margin: 0 0 15px 0; }
+                p { color: #666; margin-bottom: 25px; }
+                .btn { display: inline-block; padding: 12px 30px; background: #667eea; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; }
+                .btn:hover { background: #5a6fd6; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="icon">${isApproved ? '✅' : '❌'}</div>
+                <h1>${isApproved ? (isFullyApproved ? 'Fully Approved!' : 'Approved!') : 'Rejected'}</h1>
+                <p>${isApproved 
+                    ? (isFullyApproved 
+                        ? 'The request has been fully approved and is now complete.' 
+                        : 'Your approval has been recorded. The request has been sent to the next approver.')
+                    : 'The request has been rejected and the requester has been notified.'
+                }</p>
+                <a href="/stores/extra-cleaning" class="btn">← Back to Extra Cleaning</a>
+            </div>
+        </body>
+        </html>
+    `);
+});
+
+// API: Approve/Reject request (called from approval email link or dashboard)
+router.post('/api/approve/:id', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const requestId = parseInt(req.params.id);
+        const { action, comments } = req.body; // action: 'approve' or 'reject'
+        const approverEmail = req.currentUser?.email || req.body.approverEmail;
+        const approverName = req.currentUser?.name || req.body.approverName || 'Unknown';
+        
+        // Get the current request
+        const requestResult = await pool.request()
+            .input('id', sql.Int, requestId)
+            .query(`SELECT * FROM ExtraCleaningRequests WHERE Id = @id`);
+        
+        if (requestResult.recordset.length === 0) {
+            await pool.close();
+            return res.status(404).json({ error: 'Request not found' });
+        }
+        
+        const request = requestResult.recordset[0];
+        const approvalChain = JSON.parse(request.ApprovalChain || '[]');
+        const currentStep = request.CurrentApprovalStep || 0;
+        
+        // Verify this is the current approver
+        if (request.CurrentApproverEmail?.toLowerCase() !== approverEmail?.toLowerCase()) {
+            await pool.close();
+            return res.status(403).json({ error: 'You are not the current approver for this request' });
+        }
+        
+        // Log the approval action in history
+        await pool.request()
+            .input('requestId', sql.Int, requestId)
+            .input('approverEmail', sql.NVarChar, approverEmail)
+            .input('approverRole', sql.NVarChar, request.CurrentApproverRole)
+            .input('approverName', sql.NVarChar, approverName)
+            .input('action', sql.NVarChar, action === 'approve' ? 'Approved' : 'Rejected')
+            .input('comments', sql.NVarChar, comments || null)
+            .input('stepNumber', sql.Int, currentStep)
+            .query(`INSERT INTO ExtraCleaningApprovalHistory 
+                    (RequestId, ApproverEmail, ApproverRole, ApproverName, Action, Comments, StepNumber)
+                    VALUES (@requestId, @approverEmail, @approverRole, @approverName, @action, @comments, @stepNumber)`);
+        
+        if (action === 'reject') {
+            // Request rejected - set status to Rejected
+            await pool.request()
+                .input('id', sql.Int, requestId)
+                .query(`UPDATE ExtraCleaningRequests SET 
+                        OverallStatus = 'Rejected',
+                        CurrentApproverEmail = NULL,
+                        CurrentApproverRole = NULL
+                        WHERE Id = @id`);
+            
+            await pool.close();
+            console.log('❌ Request #' + requestId + ' rejected by ' + approverName);
+            
+            // Send rejection notification to requester
+            const appUrl = process.env.NODE_ENV === 'live' 
+                ? 'https://oeapp.gmrlapps.com' 
+                : 'https://oeapp-uat.gmrlapps.com';
+            
+            if (request.CreatedByEmail) {
+                emailService.sendStatusNotificationEmail({
+                    requesterEmail: request.CreatedByEmail,
+                    request: request,
+                    status: 'rejected',
+                    approverRole: request.CurrentApproverRole,
+                    comments: comments,
+                    appUrl: appUrl
+                }).catch(err => console.error('📧 ❌ Failed to send rejection email:', err.message));
+            }
+            
+            return res.json({ success: true, message: 'Request rejected', status: 'Rejected' });
+        }
+        
+        // Request approved - move to next step
+        const nextStep = currentStep + 1;
+        
+        if (nextStep >= approvalChain.length) {
+            // All approvers have approved - mark as fully approved
+            await pool.request()
+                .input('id', sql.Int, requestId)
+                .query(`UPDATE ExtraCleaningRequests SET 
+                        OverallStatus = 'FullyApproved',
+                        CurrentApprovalStep = ${nextStep},
+                        CurrentApproverEmail = NULL,
+                        CurrentApproverRole = NULL
+                        WHERE Id = @id`);
+            
+            await pool.close();
+            console.log('✅ Request #' + requestId + ' FULLY APPROVED');
+            
+            // Send approval notification to requester
+            const appUrl = process.env.NODE_ENV === 'live' 
+                ? 'https://oeapp.gmrlapps.com' 
+                : 'https://oeapp-uat.gmrlapps.com';
+            
+            if (request.CreatedByEmail) {
+                emailService.sendStatusNotificationEmail({
+                    requesterEmail: request.CreatedByEmail,
+                    request: request,
+                    status: 'approved',
+                    approverRole: 'All Approvers',
+                    comments: 'Your request has been fully approved!',
+                    appUrl: appUrl
+                }).catch(err => console.error('📧 ❌ Failed to send approval notification:', err.message));
+            }
+            
+            return res.json({ success: true, message: 'Request fully approved!', status: 'FullyApproved' });
+        } else {
+            // Move to next approver
+            const nextApprover = approvalChain[nextStep];
+            
+            await pool.request()
+                .input('id', sql.Int, requestId)
+                .input('nextEmail', sql.NVarChar, nextApprover.email)
+                .input('nextRole', sql.NVarChar, nextApprover.role)
+                .query(`UPDATE ExtraCleaningRequests SET 
+                        CurrentApprovalStep = ${nextStep},
+                        CurrentApproverEmail = @nextEmail,
+                        CurrentApproverRole = @nextRole
+                        WHERE Id = @id`);
+            
+            // Send email to next approver
+            const appUrl = process.env.NODE_ENV === 'live' 
+                ? 'https://oeapp.gmrlapps.com' 
+                : 'https://oeapp-uat.gmrlapps.com';
+            
+            console.log('📧 Sending approval email to next approver:', nextApprover.role, '-', nextApprover.email);
+            
+            emailService.sendApprovalRequestEmail({
+                approverEmail: nextApprover.email,
+                approverRole: nextApprover.role,
+                request: request,
+                appUrl: appUrl
+            }).then(result => {
+                if (result.success) {
+                    console.log('📧 ✅ Next approver email sent to', nextApprover.email);
+                } else {
+                    console.error('📧 ❌ Failed to send next approver email:', result.error);
+                }
+            }).catch(err => console.error('📧 ❌ Email error:', err.message));
+            
+            await pool.close();
+            console.log('✅ Request #' + requestId + ' approved by ' + approverName + ', moving to ' + nextApprover.role);
+            return res.json({ 
+                success: true, 
+                message: 'Approved! Sent to ' + nextApprover.role, 
+                status: 'PendingApproval',
+                nextApprover: nextApprover.role
+            });
+        }
+    } catch (err) {
+        console.error('Error processing approval:', err);
+        res.status(500).json({ error: 'Failed to process approval' });
+    }
+});
+
+// API: Get request details with approval history
+router.get('/api/request/:id', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        // Get request details
+        const requestResult = await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query(`SELECT r.*, u.DisplayName as CreatedByName
+                    FROM ExtraCleaningRequests r
+                    LEFT JOIN Users u ON r.CreatedBy = u.Id
+                    WHERE r.Id = @id`);
+        
+        if (requestResult.recordset.length === 0) {
+            await pool.close();
+            return res.status(404).json({ error: 'Request not found' });
+        }
+        
+        // Get approval history
+        const historyResult = await pool.request()
+            .input('requestId', sql.Int, req.params.id)
+            .query(`SELECT * FROM ExtraCleaningApprovalHistory 
+                    WHERE RequestId = @requestId 
+                    ORDER BY StepNumber, ActionDate`);
+        
+        await pool.close();
+        
+        const request = requestResult.recordset[0];
+        request.approvalHistory = historyResult.recordset;
+        request.approvalChainParsed = JSON.parse(request.ApprovalChain || '[]');
+        
+        res.json(request);
+    } catch (err) {
+        console.error('Error loading request details:', err);
+        res.status(500).json({ error: 'Failed to load request details' });
+    }
+});
+
+// API: Get pending approvals for current user
+router.get('/api/pending-approvals', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const userEmail = req.currentUser?.email;
+        
+        if (!userEmail) {
+            await pool.close();
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
+        
+        const result = await pool.request()
+            .input('email', sql.NVarChar, userEmail)
+            .query(`SELECT r.*, u.DisplayName as CreatedByName
+                    FROM ExtraCleaningRequests r
+                    LEFT JOIN Users u ON r.CreatedBy = u.Id
+                    WHERE r.CurrentApproverEmail = @email AND r.OverallStatus = 'PendingApproval'
+                    ORDER BY r.CreatedAt DESC`);
+        
+        await pool.close();
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error loading pending approvals:', err);
+        res.status(500).json({ error: 'Failed to load pending approvals' });
     }
 });
 

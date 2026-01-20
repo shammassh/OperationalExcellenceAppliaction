@@ -6,7 +6,7 @@
 const path = require('path');
 
 // Load the correct .env file based on NODE_ENV
-const envFile = process.env.NODE_ENV === 'live' ? '.env.live' : '.env';
+const envFile = process.env.NODE_ENV === 'live' ? '.env.live' : '.env.uat';
 require('dotenv').config({ path: path.join(__dirname, envFile) });
 
 const express = require('express');
@@ -33,6 +33,12 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Initialize Authentication
 initializeAuth(app);
+
+// ==========================================
+// Public Email Approval Routes (no auth required)
+// ==========================================
+const publicApprovalRoutes = require('./routes/public-approval');
+app.use('/public/approve', publicApprovalRoutes);
 
 // Mount Modules
 app.use('/stores', requireAuth, storesModule);

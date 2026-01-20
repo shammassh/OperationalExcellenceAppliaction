@@ -18,15 +18,51 @@ const dbConfig = {
         trustServerCertificate: process.env.SQL_TRUST_CERT === 'true'
     },
     pool: {
-        max: 10,
-        min: 0,
-        idleTimeoutMillis: 30000
+        max: 20,
+        min: 2,
+        idleTimeoutMillis: 60000
     }
 };
 
-// Helper function to get database connection
+// Shared connection pool - create once and reuse
+let poolPromise = null;
+let pool = null;
+
+async function getPool() {
+    // Check if we have a valid connected pool
+    if (pool && pool.connected) {
+        return pool;
+    }
+    
+    // Reset if pool exists but is not connected
+    if (pool && !pool.connected) {
+        poolPromise = null;
+        pool = null;
+    }
+    
+    if (!poolPromise) {
+        poolPromise = sql.connect(dbConfig).then(newPool => {
+            console.log('System Settings: Connected to SQL Server');
+            pool = newPool;
+            pool.on('error', err => {
+                console.error('System Settings Pool Error:', err);
+                poolPromise = null;
+                pool = null;
+            });
+            return pool;
+        }).catch(err => {
+            console.error('System Settings: Database connection failed:', err);
+            poolPromise = null;
+            pool = null;
+            throw err;
+        });
+    }
+    return poolPromise;
+}
+
+// Helper function to get database connection (deprecated - use getPool instead)
 async function getDbConnection() {
-    return await sql.connect(dbConfig);
+    return await getPool();
 }
 
 // Main settings page
@@ -328,6 +364,7 @@ router.get('/', (req, res) => {
                     <button class="tab" data-tab="thirdparties">🤝 Third Parties</button>
                     <button class="tab" data-tab="shifts">⏰ Shifts</button>
                     <button class="tab" data-tab="unitcosts">💰 Unit Costs</button>
+                    <button class="tab" data-tab="approvalrules">📋 Approval Rules</button>
                 </div>
                 
                 <!-- Stores Tab -->
@@ -440,6 +477,85 @@ router.get('/', (req, res) => {
                     </div>
                     <div id="unitcosts-table">
                         <div class="loading">Loading unit costs...</div>
+                    </div>
+                </div>
+                
+                <!-- Approval Rules Tab -->
+                <div id="approvalrules-tab" class="tab-content">
+                    <div class="section-header">
+                        <div class="section-title">Approval Flow Configuration</div>
+                    </div>
+                    
+                    <!-- Approver Emails Section -->
+                    <div style="background: white; border-radius: 10px; padding: 25px; margin-bottom: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                        <h3 style="margin-bottom: 20px; color: #333; font-size: 18px;">📧 Approver Email Addresses</h3>
+                        <p style="color: #666; margin-bottom: 20px; font-size: 14px;">Configure the email addresses for each approver role</p>
+                        
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+                            <div>
+                                <h4 style="color: #17a2b8; margin-bottom: 15px;">Extra Cleaning Module</h4>
+                                <div class="form-group">
+                                    <label>Area Manager Email</label>
+                                    <input type="email" id="approval_AREA_MANAGER_EMAIL" placeholder="areamanager@company.com" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;">
+                                </div>
+                                <div class="form-group">
+                                    <label>Head of Operations Email</label>
+                                    <input type="email" id="approval_HEAD_OF_OPERATIONS_EMAIL" placeholder="headops@company.com" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;">
+                                </div>
+                                <div class="form-group">
+                                    <label>HR Manager Email</label>
+                                    <input type="email" id="approval_HR_MANAGER_EMAIL" placeholder="hr@company.com" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;">
+                                </div>
+                            </div>
+                            <div>
+                                <h4 style="color: #667eea; margin-bottom: 15px;">Production Extras Module</h4>
+                                <div class="form-group">
+                                    <label>Default Approver 1 Email</label>
+                                    <input type="email" id="approval_DEFAULT_APPROVER_1_EMAIL" placeholder="approver1@company.com" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;">
+                                </div>
+                                <div class="form-group">
+                                    <label>Default Approver 2 Email</label>
+                                    <input type="email" id="approval_DEFAULT_APPROVER_2_EMAIL" placeholder="approver2@company.com" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;">
+                                </div>
+                                <div class="form-group">
+                                    <label>HR Approver Email</label>
+                                    <input type="email" id="approval_HR_APPROVER_EMAIL" placeholder="hr@company.com" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;">
+                                </div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 20px; text-align: right;">
+                            <button class="btn btn-success" onclick="saveApprovalSettings()">💾 Save Email Settings</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Approval Rules Section -->
+                    <div style="background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <div>
+                                <h3 style="color: #333; font-size: 18px; margin-bottom: 5px;">📋 Approval Flow Rules</h3>
+                                <p style="color: #666; font-size: 14px;">Define conditions that modify the default approval flow</p>
+                            </div>
+                            <button class="btn btn-primary" onclick="openModal('approvalrule')">+ Add Rule</button>
+                        </div>
+                        
+                        <!-- Default Flows Info -->
+                        <div style="background: #f8f9fa; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                            <strong style="color: #333;">Default Approval Flows:</strong>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px;">
+                                <div style="padding: 10px; background: #e3f2fd; border-radius: 6px;">
+                                    <span style="color: #17a2b8; font-weight: 600;">🧹 Extra Cleaning:</span>
+                                    <span style="color: #666;">Area Manager → Head of Operations</span>
+                                </div>
+                                <div style="padding: 10px; background: #f3e5f5; border-radius: 6px;">
+                                    <span style="color: #667eea; font-weight: 600;">👷 Production:</span>
+                                    <span style="color: #666;">Approver 1 → Approver 2</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="approvalrules-table">
+                            <div class="loading">Loading rules...</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -797,6 +913,84 @@ router.get('/', (req, res) => {
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" onclick="closeBulkModal()">Cancel</button>
                             <button type="submit" class="btn btn-success">Import Stores</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Approval Rule Modal -->
+            <div id="approvalruleModal" class="modal">
+                <div class="modal-content" style="max-width: 600px;">
+                    <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                        <div class="modal-title" id="approvalruleModalTitle">Add Approval Rule</div>
+                        <button class="modal-close" onclick="closeModal('approvalrule')" style="color: white;">&times;</button>
+                    </div>
+                    <form id="approvalruleForm">
+                        <input type="hidden" id="approvalruleId" value="">
+                        <div class="form-group">
+                            <label>Rule Name *</label>
+                            <input type="text" id="approvalruleName" required placeholder="e.g., Skip AM for Happy Categories">
+                        </div>
+                        <div class="form-group">
+                            <label>Module *</label>
+                            <select id="approvalruleModule" required>
+                                <option value="">Select Module...</option>
+                                <option value="ExtraCleaning">Extra Cleaning</option>
+                                <option value="Production">Production Extras</option>
+                            </select>
+                        </div>
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                            <label style="font-weight: 600; color: #333; margin-bottom: 10px; display: block;">Condition (When this matches...)</label>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                                <select id="approvalruleField" required>
+                                    <option value="">Field...</option>
+                                    <option value="Category">Category</option>
+                                    <option value="ThirdParty">Third Party</option>
+                                    <option value="NumberOfAgents">Number of Agents</option>
+                                    <option value="Store">Store</option>
+                                </select>
+                                <select id="approvalruleOperator" required>
+                                    <option value="">Operator...</option>
+                                    <option value="equals">Equals</option>
+                                    <option value="contains">Contains</option>
+                                    <option value="greater_than">Greater Than</option>
+                                    <option value="less_than">Less Than</option>
+                                </select>
+                                <input type="text" id="approvalruleValue" required placeholder="Value...">
+                            </div>
+                        </div>
+                        <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                            <label style="font-weight: 600; color: #333; margin-bottom: 10px; display: block;">Action (Do this...)</label>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <select id="approvalruleAction" required>
+                                    <option value="">Action Type...</option>
+                                    <option value="skip">SKIP Approver</option>
+                                    <option value="add">ADD Approver</option>
+                                </select>
+                                <select id="approvalruleTarget" required>
+                                    <option value="">Target Approver...</option>
+                                    <option value="AreaManager">Area Manager</option>
+                                    <option value="HeadOfOperations">Head of Operations</option>
+                                    <option value="HR">HR Manager</option>
+                                    <option value="Approver1">Approver 1</option>
+                                    <option value="Approver2">Approver 2</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Priority (lower = higher priority)</label>
+                            <input type="number" id="approvalrulePriority" value="0" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="approvalruleStatus">
+                                <option value="1">Active</option>
+                                <option value="0">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="closeModal('approvalrule')">Cancel</button>
+                            <button type="submit" class="btn btn-success">Save Rule</button>
                         </div>
                     </form>
                 </div>
@@ -1928,6 +2122,179 @@ router.get('/', (req, res) => {
                         showToast('Error importing stores', 'error');
                     }
                 });
+                
+                // ========== APPROVAL SETTINGS & RULES ==========
+                let approvalSettingsData = [];
+                let approvalRulesData = [];
+                
+                // Load approval settings on page load
+                loadApprovalSettings();
+                loadApprovalRules();
+                
+                async function loadApprovalSettings() {
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/approval-settings?t=' + Date.now());
+                        approvalSettingsData = await res.json();
+                        
+                        // Populate the email inputs
+                        approvalSettingsData.forEach(setting => {
+                            const inputId = 'approval_' + setting.SettingKey;
+                            const input = document.getElementById(inputId);
+                            if (input) {
+                                input.value = setting.SettingValue || '';
+                            }
+                        });
+                    } catch (err) {
+                        console.error('Error loading approval settings:', err);
+                        showToast('Error loading approval settings', 'error');
+                    }
+                }
+                
+                async function saveApprovalSettings() {
+                    const settings = [
+                        { key: 'AREA_MANAGER_EMAIL', value: document.getElementById('approval_AREA_MANAGER_EMAIL')?.value || '' },
+                        { key: 'HEAD_OF_OPERATIONS_EMAIL', value: document.getElementById('approval_HEAD_OF_OPERATIONS_EMAIL')?.value || '' },
+                        { key: 'HR_MANAGER_EMAIL', value: document.getElementById('approval_HR_MANAGER_EMAIL')?.value || '' },
+                        { key: 'DEFAULT_APPROVER_1_EMAIL', value: document.getElementById('approval_DEFAULT_APPROVER_1_EMAIL')?.value || '' },
+                        { key: 'DEFAULT_APPROVER_2_EMAIL', value: document.getElementById('approval_DEFAULT_APPROVER_2_EMAIL')?.value || '' },
+                        { key: 'HR_APPROVER_EMAIL', value: document.getElementById('approval_HR_APPROVER_EMAIL')?.value || '' }
+                    ];
+                    
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/approval-settings', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ settings })
+                        });
+                        
+                        if (res.ok) {
+                            showToast('Approval settings saved!');
+                        } else {
+                            const err = await res.json();
+                            showToast(err.error || 'Error saving approval settings', 'error');
+                        }
+                    } catch (err) {
+                        console.error('Error saving approval settings:', err);
+                        showToast('Error saving approval settings', 'error');
+                    }
+                }
+                
+                async function loadApprovalRules() {
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/approval-rules?t=' + Date.now());
+                        approvalRulesData = await res.json();
+                        renderApprovalRulesTable(approvalRulesData);
+                    } catch (err) {
+                        console.error('Error loading approval rules:', err);
+                        document.getElementById('approvalrules-table').innerHTML = '<div class="empty-state"><div class="icon">❌</div><p>Error loading approval rules</p></div>';
+                    }
+                }
+                
+                function renderApprovalRulesTable(rules) {
+                    if (!rules.length) {
+                        document.getElementById('approvalrules-table').innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>No approval rules configured. Add your first rule!</p></div>';
+                        return;
+                    }
+                    
+                    let html = '<table class="data-table"><thead><tr><th>Priority</th><th>Rule Name</th><th>Module</th><th>Condition</th><th>Action</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+                    rules.forEach(r => {
+                        const operatorText = r.TriggerOperator === 'equals' ? '=' : (r.TriggerOperator === 'contains' ? 'contains' : r.TriggerOperator);
+                        const actionText = r.ActionType === 'skip' ? 'SKIP' : 'ADD';
+                        const actionClass = r.ActionType === 'skip' ? 'background: #fff3cd; color: #856404;' : 'background: #d4edda; color: #155724;';
+                        
+                        html += '<tr>';
+                        html += '<td><span style="background: #667eea; color: white; padding: 2px 8px; border-radius: 10px; font-size: 12px;">' + r.Priority + '</span></td>';
+                        html += '<td><strong>' + r.RuleName + '</strong></td>';
+                        html += '<td>' + r.Module + '</td>';
+                        html += '<td><code style="background: #f1f3f4; padding: 2px 6px; border-radius: 4px;">' + r.TriggerField + ' ' + operatorText + ' "' + r.TriggerValue + '"</code></td>';
+                        html += '<td><span style="' + actionClass + ' padding: 2px 8px; border-radius: 4px; font-weight: 600;">' + actionText + '</span> ' + r.TargetApprover + '</td>';
+                        html += '<td><span class="status-badge ' + (r.IsActive ? 'status-active' : 'status-inactive') + '">' + (r.IsActive ? 'Active' : 'Inactive') + '</span></td>';
+                        html += '<td class="actions">';
+                        html += '<button class="btn btn-primary btn-sm" onclick="editApprovalRule(' + r.Id + ')">Edit</button>';
+                        html += '<button class="btn btn-danger btn-sm" onclick="deleteApprovalRule(' + r.Id + ')">Delete</button>';
+                        html += '</td></tr>';
+                    });
+                    html += '</tbody></table>';
+                    document.getElementById('approvalrules-table').innerHTML = html;
+                }
+                
+                function editApprovalRule(id) {
+                    const rule = approvalRulesData.find(r => r.Id === id);
+                    if (!rule) return;
+                    
+                    document.getElementById('approvalruleId').value = rule.Id;
+                    document.getElementById('approvalruleName').value = rule.RuleName;
+                    document.getElementById('approvalruleModule').value = rule.Module;
+                    document.getElementById('approvalruleField').value = rule.TriggerField;
+                    document.getElementById('approvalruleOperator').value = rule.TriggerOperator;
+                    document.getElementById('approvalruleValue').value = rule.TriggerValue;
+                    document.getElementById('approvalruleAction').value = rule.ActionType;
+                    document.getElementById('approvalruleTarget').value = rule.TargetApprover;
+                    document.getElementById('approvalrulePriority').value = rule.Priority;
+                    document.getElementById('approvalruleStatus').value = rule.IsActive ? '1' : '0';
+                    document.getElementById('approvalruleModalTitle').textContent = 'Edit Approval Rule';
+                    document.getElementById('approvalruleModal').classList.add('show');
+                }
+                
+                async function deleteApprovalRule(id) {
+                    if (!confirm('Are you sure you want to delete this approval rule?')) return;
+                    
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/approval-rules/' + id, {
+                            method: 'DELETE'
+                        });
+                        
+                        if (res.ok) {
+                            showToast('Approval rule deleted!');
+                            await loadApprovalRules();
+                        } else {
+                            const err = await res.json();
+                            showToast(err.error || 'Error deleting approval rule', 'error');
+                        }
+                    } catch (err) {
+                        console.error('Error deleting approval rule:', err);
+                        showToast('Error deleting approval rule', 'error');
+                    }
+                }
+                
+                document.getElementById('approvalruleForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const id = document.getElementById('approvalruleId').value;
+                    const data = {
+                        ruleName: document.getElementById('approvalruleName').value,
+                        module: document.getElementById('approvalruleModule').value,
+                        triggerField: document.getElementById('approvalruleField').value,
+                        triggerOperator: document.getElementById('approvalruleOperator').value,
+                        triggerValue: document.getElementById('approvalruleValue').value,
+                        actionType: document.getElementById('approvalruleAction').value,
+                        targetApprover: document.getElementById('approvalruleTarget').value,
+                        priority: parseInt(document.getElementById('approvalrulePriority').value) || 0,
+                        isActive: document.getElementById('approvalruleStatus').value === '1'
+                    };
+                    
+                    try {
+                        const url = id ? '/operational-excellence/system-settings/api/approval-rules/' + id : '/operational-excellence/system-settings/api/approval-rules';
+                        const method = id ? 'PUT' : 'POST';
+                        
+                        const res = await fetch(url, {
+                            method,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        });
+                        
+                        if (res.ok) {
+                            closeModal('approvalrule');
+                            showToast(id ? 'Approval rule updated!' : 'Approval rule added!');
+                            await loadApprovalRules();
+                        } else {
+                            const err = await res.json();
+                            showToast(err.error || 'Error saving approval rule', 'error');
+                        }
+                    } catch (err) {
+                        console.error('Error saving approval rule:', err);
+                        showToast('Error saving approval rule', 'error');
+                    }
+                });
             </script>
         </body>
         </html>
@@ -2703,6 +3070,115 @@ router.delete('/api/unitcosts/:id', async (req, res) => {
         res.status(500).json({ error: 'Failed to delete unit cost' });
     } finally {
         if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+// ========== APPROVAL SETTINGS API ==========
+router.get('/api/approval-settings', async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request().query('SELECT * FROM ApprovalSettings ORDER BY Module, SettingKey');
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error loading approval settings:', err);
+        res.status(500).json({ error: 'Failed to load approval settings' });
+    }
+});
+
+router.put('/api/approval-settings', async (req, res) => {
+    try {
+        const { settings } = req.body;
+        const pool = await getPool();
+        
+        for (const setting of settings) {
+            // Create a new request for each update
+            const request = pool.request();
+            await request
+                .input('key', sql.NVarChar, setting.key)
+                .input('value', sql.NVarChar, setting.value)
+                .input('updatedBy', sql.NVarChar, req.session?.user?.name || 'System')
+                .query(`UPDATE ApprovalSettings SET SettingValue = @value, UpdatedDate = GETDATE(), UpdatedBy = @updatedBy WHERE SettingKey = @key`);
+        }
+        
+        console.log('Approval settings saved:', settings.map(s => s.key + '=' + s.value).join(', '));
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating approval settings:', err);
+        res.status(500).json({ error: 'Failed to update approval settings' });
+    }
+});
+
+// ========== APPROVAL RULES API ==========
+router.get('/api/approval-rules', async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request().query('SELECT * FROM ApprovalRules ORDER BY Module, Priority, RuleName');
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error loading approval rules:', err);
+        res.status(500).json({ error: 'Failed to load approval rules' });
+    }
+});
+
+router.post('/api/approval-rules', async (req, res) => {
+    try {
+        const { ruleName, module, triggerField, triggerOperator, triggerValue, actionType, targetApprover, priority, isActive } = req.body;
+        const pool = await getPool();
+        await pool.request()
+            .input('ruleName', sql.NVarChar, ruleName)
+            .input('module', sql.NVarChar, module)
+            .input('triggerField', sql.NVarChar, triggerField)
+            .input('triggerOperator', sql.NVarChar, triggerOperator)
+            .input('triggerValue', sql.NVarChar, triggerValue)
+            .input('actionType', sql.NVarChar, actionType)
+            .input('targetApprover', sql.NVarChar, targetApprover)
+            .input('priority', sql.Int, priority)
+            .input('isActive', sql.Bit, isActive)
+            .input('createdBy', sql.NVarChar, req.session?.user?.name || 'System')
+            .query(`INSERT INTO ApprovalRules (RuleName, Module, TriggerField, TriggerOperator, TriggerValue, ActionType, TargetApprover, Priority, IsActive, CreatedDate, CreatedBy)
+                    VALUES (@ruleName, @module, @triggerField, @triggerOperator, @triggerValue, @actionType, @targetApprover, @priority, @isActive, GETDATE(), @createdBy)`);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error adding approval rule:', err);
+        res.status(500).json({ error: 'Failed to add approval rule' });
+    }
+});
+
+router.put('/api/approval-rules/:id', async (req, res) => {
+    try {
+        const { ruleName, module, triggerField, triggerOperator, triggerValue, actionType, targetApprover, priority, isActive } = req.body;
+        const pool = await getPool();
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .input('ruleName', sql.NVarChar, ruleName)
+            .input('module', sql.NVarChar, module)
+            .input('triggerField', sql.NVarChar, triggerField)
+            .input('triggerOperator', sql.NVarChar, triggerOperator)
+            .input('triggerValue', sql.NVarChar, triggerValue)
+            .input('actionType', sql.NVarChar, actionType)
+            .input('targetApprover', sql.NVarChar, targetApprover)
+            .input('priority', sql.Int, priority)
+            .input('isActive', sql.Bit, isActive)
+            .query(`UPDATE ApprovalRules SET RuleName = @ruleName, Module = @module, TriggerField = @triggerField, TriggerOperator = @triggerOperator,
+                    TriggerValue = @triggerValue, ActionType = @actionType, TargetApprover = @targetApprover, Priority = @priority, IsActive = @isActive
+                    WHERE Id = @id`);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating approval rule:', err);
+        res.status(500).json({ error: 'Failed to update approval rule' });
+    }
+});
+
+router.delete('/api/approval-rules/:id', async (req, res) => {
+    try {
+        const pool = await getPool();
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query('DELETE FROM ApprovalRules WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting approval rule:', err);
+        res.status(500).json({ error: 'Failed to delete approval rule' });
     }
 });
 
