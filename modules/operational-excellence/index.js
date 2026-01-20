@@ -10,11 +10,13 @@ const router = express.Router();
 const theftDashboard = require('./theft-dashboard');
 const systemSettings = require('./system-settings');
 const extraCleaningReview = require('./extra-cleaning-review');
+const productionDashboard = require('./production-dashboard');
 
 // Mount sub-routes
 router.use('/theft-dashboard', theftDashboard);
 router.use('/system-settings', systemSettings);
 router.use('/extra-cleaning-review', extraCleaningReview);
+router.use('/production-dashboard', productionDashboard);
 
 // Landing page
 router.get('/', (req, res) => {
@@ -195,6 +197,30 @@ router.get('/', (req, res) => {
                         </div>
                     </a>
                     
+                    <!-- Production Extras Dashboard -->
+                    <a href="/operational-excellence/production-dashboard" class="card" style="border-left: 4px solid #667eea;">
+                        <div class="card-icon">👷</div>
+                        <div class="card-title">Production Extras Dashboard</div>
+                        <div class="card-desc">
+                            Review and approve production extras requests. 
+                            Manage third-party production agents and track costs.
+                        </div>
+                        <div class="card-stats">
+                            <div class="stat">
+                                <div class="stat-value" id="productionPending" style="color: #ffc107;">-</div>
+                                <div class="stat-label">Pending</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" id="productionToday" style="color: #667eea;">-</div>
+                                <div class="stat-label">Today</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" id="productionMonth" style="color: #28a745;">-</div>
+                                <div class="stat-label">This Month</div>
+                            </div>
+                        </div>
+                    </a>
+                    
                     <!-- System Settings -->
                     <a href="/operational-excellence/system-settings" class="card" style="border-left: 4px solid #667eea;">
                         <div class="card-icon">⚙️</div>
@@ -300,6 +326,18 @@ router.get('/', (req, res) => {
                     })
                     .catch(err => {
                         console.error('Error loading cleaning stats:', err);
+                    });
+                
+                // Load stats for production dashboard card
+                fetch('/operational-excellence/production-dashboard/api/stats')
+                    .then(r => r.json())
+                    .then(data => {
+                        document.getElementById('productionPending').textContent = data.pending || 0;
+                        document.getElementById('productionToday').textContent = data.today || 0;
+                        document.getElementById('productionMonth').textContent = data.thisMonth || 0;
+                    })
+                    .catch(err => {
+                        console.error('Error loading production stats:', err);
                     });
             </script>
         </body>

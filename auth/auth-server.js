@@ -219,7 +219,16 @@ function initializeAuth(app) {
 function requireAuth(req, res, next) {
     const sessionId = req.cookies?.session_id;
     
+    // Helper to check if request is an API/AJAX call
+    const isApiRequest = req.path.includes('/api/') || 
+                         req.xhr || 
+                         req.headers.accept?.includes('application/json') ||
+                         req.headers['content-type']?.includes('application/json');
+    
     if (!sessionId || !sessions.has(sessionId)) {
+        if (isApiRequest) {
+            return res.status(401).json({ success: false, error: 'Session expired. Please refresh the page to login again.', sessionExpired: true });
+        }
         return res.redirect('/auth/login');
     }
     
@@ -230,11 +239,17 @@ function requireAuth(req, res, next) {
     if (sessionAge > 24 * 60 * 60 * 1000) {
         sessions.delete(sessionId);
         res.clearCookie('session_id');
+        if (isApiRequest) {
+            return res.status(401).json({ success: false, error: 'Session expired. Please refresh the page to login again.', sessionExpired: true });
+        }
         return res.redirect('/auth/login');
     }
     
     // Check if user is approved
     if (!session.isApproved) {
+        if (isApiRequest) {
+            return res.status(403).json({ success: false, error: 'Your account is pending approval.' });
+        }
         return res.redirect('/auth/pending-approval');
     }
     

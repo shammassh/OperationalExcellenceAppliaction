@@ -16,8 +16,18 @@ const dbConfig = {
     options: {
         encrypt: process.env.SQL_ENCRYPT === 'true',
         trustServerCertificate: process.env.SQL_TRUST_CERT === 'true'
+    },
+    pool: {
+        max: 10,
+        min: 0,
+        idleTimeoutMillis: 30000
     }
 };
+
+// Helper function to get database connection
+async function getDbConnection() {
+    return await sql.connect(dbConfig);
+}
 
 // Main settings page
 router.get('/', (req, res) => {
@@ -311,6 +321,13 @@ router.get('/', (req, res) => {
                     <button class="tab active" data-tab="stores">🏪 Stores</button>
                     <button class="tab" data-tab="categories">📁 Cleaning Categories</button>
                     <button class="tab" data-tab="providers">🏢 Third Party Providers</button>
+                    <button class="tab" data-tab="schemes">🏭 Outlet Schemes</button>
+                    <button class="tab" data-tab="outlets">🏬 Outlets</button>
+                    <button class="tab" data-tab="locations">📍 Locations</button>
+                    <button class="tab" data-tab="prodcategories">📂 Prod Categories</button>
+                    <button class="tab" data-tab="thirdparties">🤝 Third Parties</button>
+                    <button class="tab" data-tab="shifts">⏰ Shifts</button>
+                    <button class="tab" data-tab="unitcosts">💰 Unit Costs</button>
                 </div>
                 
                 <!-- Stores Tab -->
@@ -346,6 +363,83 @@ router.get('/', (req, res) => {
                     </div>
                     <div id="providers-table">
                         <div class="loading">Loading providers...</div>
+                    </div>
+                </div>
+                
+                <!-- Outlet Schemes Tab -->
+                <div id="schemes-tab" class="tab-content">
+                    <div class="section-header">
+                        <div class="section-title">Manage Production Outlet Schemes</div>
+                        <button class="btn btn-primary" onclick="openModal('scheme')">+ Add Scheme</button>
+                    </div>
+                    <div id="schemes-table">
+                        <div class="loading">Loading outlet schemes...</div>
+                    </div>
+                </div>
+                
+                <!-- Production Outlets Tab -->
+                <div id="outlets-tab" class="tab-content">
+                    <div class="section-header">
+                        <div class="section-title">Manage Production Outlets</div>
+                        <button class="btn btn-primary" onclick="openModal('outlet')">+ Add Outlet</button>
+                    </div>
+                    <div id="outlets-table">
+                        <div class="loading">Loading outlets...</div>
+                    </div>
+                </div>
+                
+                <!-- Production Locations Tab -->
+                <div id="locations-tab" class="tab-content">
+                    <div class="section-header">
+                        <div class="section-title">Manage Production Locations</div>
+                        <button class="btn btn-primary" onclick="openModal('location')">+ Add Location</button>
+                    </div>
+                    <div id="locations-table">
+                        <div class="loading">Loading locations...</div>
+                    </div>
+                </div>
+                
+                <!-- Production Categories Tab -->
+                <div id="prodcategories-tab" class="tab-content">
+                    <div class="section-header">
+                        <div class="section-title">Manage Production Categories</div>
+                        <button class="btn btn-primary" onclick="openModal('prodcategory')">+ Add Category</button>
+                    </div>
+                    <div id="prodcategories-table">
+                        <div class="loading">Loading categories...</div>
+                    </div>
+                </div>
+                
+                <!-- Third Parties Tab -->
+                <div id="thirdparties-tab" class="tab-content">
+                    <div class="section-header">
+                        <div class="section-title">Manage Third Parties</div>
+                        <button class="btn btn-primary" onclick="openModal('thirdparty')">+ Add Third Party</button>
+                    </div>
+                    <div id="thirdparties-table">
+                        <div class="loading">Loading third parties...</div>
+                    </div>
+                </div>
+                
+                <!-- Shifts Tab -->
+                <div id="shifts-tab" class="tab-content">
+                    <div class="section-header">
+                        <div class="section-title">Manage Shifts</div>
+                        <button class="btn btn-primary" onclick="openModal('shift')">+ Add Shift</button>
+                    </div>
+                    <div id="shifts-table">
+                        <div class="loading">Loading shifts...</div>
+                    </div>
+                </div>
+                
+                <!-- Unit Costs Tab -->
+                <div id="unitcosts-tab" class="tab-content">
+                    <div class="section-header">
+                        <div class="section-title">Manage Unit Costs</div>
+                        <button class="btn btn-primary" onclick="openModal('unitcost')">+ Add Unit Cost</button>
+                    </div>
+                    <div id="unitcosts-table">
+                        <div class="loading">Loading unit costs...</div>
                     </div>
                 </div>
             </div>
@@ -459,6 +553,226 @@ router.get('/', (req, res) => {
                 </div>
             </div>
             
+            <!-- Outlet Scheme Modal -->
+            <div id="schemeModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="modal-title" id="schemeModalTitle">Add Outlet Scheme</div>
+                        <button class="modal-close" onclick="closeModal('scheme')">&times;</button>
+                    </div>
+                    <form id="schemeForm">
+                        <input type="hidden" id="schemeId" value="">
+                        <div class="form-group">
+                            <label>Scheme Name *</label>
+                            <input type="text" id="schemeName" required placeholder="Enter scheme name">
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="schemeStatus">
+                                <option value="1">Active</option>
+                                <option value="0">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="closeModal('scheme')">Cancel</button>
+                            <button type="submit" class="btn btn-success">Save Scheme</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Production Outlet Modal -->
+            <div id="outletModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="modal-title" id="outletModalTitle">Add Outlet</div>
+                        <button class="modal-close" onclick="closeModal('outlet')">&times;</button>
+                    </div>
+                    <form id="outletForm">
+                        <input type="hidden" id="outletId" value="">
+                        <div class="form-group">
+                            <label>Outlet Name *</label>
+                            <input type="text" id="outletName" required placeholder="Enter outlet name">
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="outletStatus">
+                                <option value="1">Active</option>
+                                <option value="0">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="closeModal('outlet')">Cancel</button>
+                            <button type="submit" class="btn btn-success">Save Outlet</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Production Location Modal -->
+            <div id="locationModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="modal-title" id="locationModalTitle">Add Location</div>
+                        <button class="modal-close" onclick="closeModal('location')">&times;</button>
+                    </div>
+                    <form id="locationForm">
+                        <input type="hidden" id="locationId" value="">
+                        <div class="form-group">
+                            <label>Outlet Scheme *</label>
+                            <select id="locationScheme" required>
+                                <option value="">Select Scheme...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Location Name *</label>
+                            <input type="text" id="locationName" required placeholder="Enter location name">
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="locationStatus">
+                                <option value="1">Active</option>
+                                <option value="0">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="closeModal('location')">Cancel</button>
+                            <button type="submit" class="btn btn-success">Save Location</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Production Category Modal -->
+            <div id="prodcategoryModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="modal-title" id="prodcategoryModalTitle">Add Category</div>
+                        <button class="modal-close" onclick="closeModal('prodcategory')">&times;</button>
+                    </div>
+                    <form id="prodcategoryForm">
+                        <input type="hidden" id="prodcategoryId" value="">
+                        <div class="form-group">
+                            <label>Category Name *</label>
+                            <input type="text" id="prodcategoryName" required placeholder="Enter category name">
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="prodcategoryStatus">
+                                <option value="1">Active</option>
+                                <option value="0">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="closeModal('prodcategory')">Cancel</button>
+                            <button type="submit" class="btn btn-success">Save Category</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Third Party Modal -->
+            <div id="thirdpartyModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="modal-title" id="thirdpartyModalTitle">Add Third Party</div>
+                        <button class="modal-close" onclick="closeModal('thirdparty')">&times;</button>
+                    </div>
+                    <form id="thirdpartyForm">
+                        <input type="hidden" id="thirdpartyId" value="">
+                        <div class="form-group">
+                            <label>Third Party Name *</label>
+                            <input type="text" id="thirdpartyName" required placeholder="Enter third party name">
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="thirdpartyStatus">
+                                <option value="1">Active</option>
+                                <option value="0">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="closeModal('thirdparty')">Cancel</button>
+                            <button type="submit" class="btn btn-success">Save Third Party</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Shift Modal -->
+            <div id="shiftModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="modal-title" id="shiftModalTitle">Add Shift</div>
+                        <button class="modal-close" onclick="closeModal('shift')">&times;</button>
+                    </div>
+                    <form id="shiftForm">
+                        <input type="hidden" id="shiftId" value="">
+                        <div class="form-group">
+                            <label>Shift Name *</label>
+                            <input type="text" id="shiftName" required placeholder="e.g., Morning, Afternoon, Night">
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="shiftStatus">
+                                <option value="1">Active</option>
+                                <option value="0">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="closeModal('shift')">Cancel</button>
+                            <button type="submit" class="btn btn-success">Save Shift</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Unit Cost Modal -->
+            <div id="unitcostModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="modal-title" id="unitcostModalTitle">Add Unit Cost</div>
+                        <button class="modal-close" onclick="closeModal('unitcost')">&times;</button>
+                    </div>
+                    <form id="unitcostForm">
+                        <input type="hidden" id="unitcostId" value="">
+                        <div class="form-group">
+                            <label>Category *</label>
+                            <select id="unitcostCategory" required>
+                                <option value="">Select Category...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Third Party *</label>
+                            <select id="unitcostThirdParty" required>
+                                <option value="">Select Third Party...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Shift *</label>
+                            <select id="unitcostShift" required>
+                                <option value="">Select Shift...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Cost Value ($) *</label>
+                            <input type="number" id="unitcostValue" step="0.01" min="0" required placeholder="e.g., 15.50">
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="unitcostStatus">
+                                <option value="1">Active</option>
+                                <option value="0">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="closeModal('unitcost')">Cancel</button>
+                            <button type="submit" class="btn btn-success">Save Unit Cost</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
             <!-- Bulk Import Modal -->
             <div id="bulkModal" class="modal">
                 <div class="modal-content" style="max-width: 600px;">
@@ -503,6 +817,13 @@ router.get('/', (req, res) => {
                 loadStores();
                 loadCategories();
                 loadProviders();
+                loadSchemes();
+                loadOutlets();
+                loadLocations();
+                loadProdCategories();
+                loadThirdParties();
+                loadShifts();
+                loadUnitCosts();
                 
                 // Modal functions
                 function openModal(type) {
@@ -513,6 +834,16 @@ router.get('/', (req, res) => {
                     // Populate category dropdown when opening provider modal
                     if (type === 'provider') {
                         populateProviderCategoryDropdown();
+                    }
+                    
+                    // Populate scheme dropdown when opening location modal
+                    if (type === 'location') {
+                        populateLocationSchemeDropdown();
+                    }
+                    
+                    // Populate dropdowns when opening unit cost modal
+                    if (type === 'unitcost') {
+                        populateUnitCostDropdowns();
                     }
                     
                     document.getElementById(type + 'Modal').classList.add('show');
@@ -799,6 +1130,13 @@ router.get('/', (req, res) => {
                             if (deleteType === 'store') await loadStores();
                             else if (deleteType === 'category') await loadCategories();
                             else if (deleteType === 'provider') await loadProviders();
+                            else if (deleteType === 'scheme') await loadSchemes();
+                            else if (deleteType === 'outlet') await loadOutlets();
+                            else if (deleteType === 'location') await loadLocations();
+                            else if (deleteType === 'prodcategory') await loadProdCategories();
+                            else if (deleteType === 'thirdparty') await loadThirdParties();
+                            else if (deleteType === 'shift') await loadShifts();
+                            else if (deleteType === 'unitcost') await loadUnitCosts();
                         } else {
                             const err = await res.json();
                             showToast(err.error || 'Error deleting item', 'error');
@@ -812,6 +1150,736 @@ router.get('/', (req, res) => {
                 function escapeJS(str) {
                     return str ? str.replace(/'/g, "\\\\'").replace(/"/g, '\\\\"') : '';
                 }
+                
+                // ========== PRODUCTION OUTLET SCHEMES ==========
+                async function loadSchemes() {
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/schemes');
+                        const schemes = await res.json();
+                        renderSchemesTable(schemes);
+                    } catch (err) {
+                        console.error('Error loading schemes:', err);
+                    }
+                }
+                
+                function renderSchemesTable(schemes) {
+                    const container = document.getElementById('schemes-table');
+                    if (!container) return;
+                    
+                    if (schemes.length === 0) {
+                        container.innerHTML = '<div style="text-align: center; color: #666; padding: 40px;">No outlet schemes found. Click "Add Scheme" to create one.</div>';
+                        return;
+                    }
+                    
+                    container.innerHTML = \`
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Scheme Name</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                \${schemes.map(s => \`
+                                    <tr>
+                                        <td>\${s.SchemeName}</td>
+                                        <td><span class="status-badge \${s.IsActive ? 'active' : 'inactive'}">\${s.IsActive ? 'Active' : 'Inactive'}</span></td>
+                                        <td>\${new Date(s.CreatedDate).toLocaleDateString()}</td>
+                                        <td class="actions">
+                                            <button class="btn-icon edit" onclick="editScheme(\${s.Id}, '\${escapeJS(s.SchemeName)}', \${s.IsActive})" title="Edit">✏️</button>
+                                            <button class="btn-icon delete" onclick="confirmDelete('scheme', \${s.Id}, '\${escapeJS(s.SchemeName)}')" title="Delete">🗑️</button>
+                                        </td>
+                                    </tr>
+                                \`).join('')}
+                            </tbody>
+                        </table>
+                    \`;
+                }
+                
+                function editScheme(id, name, isActive) {
+                    document.getElementById('schemeId').value = id;
+                    document.getElementById('schemeName').value = name;
+                    document.getElementById('schemeStatus').value = isActive ? '1' : '0';
+                    document.getElementById('schemeModalTitle').textContent = 'Edit Outlet Scheme';
+                    document.getElementById('schemeModal').classList.add('show');
+                }
+                
+                document.getElementById('schemeForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const id = document.getElementById('schemeId').value;
+                    const data = {
+                        schemeName: document.getElementById('schemeName').value,
+                        isActive: document.getElementById('schemeStatus').value === '1'
+                    };
+                    
+                    try {
+                        const url = id ? '/operational-excellence/system-settings/api/schemes/' + id : '/operational-excellence/system-settings/api/schemes';
+                        const method = id ? 'PUT' : 'POST';
+                        
+                        const res = await fetch(url, {
+                            method,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        });
+                        
+                        if (res.ok) {
+                            closeModal('scheme');
+                            showToast(id ? 'Outlet scheme updated!' : 'Outlet scheme added!');
+                            await loadSchemes();
+                            await loadLocations(); // Refresh to update dropdowns
+                        } else {
+                            const err = await res.json();
+                            showToast(err.error || 'Error saving scheme', 'error');
+                        }
+                    } catch (err) {
+                        console.error('Error saving scheme:', err);
+                        showToast('Error saving scheme', 'error');
+                    }
+                });
+                
+                // ========== PRODUCTION OUTLETS ==========
+                async function loadOutlets() {
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/outlets');
+                        const outlets = await res.json();
+                        renderOutletsTable(outlets);
+                    } catch (err) {
+                        console.error('Error loading outlets:', err);
+                    }
+                }
+                
+                function renderOutletsTable(outlets) {
+                    const container = document.getElementById('outlets-table');
+                    if (!container) return;
+                    
+                    if (outlets.length === 0) {
+                        container.innerHTML = '<div style="text-align: center; color: #666; padding: 40px;">No outlets found. Click "Add Outlet" to create one.</div>';
+                        return;
+                    }
+                    
+                    container.innerHTML = \`
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Outlet Name</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                \${outlets.map(o => \`
+                                    <tr>
+                                        <td>\${o.OutletName}</td>
+                                        <td><span class="status-badge \${o.IsActive ? 'active' : 'inactive'}">\${o.IsActive ? 'Active' : 'Inactive'}</span></td>
+                                        <td>\${new Date(o.CreatedDate).toLocaleDateString()}</td>
+                                        <td class="actions">
+                                            <button class="btn-icon edit" onclick="editOutlet(\${o.Id}, '\${escapeJS(o.OutletName)}', \${o.IsActive})" title="Edit">✏️</button>
+                                            <button class="btn-icon delete" onclick="confirmDelete('outlet', \${o.Id}, '\${escapeJS(o.OutletName)}')" title="Delete">🗑️</button>
+                                        </td>
+                                    </tr>
+                                \`).join('')}
+                            </tbody>
+                        </table>
+                    \`;
+                }
+                
+                function editOutlet(id, name, isActive) {
+                    document.getElementById('outletId').value = id;
+                    document.getElementById('outletName').value = name;
+                    document.getElementById('outletStatus').value = isActive ? '1' : '0';
+                    document.getElementById('outletModalTitle').textContent = 'Edit Outlet';
+                    document.getElementById('outletModal').classList.add('show');
+                }
+                
+                document.getElementById('outletForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const id = document.getElementById('outletId').value;
+                    const data = {
+                        outletName: document.getElementById('outletName').value,
+                        isActive: document.getElementById('outletStatus').value === '1'
+                    };
+                    
+                    try {
+                        const url = id ? '/operational-excellence/system-settings/api/outlets/' + id : '/operational-excellence/system-settings/api/outlets';
+                        const method = id ? 'PUT' : 'POST';
+                        
+                        const res = await fetch(url, {
+                            method,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        });
+                        
+                        if (res.ok) {
+                            closeModal('outlet');
+                            showToast(id ? 'Outlet updated!' : 'Outlet added!');
+                            await loadOutlets();
+                        } else {
+                            const err = await res.json();
+                            showToast(err.error || 'Error saving outlet', 'error');
+                        }
+                    } catch (err) {
+                        console.error('Error saving outlet:', err);
+                        showToast('Error saving outlet', 'error');
+                    }
+                });
+                
+                // ========== PRODUCTION LOCATIONS ==========
+                async function loadLocations() {
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/locations');
+                        const locations = await res.json();
+                        renderLocationsTable(locations);
+                    } catch (err) {
+                        console.error('Error loading locations:', err);
+                    }
+                }
+                
+                function renderLocationsTable(locations) {
+                    const container = document.getElementById('locations-table');
+                    if (!container) return;
+                    
+                    if (locations.length === 0) {
+                        container.innerHTML = '<div style="text-align: center; color: #666; padding: 40px;">No locations found. Click "Add Location" to create one.</div>';
+                        return;
+                    }
+                    
+                    container.innerHTML = \`
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Location Name</th>
+                                    <th>Outlet Scheme</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                \${locations.map(l => \`
+                                    <tr>
+                                        <td>\${l.LocationName}</td>
+                                        <td>\${l.SchemeName || 'N/A'}</td>
+                                        <td><span class="status-badge \${l.IsActive ? 'active' : 'inactive'}">\${l.IsActive ? 'Active' : 'Inactive'}</span></td>
+                                        <td>\${new Date(l.CreatedDate).toLocaleDateString()}</td>
+                                        <td class="actions">
+                                            <button class="btn-icon edit" onclick="editLocation(\${l.Id}, '\${escapeJS(l.LocationName)}', \${l.SchemeId || 'null'}, \${l.IsActive})" title="Edit">✏️</button>
+                                            <button class="btn-icon delete" onclick="confirmDelete('location', \${l.Id}, '\${escapeJS(l.LocationName)}')" title="Delete">🗑️</button>
+                                        </td>
+                                    </tr>
+                                \`).join('')}
+                            </tbody>
+                        </table>
+                    \`;
+                }
+                
+                function editLocation(id, name, schemeId, isActive) {
+                    document.getElementById('locationId').value = id;
+                    document.getElementById('locationName').value = name;
+                    document.getElementById('locationScheme').value = schemeId || '';
+                    document.getElementById('locationStatus').value = isActive ? '1' : '0';
+                    document.getElementById('locationModalTitle').textContent = 'Edit Location';
+                    populateLocationSchemeDropdown().then(() => {
+                        document.getElementById('locationScheme').value = schemeId || '';
+                    });
+                    document.getElementById('locationModal').classList.add('show');
+                }
+                
+                async function populateLocationSchemeDropdown() {
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/schemes');
+                        const schemes = await res.json();
+                        const select = document.getElementById('locationScheme');
+                        select.innerHTML = '<option value="">-- Select Outlet Scheme --</option>' + 
+                            schemes.filter(s => s.IsActive).map(s => \`<option value="\${s.Id}">\${s.SchemeName}</option>\`).join('');
+                    } catch (err) {
+                        console.error('Error loading schemes for dropdown:', err);
+                    }
+                }
+                
+                document.getElementById('locationForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const id = document.getElementById('locationId').value;
+                    const data = {
+                        locationName: document.getElementById('locationName').value,
+                        schemeId: document.getElementById('locationScheme').value || null,
+                        isActive: document.getElementById('locationStatus').value === '1'
+                    };
+                    
+                    try {
+                        const url = id ? '/operational-excellence/system-settings/api/locations/' + id : '/operational-excellence/system-settings/api/locations';
+                        const method = id ? 'PUT' : 'POST';
+                        
+                        const res = await fetch(url, {
+                            method,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        });
+                        
+                        if (res.ok) {
+                            closeModal('location');
+                            showToast(id ? 'Location updated!' : 'Location added!');
+                            await loadLocations();
+                        } else {
+                            const err = await res.json();
+                            showToast(err.error || 'Error saving location', 'error');
+                        }
+                    } catch (err) {
+                        console.error('Error saving location:', err);
+                        showToast('Error saving location', 'error');
+                    }
+                });
+                
+                // ========== PRODUCTION CATEGORIES ==========
+                async function loadProdCategories() {
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/prodcategorys');
+                        const categories = await res.json();
+                        renderProdCategoriesTable(categories);
+                    } catch (err) {
+                        console.error('Error loading production categories:', err);
+                    }
+                }
+                
+                function renderProdCategoriesTable(categories) {
+                    const container = document.getElementById('prodcategories-table');
+                    if (!container) return;
+                    
+                    if (categories.length === 0) {
+                        container.innerHTML = '<div style="text-align: center; color: #666; padding: 40px;">No categories found. Click "Add Category" to create one.</div>';
+                        return;
+                    }
+                    
+                    container.innerHTML = \`
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Category Name</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                \${categories.map(c => \`
+                                    <tr>
+                                        <td>\${c.CategoryName}</td>
+                                        <td><span class="status-badge \${c.IsActive ? 'active' : 'inactive'}">\${c.IsActive ? 'Active' : 'Inactive'}</span></td>
+                                        <td>\${new Date(c.CreatedDate).toLocaleDateString()}</td>
+                                        <td class="actions">
+                                            <button class="btn-icon edit" onclick="editProdCategory(\${c.Id}, '\${escapeJS(c.CategoryName)}', \${c.IsActive})" title="Edit">✏️</button>
+                                            <button class="btn-icon delete" onclick="confirmDelete('prodcategory', \${c.Id}, '\${escapeJS(c.CategoryName)}')" title="Delete">🗑️</button>
+                                        </td>
+                                    </tr>
+                                \`).join('')}
+                            </tbody>
+                        </table>
+                    \`;
+                }
+                
+                function editProdCategory(id, name, isActive) {
+                    document.getElementById('prodcategoryId').value = id;
+                    document.getElementById('prodcategoryName').value = name;
+                    document.getElementById('prodcategoryStatus').value = isActive ? '1' : '0';
+                    document.getElementById('prodcategoryModalTitle').textContent = 'Edit Category';
+                    document.getElementById('prodcategoryModal').classList.add('show');
+                }
+                
+                document.getElementById('prodcategoryForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const id = document.getElementById('prodcategoryId').value;
+                    const data = {
+                        categoryName: document.getElementById('prodcategoryName').value,
+                        isActive: document.getElementById('prodcategoryStatus').value === '1'
+                    };
+                    
+                    try {
+                        const url = id ? '/operational-excellence/system-settings/api/prodcategorys/' + id : '/operational-excellence/system-settings/api/prodcategorys';
+                        const method = id ? 'PUT' : 'POST';
+                        
+                        const res = await fetch(url, {
+                            method,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        });
+                        
+                        if (res.ok) {
+                            closeModal('prodcategory');
+                            showToast(id ? 'Category updated!' : 'Category added!');
+                            await loadProdCategories();
+                        } else {
+                            const err = await res.json();
+                            showToast(err.error || 'Error saving category', 'error');
+                        }
+                    } catch (err) {
+                        console.error('Error saving category:', err);
+                        showToast('Error saving category', 'error');
+                    }
+                });
+                
+                // ========== THIRD PARTIES ==========
+                async function loadThirdParties() {
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/thirdpartys');
+                        const parties = await res.json();
+                        renderThirdPartiesTable(parties);
+                    } catch (err) {
+                        console.error('Error loading third parties:', err);
+                    }
+                }
+                
+                function renderThirdPartiesTable(parties) {
+                    const container = document.getElementById('thirdparties-table');
+                    if (!container) return;
+                    
+                    if (parties.length === 0) {
+                        container.innerHTML = '<div style="text-align: center; color: #666; padding: 40px;">No third parties found. Click "Add Third Party" to create one.</div>';
+                        return;
+                    }
+                    
+                    container.innerHTML = \`
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Third Party Name</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                \${parties.map(p => \`
+                                    <tr>
+                                        <td>\${p.ThirdPartyName}</td>
+                                        <td><span class="status-badge \${p.IsActive ? 'active' : 'inactive'}">\${p.IsActive ? 'Active' : 'Inactive'}</span></td>
+                                        <td>\${new Date(p.CreatedDate).toLocaleDateString()}</td>
+                                        <td class="actions">
+                                            <button class="btn-icon edit" onclick="editThirdParty(\${p.Id}, '\${escapeJS(p.ThirdPartyName)}', \${p.IsActive})" title="Edit">✏️</button>
+                                            <button class="btn-icon delete" onclick="confirmDelete('thirdparty', \${p.Id}, '\${escapeJS(p.ThirdPartyName)}')" title="Delete">🗑️</button>
+                                        </td>
+                                    </tr>
+                                \`).join('')}
+                            </tbody>
+                        </table>
+                    \`;
+                }
+                
+                function editThirdParty(id, name, isActive) {
+                    document.getElementById('thirdpartyId').value = id;
+                    document.getElementById('thirdpartyName').value = name;
+                    document.getElementById('thirdpartyStatus').value = isActive ? '1' : '0';
+                    document.getElementById('thirdpartyModalTitle').textContent = 'Edit Third Party';
+                    document.getElementById('thirdpartyModal').classList.add('show');
+                }
+                
+                document.getElementById('thirdpartyForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const id = document.getElementById('thirdpartyId').value;
+                    const data = {
+                        thirdPartyName: document.getElementById('thirdpartyName').value,
+                        isActive: document.getElementById('thirdpartyStatus').value === '1'
+                    };
+                    
+                    try {
+                        const url = id ? '/operational-excellence/system-settings/api/thirdpartys/' + id : '/operational-excellence/system-settings/api/thirdpartys';
+                        const method = id ? 'PUT' : 'POST';
+                        
+                        const res = await fetch(url, {
+                            method,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        });
+                        
+                        if (res.ok) {
+                            closeModal('thirdparty');
+                            showToast(id ? 'Third party updated!' : 'Third party added!');
+                            await loadThirdParties();
+                        } else {
+                            const err = await res.json();
+                            showToast(err.error || 'Error saving third party', 'error');
+                        }
+                    } catch (err) {
+                        console.error('Error saving third party:', err);
+                        showToast('Error saving third party', 'error');
+                    }
+                });
+                
+                // ========== SHIFTS ==========
+                async function loadShifts() {
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/shifts');
+                        const shifts = await res.json();
+                        renderShiftsTable(shifts);
+                    } catch (err) {
+                        console.error('Error loading shifts:', err);
+                    }
+                }
+                
+                function renderShiftsTable(shifts) {
+                    const container = document.getElementById('shifts-table');
+                    if (!container) return;
+                    
+                    if (shifts.length === 0) {
+                        container.innerHTML = '<div style="text-align: center; color: #666; padding: 40px;">No shifts found. Click "Add Shift" to create one.</div>';
+                        return;
+                    }
+                    
+                    container.innerHTML = \`
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Shift Name</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                \${shifts.map(s => \`
+                                    <tr>
+                                        <td>\${s.ShiftName}</td>
+                                        <td><span class="status-badge \${s.IsActive ? 'active' : 'inactive'}">\${s.IsActive ? 'Active' : 'Inactive'}</span></td>
+                                        <td>\${new Date(s.CreatedDate).toLocaleDateString()}</td>
+                                        <td class="actions">
+                                            <button class="btn-icon edit" onclick="editShift(\${s.Id}, '\${escapeJS(s.ShiftName)}', \${s.IsActive})" title="Edit">✏️</button>
+                                            <button class="btn-icon delete" onclick="confirmDelete('shift', \${s.Id}, '\${escapeJS(s.ShiftName)}')" title="Delete">🗑️</button>
+                                        </td>
+                                    </tr>
+                                \`).join('')}
+                            </tbody>
+                        </table>
+                    \`;
+                }
+                
+                function editShift(id, name, isActive) {
+                    document.getElementById('shiftId').value = id;
+                    document.getElementById('shiftName').value = name;
+                    document.getElementById('shiftStatus').value = isActive ? '1' : '0';
+                    document.getElementById('shiftModalTitle').textContent = 'Edit Shift';
+                    document.getElementById('shiftModal').classList.add('show');
+                }
+                
+                document.getElementById('shiftForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const id = document.getElementById('shiftId').value;
+                    const data = {
+                        shiftName: document.getElementById('shiftName').value,
+                        isActive: document.getElementById('shiftStatus').value === '1'
+                    };
+                    
+                    try {
+                        const url = id ? '/operational-excellence/system-settings/api/shifts/' + id : '/operational-excellence/system-settings/api/shifts';
+                        const method = id ? 'PUT' : 'POST';
+                        
+                        const res = await fetch(url, {
+                            method,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        });
+                        
+                        if (res.ok) {
+                            closeModal('shift');
+                            showToast(id ? 'Shift updated!' : 'Shift added!');
+                            await loadShifts();
+                        } else {
+                            const err = await res.json();
+                            showToast(err.error || 'Error saving shift', 'error');
+                        }
+                    } catch (err) {
+                        console.error('Error saving shift:', err);
+                        showToast('Error saving shift', 'error');
+                    }
+                });
+                
+                // ========== UNIT COSTS ==========
+                let unitCostsData = [];
+                let prodCategoriesForCost = [];
+                let thirdPartiesForCost = [];
+                let shiftsForCost = [];
+                
+                async function loadUnitCosts() {
+                    try {
+                        // Load unit costs and also refresh dropdown data
+                        const [costsRes, categoriesRes, partiesRes, shiftsRes] = await Promise.all([
+                            fetch('/operational-excellence/system-settings/api/unitcosts'),
+                            fetch('/operational-excellence/system-settings/api/prodcategorys'),
+                            fetch('/operational-excellence/system-settings/api/thirdpartys'),
+                            fetch('/operational-excellence/system-settings/api/shifts')
+                        ]);
+                        unitCostsData = await costsRes.json();
+                        prodCategoriesForCost = await categoriesRes.json();
+                        thirdPartiesForCost = await partiesRes.json();
+                        shiftsForCost = await shiftsRes.json();
+                        renderUnitCostsTable(unitCostsData);
+                    } catch (err) {
+                        console.error('Error loading unit costs:', err);
+                    }
+                }
+                
+                function renderUnitCostsTable(costs) {
+                    const container = document.getElementById('unitcosts-table');
+                    if (!container) return;
+                    
+                    if (costs.length === 0) {
+                        container.innerHTML = '<div style="text-align: center; color: #666; padding: 40px;">No unit costs found. Click "Add Unit Cost" to create one.</div>';
+                        return;
+                    }
+                    
+                    container.innerHTML = \`
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Third Party</th>
+                                    <th>Shift</th>
+                                    <th>Cost ($)</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                \${costs.map(c => \`
+                                    <tr>
+                                        <td>\${c.CategoryName || '-'}</td>
+                                        <td>\${c.ThirdPartyName || '-'}</td>
+                                        <td>\${c.ShiftName || '-'}</td>
+                                        <td>$\${c.CostValue ? parseFloat(c.CostValue).toFixed(2) : '0.00'}</td>
+                                        <td><span class="status-badge \${c.IsActive ? 'active' : 'inactive'}">\${c.IsActive ? 'Active' : 'Inactive'}</span></td>
+                                        <td class="actions">
+                                            <button class="btn-icon edit" onclick="editUnitCost(\${c.Id}, \${c.CategoryId}, \${c.ThirdPartyId}, \${c.ShiftId}, \${c.CostValue || 0}, \${c.IsActive})" title="Edit">✏️</button>
+                                            <button class="btn-icon delete" onclick="confirmDelete('unitcost', \${c.Id}, 'this unit cost')" title="Delete">🗑️</button>
+                                        </td>
+                                    </tr>
+                                \`).join('')}
+                            </tbody>
+                        </table>
+                    \`;
+                }
+                
+                function populateUnitCostDropdowns() {
+                    // Fetch fresh data for dropdowns
+                    Promise.all([
+                        fetch('/operational-excellence/system-settings/api/prodcategorys'),
+                        fetch('/operational-excellence/system-settings/api/thirdpartys'),
+                        fetch('/operational-excellence/system-settings/api/shifts')
+                    ]).then(async ([categoriesRes, partiesRes, shiftsRes]) => {
+                        const categories = await categoriesRes.json();
+                        const parties = await partiesRes.json();
+                        const shifts = await shiftsRes.json();
+                        
+                        // Update cached data
+                        prodCategoriesForCost = categories;
+                        thirdPartiesForCost = parties;
+                        shiftsForCost = shifts;
+                        
+                        // Populate Category dropdown
+                        const categorySelect = document.getElementById('unitcostCategory');
+                        categorySelect.innerHTML = '<option value="">Select Category...</option>';
+                        categories.filter(c => c.IsActive).forEach(c => {
+                            categorySelect.innerHTML += '<option value="' + c.Id + '">' + c.CategoryName + '</option>';
+                        });
+                        
+                        // Populate Third Party dropdown
+                        const thirdPartySelect = document.getElementById('unitcostThirdParty');
+                        thirdPartySelect.innerHTML = '<option value="">Select Third Party...</option>';
+                        parties.filter(t => t.IsActive).forEach(t => {
+                            thirdPartySelect.innerHTML += '<option value="' + t.Id + '">' + t.ThirdPartyName + '</option>';
+                        });
+                        
+                        // Populate Shift dropdown
+                        const shiftSelect = document.getElementById('unitcostShift');
+                        shiftSelect.innerHTML = '<option value="">Select Shift...</option>';
+                        shifts.filter(s => s.IsActive).forEach(s => {
+                            shiftSelect.innerHTML += '<option value="' + s.Id + '">' + s.ShiftName + '</option>';
+                        });
+                    }).catch(err => {
+                        console.error('Error populating unit cost dropdowns:', err);
+                        showToast('Error loading dropdown data', 'error');
+                    });
+                }
+                
+                function editUnitCost(id, categoryId, thirdPartyId, shiftId, value, isActive) {
+                    // First set the form values
+                    document.getElementById('unitcostId').value = id;
+                    document.getElementById('unitcostValue').value = value;
+                    document.getElementById('unitcostStatus').value = isActive ? '1' : '0';
+                    document.getElementById('unitcostModalTitle').textContent = 'Edit Unit Cost';
+                    document.getElementById('unitcostModal').classList.add('show');
+                    
+                    // Then populate dropdowns and set selected values
+                    Promise.all([
+                        fetch('/operational-excellence/system-settings/api/prodcategorys'),
+                        fetch('/operational-excellence/system-settings/api/thirdpartys'),
+                        fetch('/operational-excellence/system-settings/api/shifts')
+                    ]).then(async ([categoriesRes, partiesRes, shiftsRes]) => {
+                        const categories = await categoriesRes.json();
+                        const parties = await partiesRes.json();
+                        const shifts = await shiftsRes.json();
+                        
+                        // Populate Category dropdown
+                        const categorySelect = document.getElementById('unitcostCategory');
+                        categorySelect.innerHTML = '<option value="">Select Category...</option>';
+                        categories.filter(c => c.IsActive).forEach(c => {
+                            categorySelect.innerHTML += '<option value="' + c.Id + '">' + c.CategoryName + '</option>';
+                        });
+                        categorySelect.value = categoryId;
+                        
+                        // Populate Third Party dropdown
+                        const thirdPartySelect = document.getElementById('unitcostThirdParty');
+                        thirdPartySelect.innerHTML = '<option value="">Select Third Party...</option>';
+                        parties.filter(t => t.IsActive).forEach(t => {
+                            thirdPartySelect.innerHTML += '<option value="' + t.Id + '">' + t.ThirdPartyName + '</option>';
+                        });
+                        thirdPartySelect.value = thirdPartyId;
+                        
+                        // Populate Shift dropdown
+                        const shiftSelect = document.getElementById('unitcostShift');
+                        shiftSelect.innerHTML = '<option value="">Select Shift...</option>';
+                        shifts.filter(s => s.IsActive).forEach(s => {
+                            shiftSelect.innerHTML += '<option value="' + s.Id + '">' + s.ShiftName + '</option>';
+                        });
+                        shiftSelect.value = shiftId;
+                    }).catch(err => {
+                        console.error('Error populating unit cost dropdowns:', err);
+                    });
+                }
+                
+                document.getElementById('unitcostForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const id = document.getElementById('unitcostId').value;
+                    const data = {
+                        categoryId: parseInt(document.getElementById('unitcostCategory').value),
+                        thirdPartyId: parseInt(document.getElementById('unitcostThirdParty').value),
+                        shiftId: parseInt(document.getElementById('unitcostShift').value),
+                        costValue: parseFloat(document.getElementById('unitcostValue').value) || 0,
+                        isActive: document.getElementById('unitcostStatus').value === '1'
+                    };
+                    
+                    try {
+                        const url = id ? '/operational-excellence/system-settings/api/unitcosts/' + id : '/operational-excellence/system-settings/api/unitcosts';
+                        const method = id ? 'PUT' : 'POST';
+                        
+                        const res = await fetch(url, {
+                            method,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        });
+                        
+                        if (res.ok) {
+                            closeModal('unitcost');
+                            showToast(id ? 'Unit cost updated!' : 'Unit cost added!');
+                            await loadUnitCosts();
+                        } else {
+                            const err = await res.json();
+                            showToast(err.error || 'Error saving unit cost', 'error');
+                        }
+                    } catch (err) {
+                        console.error('Error saving unit cost:', err);
+                        showToast('Error saving unit cost', 'error');
+                    }
+                });
                 
                 // ========== BULK IMPORT ==========
                 function openBulkModal() {
@@ -1111,6 +2179,530 @@ router.delete('/api/providers/:id', async (req, res) => {
     } catch (err) {
         console.error('Error deleting provider:', err);
         res.status(500).json({ error: 'Failed to delete provider' });
+    }
+});
+
+// ========== PRODUCTION OUTLET SCHEMES API ==========
+router.get('/api/schemes', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        const result = await pool.request()
+            .query('SELECT * FROM ProductionOutletSchemes ORDER BY SchemeName');
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error loading schemes:', err);
+        res.status(500).json({ error: 'Failed to load schemes' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.post('/api/schemes', async (req, res) => {
+    let pool;
+    try {
+        const { schemeName, isActive } = req.body;
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('schemeName', sql.NVarChar, schemeName)
+            .input('isActive', sql.Bit, isActive)
+            .input('createdBy', sql.NVarChar, req.session?.user?.name || 'System')
+            .query(`INSERT INTO ProductionOutletSchemes (SchemeName, IsActive, CreatedDate, CreatedBy) 
+                    VALUES (@schemeName, @isActive, GETDATE(), @createdBy)`);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error adding scheme:', err);
+        res.status(500).json({ error: 'Failed to add scheme' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.put('/api/schemes/:id', async (req, res) => {
+    let pool;
+    try {
+        const { schemeName, isActive } = req.body;
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .input('schemeName', sql.NVarChar, schemeName)
+            .input('isActive', sql.Bit, isActive)
+            .query('UPDATE ProductionOutletSchemes SET SchemeName = @schemeName, IsActive = @isActive WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating scheme:', err);
+        res.status(500).json({ error: 'Failed to update scheme' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.delete('/api/schemes/:id', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query('DELETE FROM ProductionOutletSchemes WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting scheme:', err);
+        res.status(500).json({ error: 'Failed to delete scheme' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+// ========== PRODUCTION OUTLETS API ==========
+router.get('/api/outlets', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        const result = await pool.request()
+            .query('SELECT * FROM ProductionOutlets ORDER BY OutletName');
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error loading outlets:', err);
+        res.status(500).json({ error: 'Failed to load outlets' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.post('/api/outlets', async (req, res) => {
+    let pool;
+    try {
+        const { outletName, isActive } = req.body;
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('outletName', sql.NVarChar, outletName)
+            .input('isActive', sql.Bit, isActive)
+            .input('createdBy', sql.NVarChar, req.session?.user?.name || 'System')
+            .query(`INSERT INTO ProductionOutlets (OutletName, IsActive, CreatedDate, CreatedBy) 
+                    VALUES (@outletName, @isActive, GETDATE(), @createdBy)`);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error adding outlet:', err);
+        res.status(500).json({ error: 'Failed to add outlet' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.put('/api/outlets/:id', async (req, res) => {
+    let pool;
+    try {
+        const { outletName, isActive } = req.body;
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .input('outletName', sql.NVarChar, outletName)
+            .input('isActive', sql.Bit, isActive)
+            .query('UPDATE ProductionOutlets SET OutletName = @outletName, IsActive = @isActive WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating outlet:', err);
+        res.status(500).json({ error: 'Failed to update outlet' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.delete('/api/outlets/:id', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query('DELETE FROM ProductionOutlets WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting outlet:', err);
+        res.status(500).json({ error: 'Failed to delete outlet' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+// ========== PRODUCTION LOCATIONS API ==========
+router.get('/api/locations', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        const result = await pool.request()
+            .query(`SELECT l.*, s.SchemeName 
+                    FROM ProductionLocations l 
+                    LEFT JOIN ProductionOutletSchemes s ON l.SchemeId = s.Id 
+                    ORDER BY l.LocationName`);
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error loading locations:', err);
+        res.status(500).json({ error: 'Failed to load locations' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.post('/api/locations', async (req, res) => {
+    let pool;
+    try {
+        const { locationName, schemeId, isActive } = req.body;
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('locationName', sql.NVarChar, locationName)
+            .input('schemeId', sql.Int, schemeId || null)
+            .input('isActive', sql.Bit, isActive)
+            .input('createdBy', sql.NVarChar, req.session?.user?.name || 'System')
+            .query(`INSERT INTO ProductionLocations (LocationName, SchemeId, IsActive, CreatedDate, CreatedBy) 
+                    VALUES (@locationName, @schemeId, @isActive, GETDATE(), @createdBy)`);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error adding location:', err);
+        res.status(500).json({ error: 'Failed to add location' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.put('/api/locations/:id', async (req, res) => {
+    let pool;
+    try {
+        const { locationName, schemeId, isActive } = req.body;
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .input('locationName', sql.NVarChar, locationName)
+            .input('schemeId', sql.Int, schemeId || null)
+            .input('isActive', sql.Bit, isActive)
+            .query('UPDATE ProductionLocations SET LocationName = @locationName, SchemeId = @schemeId, IsActive = @isActive WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating location:', err);
+        res.status(500).json({ error: 'Failed to update location' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.delete('/api/locations/:id', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query('DELETE FROM ProductionLocations WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting location:', err);
+        res.status(500).json({ error: 'Failed to delete location' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+// ========== PRODUCTION CATEGORIES API ==========
+router.get('/api/prodcategorys', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        const result = await pool.request()
+            .query('SELECT * FROM ProductionCategories ORDER BY CategoryName');
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error loading production categories:', err);
+        res.status(500).json({ error: 'Failed to load categories' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.post('/api/prodcategorys', async (req, res) => {
+    let pool;
+    try {
+        const { categoryName, isActive } = req.body;
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('categoryName', sql.NVarChar, categoryName)
+            .input('isActive', sql.Bit, isActive)
+            .input('createdBy', sql.NVarChar, req.session?.user?.name || 'System')
+            .query(`INSERT INTO ProductionCategories (CategoryName, IsActive, CreatedDate, CreatedBy) 
+                    VALUES (@categoryName, @isActive, GETDATE(), @createdBy)`);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error adding category:', err);
+        res.status(500).json({ error: 'Failed to add category' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.put('/api/prodcategorys/:id', async (req, res) => {
+    let pool;
+    try {
+        const { categoryName, isActive } = req.body;
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .input('categoryName', sql.NVarChar, categoryName)
+            .input('isActive', sql.Bit, isActive)
+            .query('UPDATE ProductionCategories SET CategoryName = @categoryName, IsActive = @isActive WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating category:', err);
+        res.status(500).json({ error: 'Failed to update category' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.delete('/api/prodcategorys/:id', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query('DELETE FROM ProductionCategories WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting category:', err);
+        res.status(500).json({ error: 'Failed to delete category' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+// ========== THIRD PARTIES API ==========
+router.get('/api/thirdpartys', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        const result = await pool.request()
+            .query('SELECT * FROM ProductionThirdParties ORDER BY ThirdPartyName');
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error loading third parties:', err);
+        res.status(500).json({ error: 'Failed to load third parties' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.post('/api/thirdpartys', async (req, res) => {
+    let pool;
+    try {
+        const { thirdPartyName, isActive } = req.body;
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('thirdPartyName', sql.NVarChar, thirdPartyName)
+            .input('isActive', sql.Bit, isActive)
+            .input('createdBy', sql.NVarChar, req.session?.user?.name || 'System')
+            .query(`INSERT INTO ProductionThirdParties (ThirdPartyName, IsActive, CreatedDate, CreatedBy) 
+                    VALUES (@thirdPartyName, @isActive, GETDATE(), @createdBy)`);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error adding third party:', err);
+        res.status(500).json({ error: 'Failed to add third party' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.put('/api/thirdpartys/:id', async (req, res) => {
+    let pool;
+    try {
+        const { thirdPartyName, isActive } = req.body;
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .input('thirdPartyName', sql.NVarChar, thirdPartyName)
+            .input('isActive', sql.Bit, isActive)
+            .query('UPDATE ProductionThirdParties SET ThirdPartyName = @thirdPartyName, IsActive = @isActive WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating third party:', err);
+        res.status(500).json({ error: 'Failed to update third party' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.delete('/api/thirdpartys/:id', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query('DELETE FROM ProductionThirdParties WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting third party:', err);
+        res.status(500).json({ error: 'Failed to delete third party' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+// ========== SHIFTS API ==========
+router.get('/api/shifts', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        const result = await pool.request()
+            .query('SELECT * FROM ProductionShifts ORDER BY ShiftName');
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error loading shifts:', err);
+        res.status(500).json({ error: 'Failed to load shifts' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.post('/api/shifts', async (req, res) => {
+    let pool;
+    try {
+        const { shiftName, isActive } = req.body;
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('shiftName', sql.NVarChar, shiftName)
+            .input('isActive', sql.Bit, isActive)
+            .input('createdBy', sql.NVarChar, req.session?.user?.name || 'System')
+            .query(`INSERT INTO ProductionShifts (ShiftName, IsActive, CreatedDate, CreatedBy) 
+                    VALUES (@shiftName, @isActive, GETDATE(), @createdBy)`);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error adding shift:', err);
+        res.status(500).json({ error: 'Failed to add shift' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.put('/api/shifts/:id', async (req, res) => {
+    let pool;
+    try {
+        const { shiftName, isActive } = req.body;
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .input('shiftName', sql.NVarChar, shiftName)
+            .input('isActive', sql.Bit, isActive)
+            .query('UPDATE ProductionShifts SET ShiftName = @shiftName, IsActive = @isActive WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating shift:', err);
+        res.status(500).json({ error: 'Failed to update shift' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.delete('/api/shifts/:id', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query('DELETE FROM ProductionShifts WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting shift:', err);
+        res.status(500).json({ error: 'Failed to delete shift' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+// ========== UNIT COSTS API ==========
+router.get('/api/unitcosts', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        const result = await pool.request()
+            .query(`SELECT uc.*, 
+                    c.CategoryName, 
+                    t.ThirdPartyName, 
+                    s.ShiftName
+                    FROM ProductionUnitCosts uc
+                    LEFT JOIN ProductionCategories c ON uc.CategoryId = c.Id
+                    LEFT JOIN ProductionThirdParties t ON uc.ThirdPartyId = t.Id
+                    LEFT JOIN ProductionShifts s ON uc.ShiftId = s.Id
+                    ORDER BY c.CategoryName, t.ThirdPartyName, s.ShiftName`);
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error loading unit costs:', err);
+        res.status(500).json({ error: 'Failed to load unit costs' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.post('/api/unitcosts', async (req, res) => {
+    let pool;
+    try {
+        const { categoryId, thirdPartyId, shiftId, costValue, isActive } = req.body;
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('categoryId', sql.Int, categoryId)
+            .input('thirdPartyId', sql.Int, thirdPartyId)
+            .input('shiftId', sql.Int, shiftId)
+            .input('costValue', sql.Decimal(10, 2), costValue)
+            .input('isActive', sql.Bit, isActive)
+            .input('createdBy', sql.NVarChar, req.session?.user?.name || 'System')
+            .query(`INSERT INTO ProductionUnitCosts (CategoryId, ThirdPartyId, ShiftId, CostValue, IsActive, CreatedDate, CreatedBy) 
+                    VALUES (@categoryId, @thirdPartyId, @shiftId, @costValue, @isActive, GETDATE(), @createdBy)`);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error adding unit cost:', err);
+        if (err.message && err.message.includes('UQ_UnitCosts_Combination')) {
+            res.status(400).json({ error: 'This combination of Category, Third Party, and Shift already exists' });
+        } else {
+            res.status(500).json({ error: 'Failed to add unit cost' });
+        }
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.put('/api/unitcosts/:id', async (req, res) => {
+    let pool;
+    try {
+        const { categoryId, thirdPartyId, shiftId, costValue, isActive } = req.body;
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .input('categoryId', sql.Int, categoryId)
+            .input('thirdPartyId', sql.Int, thirdPartyId)
+            .input('shiftId', sql.Int, shiftId)
+            .input('costValue', sql.Decimal(10, 2), costValue)
+            .input('isActive', sql.Bit, isActive)
+            .query('UPDATE ProductionUnitCosts SET CategoryId = @categoryId, ThirdPartyId = @thirdPartyId, ShiftId = @shiftId, CostValue = @costValue, IsActive = @isActive WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating unit cost:', err);
+        if (err.message && err.message.includes('UQ_UnitCosts_Combination')) {
+            res.status(400).json({ error: 'This combination of Category, Third Party, and Shift already exists' });
+        } else {
+            res.status(500).json({ error: 'Failed to update unit cost' });
+        }
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
+    }
+});
+
+router.delete('/api/unitcosts/:id', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query('DELETE FROM ProductionUnitCosts WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting unit cost:', err);
+        res.status(500).json({ error: 'Failed to delete unit cost' });
+    } finally {
+        if (pool) try { await pool.close(); } catch(e) {}
     }
 });
 

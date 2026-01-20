@@ -9,12 +9,14 @@ const path = require('path');
 // Import form handlers
 const theftIncidentRoutes = require('./theft-incident/routes');
 const extraCleaningRoutes = require('./extra-cleaning/routes');
+const productionExtrasRoutes = require('./production-extras/routes');
 
 // Stores main page
 router.get('/', (req, res) => {
     const forms = [
         { id: 'theft-incident', icon: '🚨', title: 'Theft Incident Report', href: '/stores/theft-incident', desc: 'Report theft incidents at stores', color: '#dc3545' },
         { id: 'extra-cleaning', icon: '🧹', title: 'Extra Cleaning Agents Request', href: '/stores/extra-cleaning', desc: 'Request extra cleaning agents for your store', color: '#17a2b8' },
+        { id: 'production-extras', icon: '👷', title: 'Production Extras Request', href: '/stores/production-extras', desc: 'Request extra production agents', color: '#667eea' },
         // More forms will be added here
     ];
     
@@ -142,5 +144,6 @@ router.get('/', (req, res) => {
 // Mount form routes
 router.use('/theft-incident', theftIncidentRoutes);
 router.use('/extra-cleaning', extraCleaningRoutes);
+router.use('/production-extras', productionExtrasRoutes);
 
 module.exports = router;
