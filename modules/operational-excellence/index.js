@@ -11,12 +11,14 @@ const theftDashboard = require('./theft-dashboard');
 const systemSettings = require('./system-settings');
 const extraCleaningReview = require('./extra-cleaning-review');
 const productionDashboard = require('./production-dashboard');
+const feedbackDashboard = require('./feedback-dashboard');
 
 // Mount sub-routes
 router.use('/theft-dashboard', theftDashboard);
 router.use('/system-settings', systemSettings);
 router.use('/extra-cleaning-review', extraCleaningReview);
 router.use('/production-dashboard', productionDashboard);
+router.use('/feedback-dashboard', feedbackDashboard);
 
 // Landing page
 router.get('/', (req, res) => {
@@ -197,6 +199,30 @@ router.get('/', (req, res) => {
                         </div>
                     </a>
                     
+                    <!-- Weekly Third Party Feedback Dashboard -->
+                    <a href="/operational-excellence/feedback-dashboard" class="card" style="border-left: 4px solid #6c5ce7;">
+                        <div class="card-icon">📋</div>
+                        <div class="card-title">Weekly Third Party Feedback</div>
+                        <div class="card-desc">
+                            View all weekly third party service feedback submissions. 
+                            Analyze ratings and track service quality trends.
+                        </div>
+                        <div class="card-stats">
+                            <div class="stat">
+                                <div class="stat-value" id="feedbackTotal" style="color: #6c5ce7;">-</div>
+                                <div class="stat-label">Total</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" id="feedbackWeek" style="color: #ffc107;">-</div>
+                                <div class="stat-label">This Week</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" id="feedbackMonth" style="color: #28a745;">-</div>
+                                <div class="stat-label">This Month</div>
+                            </div>
+                        </div>
+                    </a>
+                    
                     <!-- Production Extras Dashboard -->
                     <a href="/operational-excellence/production-dashboard" class="card" style="border-left: 4px solid #667eea;">
                         <div class="card-icon">👷</div>
@@ -338,6 +364,18 @@ router.get('/', (req, res) => {
                     })
                     .catch(err => {
                         console.error('Error loading production stats:', err);
+                    });
+                
+                // Load stats for weekly feedback dashboard card
+                fetch('/operational-excellence/feedback-dashboard/api/stats')
+                    .then(r => r.json())
+                    .then(data => {
+                        document.getElementById('feedbackTotal').textContent = data.total || 0;
+                        document.getElementById('feedbackWeek').textContent = data.thisWeek || 0;
+                        document.getElementById('feedbackMonth').textContent = data.thisMonth || 0;
+                    })
+                    .catch(err => {
+                        console.error('Error loading feedback stats:', err);
                     });
             </script>
         </body>

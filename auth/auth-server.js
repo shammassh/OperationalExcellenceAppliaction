@@ -9,6 +9,9 @@ const path = require('path');
 const msal = require('@azure/msal-node');
 const sql = require('mssql');
 
+// Load notification scheduler for login-time checks
+const { checkUserNotifications } = require('../services/notification-scheduler');
+
 // Load configuration - dotenv already loaded by app.js with correct path
 // No need to reload here as it overwrites the correct env file with default .env
 
@@ -148,6 +151,11 @@ function initializeAuth(app) {
                 if (!user.IsApproved) {
                     return res.redirect('/auth/pending-approval');
                 }
+                
+                // Check/create notifications for the user on login
+                checkUserNotifications(user.Id, user.Email).catch(err => {
+                    console.error('Error checking user notifications:', err);
+                });
                 
                 // Redirect to dashboard
                 res.redirect('/dashboard');

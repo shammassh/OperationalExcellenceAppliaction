@@ -40,6 +40,12 @@ initializeAuth(app);
 const publicApprovalRoutes = require('./routes/public-approval');
 app.use('/public/approve', publicApprovalRoutes);
 
+// ==========================================
+// Notifications Routes
+// ==========================================
+const notificationsRoutes = require('./routes/notifications');
+app.use('/notifications', requireAuth, notificationsRoutes);
+
 // Mount Modules
 app.use('/stores', requireAuth, storesModule);
 app.use('/admin', requireAuth, adminModule);
@@ -261,12 +267,43 @@ app.get('/dashboard', requireAuth, (req, res) => {
                     padding: 40px;
                     color: #666;
                 }
+                .notification-bell {
+                    position: relative;
+                    background: rgba(255,255,255,0.15);
+                    padding: 10px 15px;
+                    border-radius: 8px;
+                    text-decoration: none;
+                    color: white;
+                    font-size: 20px;
+                    display: flex;
+                    align-items: center;
+                }
+                .notification-bell:hover {
+                    background: rgba(255,255,255,0.25);
+                }
+                .notification-badge {
+                    position: absolute;
+                    top: -5px;
+                    right: -5px;
+                    background: #e74c3c;
+                    color: white;
+                    font-size: 11px;
+                    font-weight: bold;
+                    padding: 2px 6px;
+                    border-radius: 10px;
+                    min-width: 18px;
+                    text-align: center;
+                }
             </style>
         </head>
         <body>
             <div class="header">
                 <h1>Operational Excellence Dashboard</h1>
                 <div style="display: flex; gap: 15px; align-items: center;">
+                    <a href="/notifications" class="notification-bell" id="notificationBell">
+                        🔔
+                        <span class="notification-badge" id="notificationCount" style="display: none;">0</span>
+                    </a>
                     ${req.currentUser.roleId === 31 ? '<a href="/admin" style="background:#1a1a2e;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;">⚙️ Admin Panel</a>' : ''}
                     <a href="/auth/logout" class="logout-btn">Logout</a>
                 </div>
@@ -283,6 +320,31 @@ app.get('/dashboard', requireAuth, (req, res) => {
                     ${menuHtml || '<div class="no-access">No departments assigned. Please contact your administrator.</div>'}
                 </div>
             </div>
+            
+            <script>
+                // Load notification count
+                async function loadNotificationCount() {
+                    try {
+                        const res = await fetch('/notifications/count');
+                        const data = await res.json();
+                        const badge = document.getElementById('notificationCount');
+                        if (data.count > 0) {
+                            badge.textContent = data.count > 99 ? '99+' : data.count;
+                            badge.style.display = 'block';
+                        } else {
+                            badge.style.display = 'none';
+                        }
+                    } catch (err) {
+                        console.error('Error loading notifications:', err);
+                    }
+                }
+                
+                // Load on page load
+                loadNotificationCount();
+                
+                // Refresh every 60 seconds
+                setInterval(loadNotificationCount, 60000);
+            </script>
         </body>
         </html>
     `);
