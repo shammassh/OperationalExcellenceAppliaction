@@ -93,6 +93,31 @@ router.get('/', async (req, res) => {
         // Get categories
         const categories = await pool.request().query('SELECT Id, CategoryName FROM CleaningCategories WHERE IsActive = 1 ORDER BY CategoryName');
         
+        // Get users by role for approval dropdowns
+        const areaManagers = await pool.request().query(`
+            SELECT u.Id, u.DisplayName, u.Email 
+            FROM Users u 
+            INNER JOIN UserRoles r ON u.RoleId = r.Id 
+            WHERE r.RoleName = 'Area Manager' AND u.IsActive = 1 
+            ORDER BY u.DisplayName
+        `);
+        
+        const headOfOps = await pool.request().query(`
+            SELECT u.Id, u.DisplayName, u.Email 
+            FROM Users u 
+            INNER JOIN UserRoles r ON u.RoleId = r.Id 
+            WHERE r.RoleName = 'Head of Operations' AND u.IsActive = 1 
+            ORDER BY u.DisplayName
+        `);
+        
+        const hrUsers = await pool.request().query(`
+            SELECT u.Id, u.DisplayName, u.Email 
+            FROM Users u 
+            INNER JOIN UserRoles r ON u.RoleId = r.Id 
+            WHERE r.RoleName = 'HR Officer' AND u.IsActive = 1 
+            ORDER BY u.DisplayName
+        `);
+        
         // Get all third party providers with their category info (for JavaScript filtering)
         const providers = await pool.request().query(`
             SELECT p.Id, p.ProviderName, p.CategoryId, c.CategoryName 
@@ -110,6 +135,19 @@ router.get('/', async (req, res) => {
         
         const categoryOptions = categories.recordset.map(c => 
             `<option value="${c.CategoryName}" data-id="${c.Id}">${c.CategoryName}</option>`
+        ).join('');
+        
+        // Build approval dropdown options
+        const areaManagerOptions = areaManagers.recordset.map(u => 
+            `<option value="${u.Id}" data-name="${u.DisplayName}" data-email="${u.Email}">${u.DisplayName}</option>`
+        ).join('');
+        
+        const headOfOpsOptions = headOfOps.recordset.map(u => 
+            `<option value="${u.Id}" data-name="${u.DisplayName}" data-email="${u.Email}">${u.DisplayName}</option>`
+        ).join('');
+        
+        const hrOptions = hrUsers.recordset.map(u => 
+            `<option value="${u.Id}" data-name="${u.DisplayName}" data-email="${u.Email}">${u.DisplayName}</option>`
         ).join('');
         
         // Store providers as JSON for JavaScript filtering
@@ -441,25 +479,45 @@ router.get('/', async (req, res) => {
                                 </div>
                             </div>
                             
-                            <!-- Approval Info -->
+                            <!-- Approval Selection -->
                             <div class="form-section">
-                                <div class="section-title">✅ Approval Workflow</div>
-                                <div style="background:#f8f9fa;padding:20px;border-radius:8px;color:#666;">
-                                    <p style="margin-bottom:10px;">This request will be sent for approval to:</p>
-                                    <div style="display:flex;gap:20px;flex-wrap:wrap;">
-                                        <div style="display:flex;align-items:center;gap:8px;">
-                                            <span style="width:24px;height:24px;background:#17a2b8;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;">1</span>
-                                            <span>Area Manager</span>
-                                        </div>
-                                        <div style="display:flex;align-items:center;gap:8px;">
-                                            <span style="width:24px;height:24px;background:#17a2b8;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;">2</span>
-                                            <span>Head Office</span>
-                                        </div>
-                                        <div style="display:flex;align-items:center;gap:8px;">
-                                            <span style="width:24px;height:24px;background:#17a2b8;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;">3</span>
-                                            <span>HR Manager</span>
-                                        </div>
+                                <div class="section-title">✅ Select Approvers</div>
+                                <div class="form-row" id="approvalRow">
+                                    <!-- Area Manager -->
+                                    <div class="form-group" id="areaManagerGroup">
+                                        <label class="required" for="areaManagerId">Area Manager</label>
+                                        <select id="areaManagerId" name="areaManagerId" required onchange="updateApproverHiddenFields('am')">
+                                            <option value="">Select Area Manager...</option>
+                                            ${areaManagerOptions}
+                                        </select>
+                                        <input type="hidden" id="areaManagerName" name="areaManagerName">
+                                        <input type="hidden" id="areaManagerEmail" name="areaManagerEmail">
                                     </div>
+                                    
+                                    <!-- Head of Operations -->
+                                    <div class="form-group" id="headOfOpsGroup">
+                                        <label class="required" for="headOfOpsId">Head of Operations</label>
+                                        <select id="headOfOpsId" name="headOfOpsId" required onchange="updateApproverHiddenFields('ho')">
+                                            <option value="">Select Head of Operations...</option>
+                                            ${headOfOpsOptions}
+                                        </select>
+                                        <input type="hidden" id="headOfOpsName" name="headOfOpsName">
+                                        <input type="hidden" id="headOfOpsEmail" name="headOfOpsEmail">
+                                    </div>
+                                    
+                                    <!-- HR Responsible -->
+                                    <div class="form-group" id="hrGroup" style="display:none;">
+                                        <label class="required" for="hrId">HR Responsible</label>
+                                        <select id="hrId" name="hrId" onchange="updateApproverHiddenFields('hr')">
+                                            <option value="">Select HR Responsible...</option>
+                                            ${hrOptions}
+                                        </select>
+                                        <input type="hidden" id="hrName" name="hrName">
+                                        <input type="hidden" id="hrEmail" name="hrEmail">
+                                    </div>
+                                </div>
+                                <div id="approvalFlowInfo" style="background:#e8f7f9;padding:15px;border-radius:8px;margin-top:15px;font-size:13px;color:#138496;">
+                                    <strong>Approval Flow:</strong> <span id="approvalFlowText">Area Manager → Head of Operations → OE Dashboard</span>
                                 </div>
                             </div>
                             
@@ -520,7 +578,121 @@ router.get('/', async (req, res) => {
                             });
                             thirdPartySelect.disabled = false;
                         }
+                        
+                        // Update approver visibility when category changes
+                        updateApproverVisibility();
                     });
+                    
+                    // Update approver visibility when store changes
+                    document.getElementById('store').addEventListener('change', function() {
+                        updateApproverVisibility();
+                    });
+                    
+                    /**
+                     * Approver Visibility Rules:
+                     * Rule 1: Category = Helper AND Store contains "Happy" → HO + HR (no AM)
+                     * Rule 2: Category = Helper only → AM + HO + HR
+                     * Rule 3: Store contains "Happy" only → HO only (no AM, no HR)
+                     * Rule 4: Default → AM + HO (no HR)
+                     */
+                    function updateApproverVisibility() {
+                        const category = document.getElementById('category').value;
+                        const store = document.getElementById('store').value;
+                        
+                        const amGroup = document.getElementById('areaManagerGroup');
+                        const hoGroup = document.getElementById('headOfOpsGroup');
+                        const hrGroup = document.getElementById('hrGroup');
+                        const amSelect = document.getElementById('areaManagerId');
+                        const hrSelect = document.getElementById('hrId');
+                        const flowText = document.getElementById('approvalFlowText');
+                        
+                        const isHelper = category && category.toLowerCase() === 'helpers';
+                        const isHappy = store && store.toLowerCase().includes('happy');
+                        
+                        // Rule 1: Helper + Happy → HO + HR (skip AM)
+                        if (isHelper && isHappy) {
+                            amGroup.style.display = 'none';
+                            amSelect.removeAttribute('required');
+                            amSelect.value = '';
+                            
+                            hoGroup.style.display = 'block';
+                            
+                            hrGroup.style.display = 'block';
+                            hrSelect.setAttribute('required', 'required');
+                            
+                            flowText.textContent = 'Head of Operations → HR Responsible → OE Dashboard';
+                        }
+                        // Rule 2: Helper only → AM + HO + HR
+                        else if (isHelper && !isHappy) {
+                            amGroup.style.display = 'block';
+                            amSelect.setAttribute('required', 'required');
+                            
+                            hoGroup.style.display = 'block';
+                            
+                            hrGroup.style.display = 'block';
+                            hrSelect.setAttribute('required', 'required');
+                            
+                            flowText.textContent = 'Area Manager → Head of Operations → HR Responsible → OE Dashboard';
+                        }
+                        // Rule 3: Happy only (not Helper) → HO only
+                        else if (!isHelper && isHappy) {
+                            amGroup.style.display = 'none';
+                            amSelect.removeAttribute('required');
+                            amSelect.value = '';
+                            
+                            hoGroup.style.display = 'block';
+                            
+                            hrGroup.style.display = 'none';
+                            hrSelect.removeAttribute('required');
+                            hrSelect.value = '';
+                            
+                            flowText.textContent = 'Head of Operations → OE Dashboard';
+                        }
+                        // Rule 4: Default → AM + HO (no HR)
+                        else {
+                            amGroup.style.display = 'block';
+                            amSelect.setAttribute('required', 'required');
+                            
+                            hoGroup.style.display = 'block';
+                            
+                            hrGroup.style.display = 'none';
+                            hrSelect.removeAttribute('required');
+                            hrSelect.value = '';
+                            
+                            flowText.textContent = 'Area Manager → Head of Operations → OE Dashboard';
+                        }
+                    }
+                    
+                    // Initialize visibility on page load
+                    updateApproverVisibility();
+                    
+                    // Update hidden fields when approver dropdown changes
+                    function updateApproverHiddenFields(type) {
+                        let select, nameField, emailField;
+                        
+                        if (type === 'am') {
+                            select = document.getElementById('areaManagerId');
+                            nameField = document.getElementById('areaManagerName');
+                            emailField = document.getElementById('areaManagerEmail');
+                        } else if (type === 'ho') {
+                            select = document.getElementById('headOfOpsId');
+                            nameField = document.getElementById('headOfOpsName');
+                            emailField = document.getElementById('headOfOpsEmail');
+                        } else if (type === 'hr') {
+                            select = document.getElementById('hrId');
+                            nameField = document.getElementById('hrName');
+                            emailField = document.getElementById('hrEmail');
+                        }
+                        
+                        if (select && select.selectedIndex > 0) {
+                            const option = select.options[select.selectedIndex];
+                            nameField.value = option.getAttribute('data-name') || option.textContent;
+                            emailField.value = option.getAttribute('data-email') || '';
+                        } else if (nameField && emailField) {
+                            nameField.value = '';
+                            emailField.value = '';
+                        }
+                    }
                     
                     // Shift selection
                     function selectShift(element, hours) {
@@ -553,9 +725,88 @@ router.post('/submit', async (req, res) => {
         console.log('📋 Submit request - Current user:', JSON.stringify(req.currentUser));
         console.log('📋 User ID:', req.currentUser?.userId);
         console.log('📋 Category:', req.body.category);
+        console.log('📋 Store:', req.body.store);
         
-        // Build the dynamic approval chain based on category
-        const approvalChain = await buildApprovalChain(pool, req.body.category);
+        // Get selected approvers from form
+        const category = req.body.category || '';
+        const store = req.body.store || '';
+        const isHelper = category.toLowerCase() === 'helpers';
+        const isHappy = store.toLowerCase().includes('happy');
+        
+        // Get selected approver details from form
+        const selectedAM = req.body.areaManagerId ? {
+            id: parseInt(req.body.areaManagerId),
+            name: req.body.areaManagerName || '',
+            email: req.body.areaManagerEmail || ''
+        } : null;
+        
+        const selectedHO = req.body.headOfOpsId ? {
+            id: parseInt(req.body.headOfOpsId),
+            name: req.body.headOfOpsName || '',
+            email: req.body.headOfOpsEmail || ''
+        } : null;
+        
+        const selectedHR = req.body.hrId ? {
+            id: parseInt(req.body.hrId),
+            name: req.body.hrName || '',
+            email: req.body.hrEmail || ''
+        } : null;
+        
+        // If names/emails not passed from form, fetch from database
+        if (selectedAM && (!selectedAM.name || !selectedAM.email)) {
+            const amUser = await pool.request()
+                .input('id', sql.Int, selectedAM.id)
+                .query('SELECT DisplayName, Email FROM Users WHERE Id = @id');
+            if (amUser.recordset.length > 0) {
+                selectedAM.name = amUser.recordset[0].DisplayName;
+                selectedAM.email = amUser.recordset[0].Email;
+            }
+        }
+        
+        if (selectedHO && (!selectedHO.name || !selectedHO.email)) {
+            const hoUser = await pool.request()
+                .input('id', sql.Int, selectedHO.id)
+                .query('SELECT DisplayName, Email FROM Users WHERE Id = @id');
+            if (hoUser.recordset.length > 0) {
+                selectedHO.name = hoUser.recordset[0].DisplayName;
+                selectedHO.email = hoUser.recordset[0].Email;
+            }
+        }
+        
+        if (selectedHR && selectedHR.id && (!selectedHR.name || !selectedHR.email)) {
+            const hrUser = await pool.request()
+                .input('id', sql.Int, selectedHR.id)
+                .query('SELECT DisplayName, Email FROM Users WHERE Id = @id');
+            if (hrUser.recordset.length > 0) {
+                selectedHR.name = hrUser.recordset[0].DisplayName;
+                selectedHR.email = hrUser.recordset[0].Email;
+            }
+        }
+        
+        // Build approval chain based on visibility rules
+        let approvalChain = [];
+        
+        // Rule 1: Helper + Happy → HO + HR (skip AM)
+        if (isHelper && isHappy) {
+            if (selectedHO) approvalChain.push({ role: 'HeadOfOperations', email: selectedHO.email, name: selectedHO.name, id: selectedHO.id });
+            if (selectedHR && selectedHR.id) approvalChain.push({ role: 'HR', email: selectedHR.email, name: selectedHR.name, id: selectedHR.id });
+        }
+        // Rule 2: Helper only → AM + HO + HR
+        else if (isHelper && !isHappy) {
+            if (selectedAM) approvalChain.push({ role: 'AreaManager', email: selectedAM.email, name: selectedAM.name, id: selectedAM.id });
+            if (selectedHO) approvalChain.push({ role: 'HeadOfOperations', email: selectedHO.email, name: selectedHO.name, id: selectedHO.id });
+            if (selectedHR && selectedHR.id) approvalChain.push({ role: 'HR', email: selectedHR.email, name: selectedHR.name, id: selectedHR.id });
+        }
+        // Rule 3: Happy only → HO only
+        else if (!isHelper && isHappy) {
+            if (selectedHO) approvalChain.push({ role: 'HeadOfOperations', email: selectedHO.email, name: selectedHO.name, id: selectedHO.id });
+        }
+        // Rule 4: Default → AM + HO
+        else {
+            if (selectedAM) approvalChain.push({ role: 'AreaManager', email: selectedAM.email, name: selectedAM.name, id: selectedAM.id });
+            if (selectedHO) approvalChain.push({ role: 'HeadOfOperations', email: selectedHO.email, name: selectedHO.name, id: selectedHO.id });
+        }
+        
         console.log('📋 Approval Chain:', JSON.stringify(approvalChain));
         
         // Format time values (HTML time input gives HH:MM, SQL needs HH:MM:SS)
@@ -594,17 +845,32 @@ router.post('/submit', async (req, res) => {
             .input('currentApproverEmail', sql.NVarChar, firstApprover?.email || null)
             .input('currentApproverRole', sql.NVarChar, firstApprover?.role || null)
             .input('overallStatus', sql.NVarChar, initialStatus)
+            .input('selectedAmId', sql.Int, selectedAM?.id || null)
+            .input('selectedAmName', sql.NVarChar, selectedAM?.name || null)
+            .input('selectedAmEmail', sql.NVarChar, selectedAM?.email || null)
+            .input('selectedHoId', sql.Int, selectedHO?.id || null)
+            .input('selectedHoName', sql.NVarChar, selectedHO?.name || null)
+            .input('selectedHoEmail', sql.NVarChar, selectedHO?.email || null)
+            .input('selectedHrId', sql.Int, selectedHR?.id || null)
+            .input('selectedHrName', sql.NVarChar, selectedHR?.name || null)
+            .input('selectedHrEmail', sql.NVarChar, selectedHR?.email || null)
             .query(`
                 INSERT INTO ExtraCleaningRequests (
                     Store, Category, ThirdParty, NumberOfAgents, Description,
                     StartDate, StartTimeFrom, StartTimeTo, ShiftHours,
                     EndDate, EndTimeFrom, EndTimeTo, CreatedBy, CreatedByEmail,
-                    ApprovalChain, CurrentApprovalStep, CurrentApproverEmail, CurrentApproverRole, OverallStatus
+                    ApprovalChain, CurrentApprovalStep, CurrentApproverEmail, CurrentApproverRole, OverallStatus,
+                    SelectedAreaManagerId, SelectedAreaManagerName, SelectedAreaManagerEmail,
+                    SelectedHeadOfOpsId, SelectedHeadOfOpsName, SelectedHeadOfOpsEmail,
+                    SelectedHRId, SelectedHRName, SelectedHREmail
                 ) VALUES (
                     @store, @category, @thirdParty, @numberOfAgents, @description,
                     @startDate, @startTimeFrom, @startTimeTo, @shiftHours,
                     @endDate, @endTimeFrom, @endTimeTo, @createdBy, @createdByEmail,
-                    @approvalChain, @currentStep, @currentApproverEmail, @currentApproverRole, @overallStatus
+                    @approvalChain, @currentStep, @currentApproverEmail, @currentApproverRole, @overallStatus,
+                    @selectedAmId, @selectedAmName, @selectedAmEmail,
+                    @selectedHoId, @selectedHoName, @selectedHoEmail,
+                    @selectedHrId, @selectedHrName, @selectedHrEmail
                 );
                 SELECT SCOPE_IDENTITY() as Id;
             `);
