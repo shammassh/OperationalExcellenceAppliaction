@@ -21,6 +21,7 @@ const { initializeAuth, requireAuth, requireRole } = require('./auth/auth-server
 const storesModule = require('./modules/stores');
 const adminModule = require('./modules/admin');
 const operationalExcellenceModule = require('./modules/operational-excellence');
+const hrModule = require('./modules/hr');
 
 const app = express();
 const PORT = process.env.PORT || 3010;
@@ -50,6 +51,7 @@ app.use('/notifications', requireAuth, notificationsRoutes);
 app.use('/stores', requireAuth, storesModule);
 app.use('/admin', requireAuth, adminModule);
 app.use('/operational-excellence', requireAuth, operationalExcellenceModule);
+app.use('/hr', requireAuth, hrModule);
 
 // ==========================================
 // Routes

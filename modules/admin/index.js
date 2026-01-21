@@ -115,34 +115,54 @@ router.get('/users', async (req, res) => {
     try {
         const pool = await sql.connect(dbConfig);
         
+        // Get users with their assigned roles (supports multiple roles)
         const users = await pool.request().query(`
             SELECT u.Id, u.Email, u.DisplayName, u.IsActive, u.CreatedAt,
-                   r.RoleName, r.Id as RoleId,
-                   (SELECT COUNT(*) FROM UserFormAccess WHERE UserId = u.Id) as FormCount
+                   (SELECT COUNT(*) FROM UserFormAccess WHERE UserId = u.Id) as FormCount,
+                   (SELECT STRING_AGG(r.RoleName, ', ') FROM UserRoleAssignments ura 
+                    JOIN UserRoles r ON ura.RoleId = r.Id WHERE ura.UserId = u.Id) as RoleNames,
+                   (SELECT STRING_AGG(CAST(ura.RoleId AS VARCHAR), ',') FROM UserRoleAssignments ura 
+                    WHERE ura.UserId = u.Id) as RoleIds
             FROM Users u
-            LEFT JOIN UserRoles r ON u.RoleId = r.Id
             ORDER BY u.DisplayName
         `);
         
-        const roles = await pool.request().query('SELECT Id, RoleName FROM UserRoles ORDER BY RoleName');
+        const roles = await pool.request().query('SELECT Id, RoleName, CategoryId FROM UserRoles ORDER BY RoleName');
+        const categories = await pool.request().query('SELECT Id, CategoryName FROM RoleCategories ORDER BY CategoryName');
         
         await pool.close();
         
-        let userRows = users.recordset.map(u => `
+        let userRows = users.recordset.map(u => {
+            const roleDisplay = u.RoleNames ? u.RoleNames.split(', ').map(r => 
+                `<span class="role-badge">${r}</span>`
+            ).join(' ') : '<span class="role-badge no-role">No Role</span>';
+            
+            return `
             <tr>
                 <td>${u.DisplayName || 'N/A'}</td>
                 <td>${u.Email}</td>
-                <td><span class="role-badge">${u.RoleName || 'No Role'}</span></td>
+                <td class="roles-cell">${roleDisplay}</td>
                 <td><span class="form-count">${u.FormCount} forms</span></td>
                 <td><span class="status-badge ${u.IsActive ? 'active' : 'inactive'}">${u.IsActive ? 'Active' : 'Inactive'}</span></td>
                 <td>
                     <a href="/admin/users/${u.Id}/forms" class="btn btn-sm btn-primary">Manage Forms</a>
-                    <button class="btn btn-sm btn-secondary" onclick="editRole(${u.Id}, ${u.RoleId || 0}, '${u.DisplayName}')">Change Role</button>
+                    <button class="btn btn-sm btn-secondary" onclick="editRoles(${u.Id}, '${u.RoleIds || ''}', '${(u.DisplayName || '').replace(/'/g, "\\'")}')">Manage Roles</button>
                 </td>
             </tr>
-        `).join('');
+        `}).join('');
         
-        let roleOptions = roles.recordset.map(r => `<option value="${r.Id}">${r.RoleName}</option>`).join('');
+        // Group roles by category for the modal
+        const rolesByCategory = {};
+        categories.recordset.forEach(c => {
+            rolesByCategory[c.Id] = { name: c.CategoryName, roles: [] };
+        });
+        roles.recordset.forEach(r => {
+            if (rolesByCategory[r.CategoryId]) {
+                rolesByCategory[r.CategoryId].roles.push(r);
+            }
+        });
+        
+        const rolesJson = JSON.stringify(roles.recordset);
         
         res.send(`
             <!DOCTYPE html>
@@ -194,12 +214,19 @@ router.get('/users', async (req, res) => {
                     th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
                     th { background: #f8f9fa; font-weight: 600; color: #555; }
                     tr:hover { background: #f8f9fa; }
+                    .roles-cell { max-width: 300px; }
                     .role-badge {
                         background: #e3f2fd;
                         color: #1976d2;
-                        padding: 5px 12px;
-                        border-radius: 20px;
-                        font-size: 12px;
+                        padding: 4px 10px;
+                        border-radius: 15px;
+                        font-size: 11px;
+                        display: inline-block;
+                        margin: 2px;
+                    }
+                    .role-badge.no-role {
+                        background: #f5f5f5;
+                        color: #999;
                     }
                     .form-count {
                         background: #f3e5f5;
@@ -302,29 +329,37 @@ router.get('/users', async (req, res) => {
                 
                 <!-- Role Change Modal -->
                 <div class="modal" id="roleModal">
-                    <div class="modal-content">
-                        <div class="modal-title">Change User Role</div>
-                        <form action="/admin/users/change-role" method="POST">
-                            <input type="hidden" id="userId" name="userId">
-                            <div class="form-group">
-                                <label id="userNameLabel">User</label>
+                    <div class="modal-content" style="width:550px;max-height:80vh;overflow-y:auto;">
+                        <div class="modal-title">Manage User Roles</div>
+                        <input type="hidden" id="userId">
+                        <div class="form-group">
+                            <label id="userNameLabel" style="font-weight:600;font-size:16px;">User</label>
+                        </div>
+                        <div class="form-group">
+                            <label style="margin-bottom:10px;display:block;">Select Roles (multiple allowed):</label>
+                            <div id="rolesCheckboxes" style="max-height:400px;overflow-y:auto;border:1px solid #ddd;border-radius:8px;padding:15px;">
+                                <!-- Roles will be inserted here by JS -->
                             </div>
-                            <div class="form-group">
-                                <label>Select Role</label>
-                                <select name="roleId" id="roleSelect" required>
-                                    <option value="">-- Select Role --</option>
-                                    ${roleOptions}
-                                </select>
-                            </div>
-                            <div class="modal-actions">
-                                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                                <button type="submit" class="btn btn-primary">Save Changes</button>
-                            </div>
-                        </form>
+                        </div>
+                        <div class="modal-actions">
+                            <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                            <button type="button" class="btn btn-primary" onclick="saveRoles()">Save Roles</button>
+                        </div>
                     </div>
                 </div>
                 
+                <style>
+                    .role-category { margin-bottom: 15px; }
+                    .role-category-title { font-weight: 600; color: #333; margin-bottom: 8px; padding-bottom: 5px; border-bottom: 1px solid #eee; }
+                    .role-checkbox { display: flex; align-items: center; padding: 6px 0; }
+                    .role-checkbox input { margin-right: 10px; width: 18px; height: 18px; cursor: pointer; }
+                    .role-checkbox label { cursor: pointer; flex: 1; }
+                </style>
+                
                 <script>
+                    const allRoles = ${rolesJson};
+                    let currentUserId = null;
+                    
                     function filterUsers(query) {
                         const rows = document.querySelectorAll('#usersTable tbody tr');
                         query = query.toLowerCase();
@@ -334,15 +369,67 @@ router.get('/users', async (req, res) => {
                         });
                     }
                     
-                    function editRole(userId, currentRoleId, userName) {
+                    function editRoles(userId, currentRoleIds, userName) {
+                        currentUserId = userId;
                         document.getElementById('userId').value = userId;
                         document.getElementById('userNameLabel').textContent = userName;
-                        document.getElementById('roleSelect').value = currentRoleId || '';
+                        
+                        // Parse current role IDs
+                        const selectedRoles = currentRoleIds ? currentRoleIds.split(',').map(id => parseInt(id)) : [];
+                        
+                        // Group roles by category
+                        const rolesByCategory = {};
+                        allRoles.forEach(r => {
+                            if (!rolesByCategory[r.CategoryId]) {
+                                rolesByCategory[r.CategoryId] = [];
+                            }
+                            rolesByCategory[r.CategoryId].push(r);
+                        });
+                        
+                        // Build checkboxes HTML
+                        let html = '';
+                        Object.keys(rolesByCategory).forEach(catId => {
+                            const roles = rolesByCategory[catId];
+                            html += '<div class="role-category">';
+                            html += '<div class="role-category-title">' + (roles[0]?.CategoryName || 'Other') + '</div>';
+                            roles.forEach(r => {
+                                const checked = selectedRoles.includes(r.Id) ? 'checked' : '';
+                                html += '<div class="role-checkbox">';
+                                html += '<input type="checkbox" id="role_' + r.Id + '" value="' + r.Id + '" ' + checked + '>';
+                                html += '<label for="role_' + r.Id + '">' + r.RoleName + '</label>';
+                                html += '</div>';
+                            });
+                            html += '</div>';
+                        });
+                        
+                        document.getElementById('rolesCheckboxes').innerHTML = html;
                         document.getElementById('roleModal').classList.add('show');
                     }
                     
                     function closeModal() {
                         document.getElementById('roleModal').classList.remove('show');
+                    }
+                    
+                    async function saveRoles() {
+                        const checkboxes = document.querySelectorAll('#rolesCheckboxes input[type="checkbox"]:checked');
+                        const roleIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+                        
+                        try {
+                            const response = await fetch('/admin/users/update-roles', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ userId: currentUserId, roleIds: roleIds })
+                            });
+                            
+                            const result = await response.json();
+                            if (result.success) {
+                                window.location.reload();
+                            } else {
+                                alert('Error: ' + result.error);
+                            }
+                        } catch (err) {
+                            alert('Error saving roles: ' + err.message);
+                        }
                     }
                     
                     async function syncUsers() {
@@ -377,7 +464,47 @@ router.get('/users', async (req, res) => {
     }
 });
 
-// Change user role
+// Update user roles (multi-role support)
+router.post('/users/update-roles', async (req, res) => {
+    try {
+        const { userId, roleIds } = req.body;
+        const pool = await sql.connect(dbConfig);
+        
+        // Delete existing role assignments
+        await pool.request()
+            .input('userId', sql.Int, userId)
+            .query('DELETE FROM UserRoleAssignments WHERE UserId = @userId');
+        
+        // Insert new role assignments
+        if (roleIds && roleIds.length > 0) {
+            for (const roleId of roleIds) {
+                await pool.request()
+                    .input('userId', sql.Int, userId)
+                    .input('roleId', sql.Int, roleId)
+                    .query('INSERT INTO UserRoleAssignments (UserId, RoleId) VALUES (@userId, @roleId)');
+            }
+            
+            // Also update the legacy RoleId column with the first role for backward compatibility
+            await pool.request()
+                .input('userId', sql.Int, userId)
+                .input('roleId', sql.Int, roleIds[0])
+                .query('UPDATE Users SET RoleId = @roleId WHERE Id = @userId');
+        } else {
+            // Clear the legacy RoleId if no roles selected
+            await pool.request()
+                .input('userId', sql.Int, userId)
+                .query('UPDATE Users SET RoleId = NULL WHERE Id = @userId');
+        }
+        
+        await pool.close();
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating roles:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Change user role (legacy - single role)
 router.post('/users/change-role', async (req, res) => {
     try {
         const { userId, roleId } = req.body;

@@ -93,27 +93,30 @@ router.get('/', async (req, res) => {
         // Get categories
         const categories = await pool.request().query('SELECT Id, CategoryName FROM CleaningCategories WHERE IsActive = 1 ORDER BY CategoryName');
         
-        // Get users by role for approval dropdowns
+        // Get users by role for approval dropdowns (using multi-role junction table)
         const areaManagers = await pool.request().query(`
-            SELECT u.Id, u.DisplayName, u.Email 
+            SELECT DISTINCT u.Id, u.DisplayName, u.Email 
             FROM Users u 
-            INNER JOIN UserRoles r ON u.RoleId = r.Id 
+            INNER JOIN UserRoleAssignments ura ON u.Id = ura.UserId
+            INNER JOIN UserRoles r ON ura.RoleId = r.Id 
             WHERE r.RoleName = 'Area Manager' AND u.IsActive = 1 
             ORDER BY u.DisplayName
         `);
         
         const headOfOps = await pool.request().query(`
-            SELECT u.Id, u.DisplayName, u.Email 
+            SELECT DISTINCT u.Id, u.DisplayName, u.Email 
             FROM Users u 
-            INNER JOIN UserRoles r ON u.RoleId = r.Id 
+            INNER JOIN UserRoleAssignments ura ON u.Id = ura.UserId
+            INNER JOIN UserRoles r ON ura.RoleId = r.Id 
             WHERE r.RoleName = 'Head of Operations' AND u.IsActive = 1 
             ORDER BY u.DisplayName
         `);
         
         const hrUsers = await pool.request().query(`
-            SELECT u.Id, u.DisplayName, u.Email 
+            SELECT DISTINCT u.Id, u.DisplayName, u.Email 
             FROM Users u 
-            INNER JOIN UserRoles r ON u.RoleId = r.Id 
+            INNER JOIN UserRoleAssignments ura ON u.Id = ura.UserId
+            INNER JOIN UserRoles r ON ura.RoleId = r.Id 
             WHERE r.RoleName = 'HR Officer' AND u.IsActive = 1 
             ORDER BY u.DisplayName
         `);
