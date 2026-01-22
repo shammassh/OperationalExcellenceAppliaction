@@ -12,6 +12,8 @@ const systemSettings = require('./system-settings');
 const extraCleaningReview = require('./extra-cleaning-review');
 const productionDashboard = require('./production-dashboard');
 const feedbackDashboard = require('./feedback-dashboard');
+const securityDashboard = require('./security-dashboard');
+const thirdpartyDashboard = require('./thirdparty-dashboard');
 
 // Mount sub-routes
 router.use('/theft-dashboard', theftDashboard);
@@ -19,6 +21,8 @@ router.use('/system-settings', systemSettings);
 router.use('/extra-cleaning-review', extraCleaningReview);
 router.use('/production-dashboard', productionDashboard);
 router.use('/feedback-dashboard', feedbackDashboard);
+router.use('/security-dashboard', securityDashboard);
+router.use('/thirdparty-dashboard', thirdpartyDashboard);
 
 // Landing page
 router.get('/', (req, res) => {
@@ -295,6 +299,54 @@ router.get('/', (req, res) => {
                         </div>
                     </a>
                     
+                    <!-- Security Schedule Dashboard -->
+                    <a href="/operational-excellence/security-dashboard" class="card" style="border-left: 4px solid #2c3e50;">
+                        <div class="card-icon">🛡️</div>
+                        <div class="card-title">Security Schedule Dashboard</div>
+                        <div class="card-desc">
+                            View all security employee schedules from stores. 
+                            Filter by period, store, and track attendance.
+                        </div>
+                        <div class="card-stats">
+                            <div class="stat">
+                                <div class="stat-value" id="securityTotal" style="color: #2c3e50;">-</div>
+                                <div class="stat-label">Total</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" id="securityActive" style="color: #28a745;">-</div>
+                                <div class="stat-label">Active</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" id="securityMonth" style="color: #17a2b8;">-</div>
+                                <div class="stat-label">This Month</div>
+                            </div>
+                        </div>
+                    </a>
+                    
+                    <!-- Thirdparty Schedule Dashboard -->
+                    <a href="/operational-excellence/thirdparty-dashboard" class="card" style="border-left: 4px solid #8e44ad;">
+                        <div class="card-icon">🏢</div>
+                        <div class="card-title">Thirdparty Schedule Dashboard</div>
+                        <div class="card-desc">
+                            View all thirdparty employee schedules from stores. 
+                            Filter by period, store, and track attendance.
+                        </div>
+                        <div class="card-stats">
+                            <div class="stat">
+                                <div class="stat-value" id="thirdpartyTotal" style="color: #8e44ad;">-</div>
+                                <div class="stat-label">Total</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" id="thirdpartyActive" style="color: #28a745;">-</div>
+                                <div class="stat-label">Active</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" id="thirdpartyMonth" style="color: #17a2b8;">-</div>
+                                <div class="stat-label">This Month</div>
+                            </div>
+                        </div>
+                    </a>
+                    
                     <!-- Future: Store Audits -->
                     <div class="card audit" style="opacity: 0.6; cursor: not-allowed;">
                         <div class="card-icon">📝</div>
@@ -376,6 +428,30 @@ router.get('/', (req, res) => {
                     })
                     .catch(err => {
                         console.error('Error loading feedback stats:', err);
+                    });
+                
+                // Load stats for security schedule dashboard card
+                fetch('/operational-excellence/security-dashboard/api/stats')
+                    .then(r => r.json())
+                    .then(data => {
+                        document.getElementById('securityTotal').textContent = data.total || 0;
+                        document.getElementById('securityActive').textContent = data.active || 0;
+                        document.getElementById('securityMonth').textContent = data.thisMonth || 0;
+                    })
+                    .catch(err => {
+                        console.error('Error loading security stats:', err);
+                    });
+                
+                // Load stats for thirdparty schedule dashboard card
+                fetch('/operational-excellence/thirdparty-dashboard/api/stats')
+                    .then(r => r.json())
+                    .then(data => {
+                        document.getElementById('thirdpartyTotal').textContent = data.Total || 0;
+                        document.getElementById('thirdpartyActive').textContent = data.Active || 0;
+                        document.getElementById('thirdpartyMonth').textContent = data.ThisMonth || 0;
+                    })
+                    .catch(err => {
+                        console.error('Error loading thirdparty stats:', err);
                     });
             </script>
         </body>
