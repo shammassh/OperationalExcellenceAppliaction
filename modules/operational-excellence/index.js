@@ -14,6 +14,7 @@ const productionDashboard = require('./production-dashboard');
 const feedbackDashboard = require('./feedback-dashboard');
 const securityDashboard = require('./security-dashboard');
 const thirdpartyDashboard = require('./thirdparty-dashboard');
+const attendanceDashboard = require('./attendance-dashboard');
 
 // Mount sub-routes
 router.use('/theft-dashboard', theftDashboard);
@@ -23,6 +24,7 @@ router.use('/production-dashboard', productionDashboard);
 router.use('/feedback-dashboard', feedbackDashboard);
 router.use('/security-dashboard', securityDashboard);
 router.use('/thirdparty-dashboard', thirdpartyDashboard);
+router.use('/attendance-dashboard', attendanceDashboard);
 
 // Landing page
 router.get('/', (req, res) => {
@@ -347,6 +349,30 @@ router.get('/', (req, res) => {
                         </div>
                     </a>
                     
+                    <!-- Thirdparty Attendance Dashboard -->
+                    <a href="/operational-excellence/attendance-dashboard" class="card" style="border-left: 4px solid #e67e22;">
+                        <div class="card-icon">📋</div>
+                        <div class="card-title">Thirdparty Attendance Dashboard</div>
+                        <div class="card-desc">
+                            View all thirdparty attendance records with pivot-like filters. 
+                            Group by store, company, date, or worker type.
+                        </div>
+                        <div class="card-stats">
+                            <div class="stat">
+                                <div class="stat-value" id="attendanceTotal" style="color: #e67e22;">-</div>
+                                <div class="stat-label">Records</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" id="attendanceCompanies" style="color: #28a745;">-</div>
+                                <div class="stat-label">Companies</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" id="attendanceMonth" style="color: #17a2b8;">-</div>
+                                <div class="stat-label">This Month</div>
+                            </div>
+                        </div>
+                    </a>
+                    
                     <!-- Future: Store Audits -->
                     <div class="card audit" style="opacity: 0.6; cursor: not-allowed;">
                         <div class="card-icon">📝</div>
@@ -452,6 +478,18 @@ router.get('/', (req, res) => {
                     })
                     .catch(err => {
                         console.error('Error loading thirdparty stats:', err);
+                    });
+                
+                // Load stats for attendance dashboard card
+                fetch('/operational-excellence/attendance-dashboard/api/stats')
+                    .then(r => r.json())
+                    .then(data => {
+                        document.getElementById('attendanceTotal').textContent = data.Total || 0;
+                        document.getElementById('attendanceCompanies').textContent = data.Companies || 0;
+                        document.getElementById('attendanceMonth').textContent = data.ThisMonth || 0;
+                    })
+                    .catch(err => {
+                        console.error('Error loading attendance stats:', err);
                     });
             </script>
         </body>

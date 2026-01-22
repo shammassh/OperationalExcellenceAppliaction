@@ -9,16 +9,19 @@ const router = express.Router();
 // Import sub-routes
 const securityScheduleRoutes = require('./security-schedule/routes');
 const thirdpartyScheduleRoutes = require('./thirdparty-schedule/routes');
+const thirdpartyAttendanceRoutes = require('./thirdparty-attendance/routes');
 
 // Mount sub-routes
 router.use('/security-schedule', securityScheduleRoutes);
 router.use('/thirdparty-schedule', thirdpartyScheduleRoutes);
+router.use('/thirdparty-attendance', thirdpartyAttendanceRoutes);
 
 // Personnel main page
 router.get('/', (req, res) => {
     const forms = [
         { id: 'security-schedule', icon: '🛡️', title: 'Employees Schedule - Security', href: '/personnel/security-schedule', desc: 'Fill weekly attendance schedule for security employees', color: '#2c3e50' },
         { id: 'thirdparty-schedule', icon: '🏢', title: 'Employees Schedule - Thirdparty', href: '/personnel/thirdparty-schedule', desc: 'Fill weekly attendance schedule for thirdparty employees', color: '#8e44ad' },
+        { id: 'thirdparty-attendance', icon: '📋', title: 'Third-Parties Attendance', href: '/personnel/thirdparty-attendance', desc: 'Download CSV template, fill attendance data, and upload', color: '#e67e22' },
     ];
     
     const formsHtml = forms.length > 0 ? forms.map(form => `
