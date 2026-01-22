@@ -1,0 +1,2078 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - OE Inspection System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            color: #1e3a5f;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f8f9fa;
+            color: #495057;
+            border: 1px solid #dee2e6;
+        }
+
+        .btn-secondary:hover {
+            background: #e9ecef;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .info-banner {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .info-banner .icon {
+            font-size: 40px;
+        }
+
+        .info-banner .text h3 {
+            color: #1e3a5f;
+            margin-bottom: 4px;
+        }
+
+        .info-banner .text p {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .schema-tabs {
+            background: white;
+            border-radius: 16px 16px 0 0;
+            display: flex;
+            overflow-x: auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .schema-tab {
+            padding: 16px 24px;
+            border: none;
+            background: none;
+            font-size: 14px;
+            font-weight: 600;
+            color: #6b7280;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 3px solid transparent;
+            white-space: nowrap;
+        }
+
+        .schema-tab:hover {
+            color: #8b5cf6;
+            background: #f9fafb;
+        }
+
+        .schema-tab.active {
+            color: #8b5cf6;
+            border-bottom-color: #8b5cf6;
+            background: #f9fafb;
+        }
+
+        .settings-panel {
+            background: white;
+            border-radius: 0 0 16px 16px;
+            padding: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .settings-section {
+            margin-bottom: 30px;
+        }
+
+        .settings-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1e3a5f;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #f3f4f6;
+        }
+
+        .overall-setting {
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            border: 2px solid #86efac;
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .overall-setting .label {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .overall-setting .label .icon {
+            font-size: 32px;
+        }
+
+        .overall-setting .label h4 {
+            font-size: 16px;
+            color: #166534;
+            margin-bottom: 4px;
+        }
+
+        .overall-setting .label p {
+            font-size: 13px;
+            color: #15803d;
+        }
+
+        .grade-input-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .grade-input {
+            width: 80px;
+            padding: 12px 16px;
+            font-size: 18px;
+            font-weight: 700;
+            text-align: center;
+            border: 2px solid #d1d5db;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .grade-input:focus {
+            outline: none;
+            border-color: #8b5cf6;
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+        }
+
+        .grade-input.changed {
+            border-color: #f59e0b;
+            background: #fffbeb;
+        }
+
+        .percent-label {
+            font-size: 18px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .sections-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .section-card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        .section-card:hover {
+            border-color: #8b5cf6;
+            background: #faf5ff;
+        }
+
+        .section-card .section-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .section-card .section-icon {
+            font-size: 24px;
+        }
+
+        .section-card .section-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .section-card .section-number {
+            font-size: 11px;
+            color: #9ca3af;
+        }
+
+        .section-grade-input {
+            width: 60px;
+            padding: 8px 10px;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            border: 2px solid #d1d5db;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .section-grade-input:focus {
+            outline: none;
+            border-color: #8b5cf6;
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+        }
+
+        .section-grade-input.changed {
+            border-color: #f59e0b;
+            background: #fffbeb;
+        }
+
+        .save-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 16px 40px;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            z-index: 100;
+        }
+
+        .save-bar.visible {
+            transform: translateY(0);
+        }
+
+        .save-bar .changes-text {
+            color: #f59e0b;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #e5e7eb;
+            border-top-color: #8b5cf6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            right: 30px;
+            background: #10b981;
+            color: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
+            z-index: 200;
+        }
+
+        .toast.visible {
+            transform: translateX(0);
+        }
+
+        .toast.error {
+            background: #ef4444;
+        }
+
+        /* Sub-tabs for Grades/Colors */
+        .sub-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .sub-tab {
+            padding: 12px 24px;
+            border: none;
+            background: none;
+            font-size: 14px;
+            font-weight: 600;
+            color: #6b7280;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+        }
+
+        .sub-tab:hover {
+            color: #8b5cf6;
+        }
+
+        .sub-tab.active {
+            color: #8b5cf6;
+            border-bottom-color: #8b5cf6;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Checklist Info Styles */
+        .checklist-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .checklist-info-card {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            gap: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .checklist-info-card:hover {
+            border-color: #8b5cf6;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
+        }
+
+        .checklist-info-icon {
+            font-size: 32px;
+            flex-shrink: 0;
+        }
+
+        .checklist-info-content {
+            flex: 1;
+        }
+
+        .checklist-info-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+
+        .checklist-info-input {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 15px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .checklist-info-input:focus {
+            outline: none;
+            border-color: #8b5cf6;
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+        }
+
+        .checklist-info-input.changed {
+            border-color: #f59e0b;
+            background: #fffbeb;
+        }
+
+        .checklist-info-hint {
+            font-size: 12px;
+            color: #9ca3af;
+            margin-top: 8px;
+        }
+
+        /* Section Icons Styles */
+        .icon-picker-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .section-icon-card {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .section-icon-card:hover {
+            border-color: #8b5cf6;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
+        }
+
+        .section-icon-card.changed {
+            border-color: #f59e0b;
+            background: #fffbeb;
+        }
+
+        .current-icon-display {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid #e5e7eb;
+        }
+
+        .current-icon-display:hover {
+            background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+            border-color: #8b5cf6;
+            transform: scale(1.05);
+        }
+
+        .section-icon-info {
+            flex: 1;
+        }
+
+        .section-icon-name {
+            font-weight: 600;
+            color: #1f2937;
+            font-size: 14px;
+        }
+
+        .section-icon-number {
+            font-size: 12px;
+            color: #9ca3af;
+            margin-top: 2px;
+        }
+
+        .icon-picker-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .icon-picker-modal.active {
+            display: flex;
+        }
+
+        .icon-picker-content {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .icon-picker-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .icon-picker-header h3 {
+            color: #1e3a5f;
+            font-size: 18px;
+        }
+
+        .icon-picker-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #9ca3af;
+            transition: color 0.2s;
+        }
+
+        .icon-picker-close:hover {
+            color: #ef4444;
+        }
+
+        .icon-picker-section {
+            margin-bottom: 16px;
+        }
+
+        .icon-picker-section h4 {
+            font-size: 12px;
+            color: #6b7280;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .icon-options {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 8px;
+        }
+
+        .icon-option {
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .icon-option:hover {
+            background: #ede9fe;
+            border-color: #8b5cf6;
+            transform: scale(1.1);
+        }
+
+        .icon-option.selected {
+            background: #8b5cf6;
+            border-color: #7c3aed;
+        }
+
+        /* Color Editor Styles */
+        .color-groups {
+            display: grid;
+            gap: 20px;
+        }
+
+        .color-group {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .color-group h4 {
+            color: #1e3a5f;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 15px;
+        }
+
+        .color-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .color-item {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .color-item label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+
+        .color-input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .color-input-wrapper input[type="color"] {
+            width: 40px;
+            height: 32px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .color-input-wrapper input[type="text"] {
+            flex: 1;
+            padding: 8px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+
+        .color-input-wrapper input[type="text"]:focus {
+            outline: none;
+            border-color: #8b5cf6;
+        }
+
+        .color-preview-section {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .color-preview-section h4 {
+            margin-bottom: 15px;
+            color: #374151;
+        }
+
+        .preview-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .preview-item {
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .color-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+
+            .overall-setting {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+
+            .sections-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .color-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>⚙️ System Settings</h1>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="window.location.href='/dashboard'">
+                <span>🏠</span> Dashboard
+            </button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="info-banner">
+            <div class="icon">⚙️</div>
+            <div class="text">
+                <h3>Schema Configuration</h3>
+                <p>Configure passing grades and color schemes for each audit schema. These settings control pass/fail thresholds and report appearance.</p>
+            </div>
+        </div>
+
+        <div id="schemaTabsContainer">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>Loading schemas...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="save-bar" id="saveBar">
+        <div class="changes-text">
+            <span>⚠️</span>
+            <span id="changesCount">0 unsaved changes</span>
+        </div>
+        <button class="btn btn-secondary" onclick="discardChanges()">Discard</button>
+        <button class="btn btn-success" onclick="saveChanges()">
+            <span>💾</span> Save Changes
+        </button>
+    </div>
+
+    <div class="toast" id="toast">
+        <span id="toastIcon">✓</span>
+        <span id="toastMessage">Settings saved</span>
+    </div>
+
+    <!-- Icon Picker Modal -->
+    <div class="icon-picker-modal" id="iconPickerModal">
+        <div class="icon-picker-content">
+            <div class="icon-picker-header">
+                <h3 id="iconPickerTitle">Select Icon</h3>
+                <button class="icon-picker-close" onclick="closeIconPicker()">&times;</button>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>🍽️ Food & Kitchen</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('🍽️')">🍽️</div>
+                    <div class="icon-option" onclick="selectIcon('🥫')">🥫</div>
+                    <div class="icon-option" onclick="selectIcon('🍳')">🍳</div>
+                    <div class="icon-option" onclick="selectIcon('🔪')">🔪</div>
+                    <div class="icon-option" onclick="selectIcon('👨‍🍳')">👨‍🍳</div>
+                    <div class="icon-option" onclick="selectIcon('🥩')">🥩</div>
+                    <div class="icon-option" onclick="selectIcon('🥗')">🥗</div>
+                    <div class="icon-option" onclick="selectIcon('🍞')">🍞</div>
+                </div>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>❄️ Temperature & Storage</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('❄️')">❄️</div>
+                    <div class="icon-option" onclick="selectIcon('🧊')">🧊</div>
+                    <div class="icon-option" onclick="selectIcon('🌡️')">🌡️</div>
+                    <div class="icon-option" onclick="selectIcon('📦')">📦</div>
+                    <div class="icon-option" onclick="selectIcon('🗄️')">🗄️</div>
+                    <div class="icon-option" onclick="selectIcon('🔥')">🔥</div>
+                    <div class="icon-option" onclick="selectIcon('💧')">💧</div>
+                    <div class="icon-option" onclick="selectIcon('🏪')">🏪</div>
+                </div>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>🧹 Cleaning & Hygiene</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('🧹')">🧹</div>
+                    <div class="icon-option" onclick="selectIcon('🧼')">🧼</div>
+                    <div class="icon-option" onclick="selectIcon('🧤')">🧤</div>
+                    <div class="icon-option" onclick="selectIcon('🚿')">🚿</div>
+                    <div class="icon-option" onclick="selectIcon('🚻')">🚻</div>
+                    <div class="icon-option" onclick="selectIcon('🗑️')">🗑️</div>
+                    <div class="icon-option" onclick="selectIcon('♻️')">♻️</div>
+                    <div class="icon-option" onclick="selectIcon('✨')">✨</div>
+                </div>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>🛠️ Maintenance & Equipment</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('🛠️')">🛠️</div>
+                    <div class="icon-option" onclick="selectIcon('🔧')">🔧</div>
+                    <div class="icon-option" onclick="selectIcon('⚙️')">⚙️</div>
+                    <div class="icon-option" onclick="selectIcon('🔌')">🔌</div>
+                    <div class="icon-option" onclick="selectIcon('💡')">💡</div>
+                    <div class="icon-option" onclick="selectIcon('🪛')">🪛</div>
+                    <div class="icon-option" onclick="selectIcon('🔩')">🔩</div>
+                    <div class="icon-option" onclick="selectIcon('🏗️')">🏗️</div>
+                </div>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>🧪 Safety & Chemicals</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('🧪')">🧪</div>
+                    <div class="icon-option" onclick="selectIcon('⚠️')">⚠️</div>
+                    <div class="icon-option" onclick="selectIcon('☣️')">☣️</div>
+                    <div class="icon-option" onclick="selectIcon('🔒')">🔒</div>
+                    <div class="icon-option" onclick="selectIcon('🛡️')">🛡️</div>
+                    <div class="icon-option" onclick="selectIcon('🐀')">🐀</div>
+                    <div class="icon-option" onclick="selectIcon('🪳')">🪳</div>
+                    <div class="icon-option" onclick="selectIcon('🦟')">🦟</div>
+                </div>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>📋 Documents & Process</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('📋')">📋</div>
+                    <div class="icon-option" onclick="selectIcon('📝')">📝</div>
+                    <div class="icon-option" onclick="selectIcon('📊')">📊</div>
+                    <div class="icon-option" onclick="selectIcon('📜')">📜</div>
+                    <div class="icon-option" onclick="selectIcon('📑')">📑</div>
+                    <div class="icon-option" onclick="selectIcon('✅')">✅</div>
+                    <div class="icon-option" onclick="selectIcon('📷')">📷</div>
+                    <div class="icon-option" onclick="selectIcon('🎯')">🎯</div>
+                </div>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>🏛️ Culture & Training</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('🏛️')">🏛️</div>
+                    <div class="icon-option" onclick="selectIcon('👥')">👥</div>
+                    <div class="icon-option" onclick="selectIcon('🎓')">🎓</div>
+                    <div class="icon-option" onclick="selectIcon('📚')">📚</div>
+                    <div class="icon-option" onclick="selectIcon('🏆')">🏆</div>
+                    <div class="icon-option" onclick="selectIcon('⭐')">⭐</div>
+                    <div class="icon-option" onclick="selectIcon('💪')">💪</div>
+                    <div class="icon-option" onclick="selectIcon('🤝')">🤝</div>
+                    <div class="icon-option" onclick="selectIcon('👍')">👍</div>
+                    <div class="icon-option" onclick="selectIcon('💼')">💼</div>
+                </div>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>🏢 Building & Facilities</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('🏢')">🏢</div>
+                    <div class="icon-option" onclick="selectIcon('🚪')">🚪</div>
+                    <div class="icon-option" onclick="selectIcon('🪟')">🪟</div>
+                    <div class="icon-option" onclick="selectIcon('🏠')">🏠</div>
+                    <div class="icon-option" onclick="selectIcon('🧱')">🧱</div>
+                    <div class="icon-option" onclick="selectIcon('🪜')">🪜</div>
+                    <div class="icon-option" onclick="selectIcon('🎛️')">🎛️</div>
+                    <div class="icon-option" onclick="selectIcon('🚰')">🚰</div>
+                    <div class="icon-option" onclick="selectIcon('💨')">💨</div>
+                    <div class="icon-option" onclick="selectIcon('🛗')">🛗</div>
+                </div>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>🍴 Utensils & Serving</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('🍴')">🍴</div>
+                    <div class="icon-option" onclick="selectIcon('🥄')">🥄</div>
+                    <div class="icon-option" onclick="selectIcon('🫙')">🫙</div>
+                    <div class="icon-option" onclick="selectIcon('🥣')">🥣</div>
+                    <div class="icon-option" onclick="selectIcon('🥡')">🥡</div>
+                    <div class="icon-option" onclick="selectIcon('🍶')">🍶</div>
+                    <div class="icon-option" onclick="selectIcon('🫖')">🫖</div>
+                    <div class="icon-option" onclick="selectIcon('🥢')">🥢</div>
+                    <div class="icon-option" onclick="selectIcon('🍵')">🍵</div>
+                    <div class="icon-option" onclick="selectIcon('🧃')">🧃</div>
+                </div>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>🐾 Pest Control</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('🐾')">🐾</div>
+                    <div class="icon-option" onclick="selectIcon('🐁')">🐁</div>
+                    <div class="icon-option" onclick="selectIcon('🪰')">🪰</div>
+                    <div class="icon-option" onclick="selectIcon('🕷️')">🕷️</div>
+                    <div class="icon-option" onclick="selectIcon('🐜')">🐜</div>
+                    <div class="icon-option" onclick="selectIcon('🪤')">🪤</div>
+                    <div class="icon-option" onclick="selectIcon('🧯')">🧯</div>
+                    <div class="icon-option" onclick="selectIcon('🚫')">🚫</div>
+                    <div class="icon-option" onclick="selectIcon('🐛')">🐛</div>
+                    <div class="icon-option" onclick="selectIcon('🪲')">🪲</div>
+                </div>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>⏰ Time & Monitoring</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('⏰')">⏰</div>
+                    <div class="icon-option" onclick="selectIcon('⌛')">⌛</div>
+                    <div class="icon-option" onclick="selectIcon('📅')">📅</div>
+                    <div class="icon-option" onclick="selectIcon('🔔')">🔔</div>
+                    <div class="icon-option" onclick="selectIcon('👁️')">👁️</div>
+                    <div class="icon-option" onclick="selectIcon('🔍')">🔍</div>
+                    <div class="icon-option" onclick="selectIcon('📈')">📈</div>
+                    <div class="icon-option" onclick="selectIcon('📉')">📉</div>
+                    <div class="icon-option" onclick="selectIcon('⏱️')">⏱️</div>
+                    <div class="icon-option" onclick="selectIcon('🕐')">🕐</div>
+                </div>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>🌿 Environment</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('🌿')">🌿</div>
+                    <div class="icon-option" onclick="selectIcon('🌱')">🌱</div>
+                    <div class="icon-option" onclick="selectIcon('🍃')">🍃</div>
+                    <div class="icon-option" onclick="selectIcon('💚')">💚</div>
+                    <div class="icon-option" onclick="selectIcon('🌍')">🌍</div>
+                    <div class="icon-option" onclick="selectIcon('☀️')">☀️</div>
+                    <div class="icon-option" onclick="selectIcon('🌙')">🌙</div>
+                    <div class="icon-option" onclick="selectIcon('🌊')">🌊</div>
+                    <div class="icon-option" onclick="selectIcon('🍀')">🍀</div>
+                    <div class="icon-option" onclick="selectIcon('🌸')">🌸</div>
+                </div>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>🔢 Numbers & Symbols</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('1️⃣')">1️⃣</div>
+                    <div class="icon-option" onclick="selectIcon('2️⃣')">2️⃣</div>
+                    <div class="icon-option" onclick="selectIcon('3️⃣')">3️⃣</div>
+                    <div class="icon-option" onclick="selectIcon('4️⃣')">4️⃣</div>
+                    <div class="icon-option" onclick="selectIcon('5️⃣')">5️⃣</div>
+                    <div class="icon-option" onclick="selectIcon('🔴')">🔴</div>
+                    <div class="icon-option" onclick="selectIcon('🟢')">🟢</div>
+                    <div class="icon-option" onclick="selectIcon('🔵')">🔵</div>
+                    <div class="icon-option" onclick="selectIcon('🟡')">🟡</div>
+                    <div class="icon-option" onclick="selectIcon('⚪')">⚪</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let schemas = [];
+        let currentSchemaId = null;
+        let currentSubTab = 'grades'; // 'grades', 'colors', 'icons', 'checklist', or 'departments'
+        let originalValues = {};
+        let currentValues = {};
+        let originalColors = {};
+        let currentColors = {};
+        let originalChecklistInfo = {};
+        let currentChecklistInfo = {};
+        let originalSectionIcons = {};
+        let currentSectionIcons = {};
+        let originalDepartmentNames = {};
+        let currentDepartmentNames = {};
+        let hasChanges = false;
+        let hasColorChanges = false;
+        let hasChecklistChanges = false;
+        let hasIconChanges = false;
+        let hasDeptNameChanges = false;
+        let currentIconPickerSectionId = null;
+
+        // Default colors
+        const defaultColors = {
+            passColor: '#10b981',
+            failColor: '#ef4444',
+            categoryPassColor: '#22c55e',
+            categoryFailColor: '#f87171',
+            headerBackgroundColor: '#1e3a5f',
+            headerTextColor: '#ffffff',
+            bannerPassBackground: '#10b981',
+            bannerPassText: '#ffffff',
+            bannerFailBackground: '#ef4444',
+            bannerFailText: '#ffffff',
+            sectionHeaderBackground: '#f3f4f6',
+            sectionBorderColor: '#e5e7eb',
+            accentColor: '#3b82f6'
+        };
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadSchemas();
+        });
+
+        async function loadSchemas() {
+            try {
+                const response = await fetch('/oe-inspection/api/schemas');
+                if (!response.ok) throw new Error('Failed to load schemas');
+                
+                const data = await response.json();
+                schemas = data.schemas || [];
+
+                if (schemas.length === 0) {
+                    document.getElementById('schemaTabsContainer').innerHTML = `
+                        <div class="settings-panel">
+                            <div style="text-align: center; padding: 40px; color: #6b7280;">
+                                <div style="font-size: 48px; margin-bottom: 16px;">📋</div>
+                                <h3>No Schemas Found</h3>
+                                <p>Create a schema in Template Builder first.</p>
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                renderTabs();
+                selectSchema(schemas[0].SchemaID);
+
+            } catch (error) {
+                console.error('Error loading schemas:', error);
+                document.getElementById('schemaTabsContainer').innerHTML = `
+                    <div class="settings-panel">
+                        <div style="text-align: center; padding: 40px; color: #ef4444;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+                            <h3>Error Loading Settings</h3>
+                            <p>${error.message}</p>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function renderTabs() {
+            const tabsHtml = `
+                <div class="schema-tabs" id="schemaTabs">
+                    ${schemas.map(schema => `
+                        <button class="schema-tab" data-schema-id="${schema.SchemaID}" onclick="selectSchema(${schema.SchemaID})">
+                            📋 ${schema.SchemaName}
+                        </button>
+                    `).join('')}
+                </div>
+                <div class="settings-panel" id="settingsPanel">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <div>Loading settings...</div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('schemaTabsContainer').innerHTML = tabsHtml;
+        }
+
+        async function selectSchema(schemaId) {
+            if (hasChanges || hasColorChanges || hasChecklistChanges || hasIconChanges || hasDeptNameChanges) {
+                if (!confirm('You have unsaved changes. Discard them?')) {
+                    return;
+                }
+            }
+
+            currentSchemaId = schemaId;
+            hasChanges = false;
+            hasColorChanges = false;
+            hasChecklistChanges = false;
+            hasIconChanges = false;
+            hasDeptNameChanges = false;
+            updateSaveBar();
+
+            // Update tab styling
+            document.querySelectorAll('.schema-tab').forEach(tab => {
+                tab.classList.toggle('active', parseInt(tab.dataset.schemaId) === schemaId);
+            });
+
+            const schema = schemas.find(s => s.SchemaID === schemaId);
+            if (!schema) return;
+
+            // Store original values for grades
+            originalValues = {
+                overallPassingGrade: schema.overallPassingGrade,
+                sections: {}
+            };
+            schema.sections.forEach(s => {
+                originalValues.sections[s.SectionID] = s.PassingGrade;
+            });
+            currentValues = JSON.parse(JSON.stringify(originalValues));
+
+            // Initialize section icons
+            initializeSectionIcons(schema);
+
+            // Load colors for this schema
+            await loadSchemaColors(schemaId);
+
+            // Load checklist info for this schema
+            await loadChecklistInfo(schemaId);
+
+            // Load department names for this schema
+            await loadDepartmentNames(schemaId);
+
+            renderSettings(schema);
+        }
+
+        async function loadChecklistInfo(schemaId) {
+            try {
+                const response = await fetch(`/oe-inspection/api/schema-checklist-info/${schemaId}`);
+                const data = await response.json();
+                if (data.success) {
+                    originalChecklistInfo = { ...data.info };
+                    currentChecklistInfo = { ...data.info };
+                } else {
+                    originalChecklistInfo = { creationDate: '', revisionDate: '', edition: '', reportTitle: '', documentPrefix: '' };
+                    currentChecklistInfo = { creationDate: '', revisionDate: '', edition: '', reportTitle: '', documentPrefix: '' };
+                }
+            } catch (error) {
+                console.error('Error loading checklist info:', error);
+                originalChecklistInfo = { creationDate: '', revisionDate: '', edition: '', reportTitle: '', documentPrefix: '' };
+                currentChecklistInfo = { creationDate: '', revisionDate: '', edition: '', reportTitle: '', documentPrefix: '' };
+            }
+        }
+
+        async function loadSchemaColors(schemaId) {
+            try {
+                const response = await fetch(`/oe-inspection/api/schema-colors/${schemaId}`);
+                const data = await response.json();
+                if (data.success) {
+                    originalColors = { ...data.colors };
+                    currentColors = { ...data.colors };
+                } else {
+                    originalColors = { ...defaultColors };
+                    currentColors = { ...defaultColors };
+                }
+            } catch (error) {
+                console.error('Error loading colors:', error);
+                originalColors = { ...defaultColors };
+                currentColors = { ...defaultColors };
+            }
+        }
+
+        // Default department names
+        const defaultDepartmentNames = {
+            Maintenance: 'Maintenance',
+            Procurement: 'Procurement',
+            Cleaning: 'Cleaning'
+        };
+
+        async function loadDepartmentNames(schemaId) {
+            try {
+                const response = await fetch(`/oe-inspection/api/schema-department-names/${schemaId}`);
+                const data = await response.json();
+                if (data.success && data.names) {
+                    originalDepartmentNames = { ...defaultDepartmentNames, ...data.names };
+                    currentDepartmentNames = { ...defaultDepartmentNames, ...data.names };
+                } else {
+                    originalDepartmentNames = { ...defaultDepartmentNames };
+                    currentDepartmentNames = { ...defaultDepartmentNames };
+                }
+            } catch (error) {
+                console.error('Error loading department names:', error);
+                originalDepartmentNames = { ...defaultDepartmentNames };
+                currentDepartmentNames = { ...defaultDepartmentNames };
+            }
+        }
+
+        function updateDepartmentName(department, value) {
+            currentDepartmentNames[department] = value;
+            checkForDeptNameChanges();
+        }
+
+        function checkForDeptNameChanges() {
+            hasDeptNameChanges = JSON.stringify(currentDepartmentNames) !== JSON.stringify(originalDepartmentNames);
+            const saveBtn = document.getElementById('saveDeptNamesBtn');
+            if (saveBtn) {
+                saveBtn.disabled = !hasDeptNameChanges;
+            }
+            updateSaveBar();
+        }
+
+        async function saveDepartmentNames() {
+            const saveBtn = document.getElementById('saveDeptNamesBtn');
+            const statusEl = document.getElementById('deptNamesSaveStatus');
+            
+            try {
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '⏳ Saving...';
+                
+                const response = await fetch(`/oe-inspection/api/schema-department-names/${currentSchemaId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ names: currentDepartmentNames })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    originalDepartmentNames = { ...currentDepartmentNames };
+                    hasDeptNameChanges = false;
+                    updateSaveBar();
+                    statusEl.textContent = '✅ Saved successfully!';
+                    saveBtn.innerHTML = '💾 Save Department Names';
+                    setTimeout(() => { statusEl.textContent = ''; }, 3000);
+                } else {
+                    throw new Error(data.error || 'Failed to save');
+                }
+            } catch (error) {
+                console.error('Error saving department names:', error);
+                statusEl.textContent = '❌ Error saving';
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '💾 Save Department Names';
+            }
+        }
+
+        function switchSubTab(tab) {
+            currentSubTab = tab;
+            document.querySelectorAll('.sub-tab').forEach(t => {
+                t.classList.toggle('active', t.dataset.tab === tab);
+            });
+            document.querySelectorAll('.tab-content').forEach(c => {
+                c.classList.toggle('active', c.id === `${tab}Content`);
+            });
+            if (tab === 'colors') {
+                updateColorPreview();
+            }
+        }
+
+        function renderSettings(schema) {
+            const settingsHtml = `
+                <div class="sub-tabs">
+                    <button class="sub-tab ${currentSubTab === 'grades' ? 'active' : ''}" data-tab="grades" onclick="switchSubTab('grades')">
+                        📊 Passing Grades
+                    </button>
+                    <button class="sub-tab ${currentSubTab === 'colors' ? 'active' : ''}" data-tab="colors" onclick="switchSubTab('colors')">
+                        🎨 Report Colors
+                    </button>
+                    <button class="sub-tab ${currentSubTab === 'icons' ? 'active' : ''}" data-tab="icons" onclick="switchSubTab('icons')">
+                        🎯 Section Icons
+                    </button>
+                    <button class="sub-tab ${currentSubTab === 'checklist' ? 'active' : ''}" data-tab="checklist" onclick="switchSubTab('checklist')">
+                        📝 Checklist Info
+                    </button>
+                    <button class="sub-tab ${currentSubTab === 'departments' ? 'active' : ''}" data-tab="departments" onclick="switchSubTab('departments')">
+                        🏢 Department Names
+                    </button>
+                </div>
+
+                <!-- Grades Tab -->
+                <div class="tab-content ${currentSubTab === 'grades' ? 'active' : ''}" id="gradesContent">
+                    <div class="settings-section">
+                        <div class="section-title">
+                            <span>🎯</span>
+                            Overall Passing Grade
+                        </div>
+                        <div class="overall-setting">
+                            <div class="label">
+                                <div class="icon">🏆</div>
+                                <div>
+                                    <h4>${schema.SchemaName}</h4>
+                                    <p>Minimum overall score required to pass the audit</p>
+                                </div>
+                            </div>
+                            <div class="grade-input-group">
+                                <input type="number" 
+                                       class="grade-input" 
+                                       id="overallGrade"
+                                       value="${schema.overallPassingGrade}" 
+                                       min="0" 
+                                       max="100"
+                                       onchange="updateOverallGrade(this.value)"
+                                       oninput="markOverallChanged(this)">
+                                <span class="percent-label">%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <div class="section-title">
+                            <span>📋</span>
+                            Section Passing Grades
+                            <span style="font-size: 12px; font-weight: 400; color: #9ca3af; margin-left: auto;">
+                                ${schema.sections.length} sections
+                            </span>
+                        </div>
+                        <div class="sections-grid">
+                            ${schema.sections.map(section => `
+                                <div class="section-card">
+                                    <div class="section-info">
+                                        <span class="section-icon">${section.SectionIcon || '📄'}</span>
+                                        <div>
+                                            <div class="section-name">${section.SectionName}</div>
+                                            <div class="section-number">Section ${section.SectionNumber}</div>
+                                        </div>
+                                    </div>
+                                    <div class="grade-input-group">
+                                        <input type="number" 
+                                               class="section-grade-input" 
+                                               data-section-id="${section.SectionID}"
+                                               data-section-name="${section.SectionName}"
+                                               value="${section.PassingGrade}" 
+                                               min="0" 
+                                               max="100"
+                                               onchange="updateSectionGrade(${section.SectionID}, this.value)"
+                                               oninput="markSectionChanged(this, ${section.SectionID})">
+                                        <span style="font-size: 12px; color: #6b7280;">%</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 20px; padding: 16px; background: #f0f9ff; border-radius: 8px; border: 1px solid #bae6fd;">
+                        <div style="display: flex; align-items: center; gap: 10px; color: #0369a1;">
+                            <span>💡</span>
+                            <span style="font-size: 13px;">
+                                <strong>Tip:</strong> Section grades are used to determine pass/fail status per section in reports. 
+                                The overall grade determines the final audit status.
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Colors Tab -->
+                <div class="tab-content ${currentSubTab === 'colors' ? 'active' : ''}" id="colorsContent">
+                    <div class="color-groups">
+                        <!-- Pass/Fail Colors -->
+                        <div class="color-group">
+                            <h4>✅ Pass/Fail Colors</h4>
+                            <div class="color-row">
+                                <div class="color-item">
+                                    <label>Pass Color</label>
+                                    <div class="color-input-wrapper">
+                                        <input type="color" id="passColor" value="${currentColors.passColor}" onchange="updateColor('passColor', this.value)">
+                                        <input type="text" id="passColorText" value="${currentColors.passColor}" onchange="updateColorFromText('passColor', this.value)">
+                                    </div>
+                                </div>
+                                <div class="color-item">
+                                    <label>Fail Color</label>
+                                    <div class="color-input-wrapper">
+                                        <input type="color" id="failColor" value="${currentColors.failColor}" onchange="updateColor('failColor', this.value)">
+                                        <input type="text" id="failColorText" value="${currentColors.failColor}" onchange="updateColorFromText('failColor', this.value)">
+                                    </div>
+                                </div>
+                                <div class="color-item">
+                                    <label>Category Pass</label>
+                                    <div class="color-input-wrapper">
+                                        <input type="color" id="categoryPassColor" value="${currentColors.categoryPassColor}" onchange="updateColor('categoryPassColor', this.value)">
+                                        <input type="text" id="categoryPassColorText" value="${currentColors.categoryPassColor}" onchange="updateColorFromText('categoryPassColor', this.value)">
+                                    </div>
+                                </div>
+                                <div class="color-item">
+                                    <label>Category Fail</label>
+                                    <div class="color-input-wrapper">
+                                        <input type="color" id="categoryFailColor" value="${currentColors.categoryFailColor}" onchange="updateColor('categoryFailColor', this.value)">
+                                        <input type="text" id="categoryFailColorText" value="${currentColors.categoryFailColor}" onchange="updateColorFromText('categoryFailColor', this.value)">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Header Colors -->
+                        <div class="color-group">
+                            <h4>📋 Report Header Colors</h4>
+                            <div class="color-row">
+                                <div class="color-item">
+                                    <label>Header Background</label>
+                                    <div class="color-input-wrapper">
+                                        <input type="color" id="headerBackgroundColor" value="${currentColors.headerBackgroundColor}" onchange="updateColor('headerBackgroundColor', this.value)">
+                                        <input type="text" id="headerBackgroundColorText" value="${currentColors.headerBackgroundColor}" onchange="updateColorFromText('headerBackgroundColor', this.value)">
+                                    </div>
+                                </div>
+                                <div class="color-item">
+                                    <label>Header Text</label>
+                                    <div class="color-input-wrapper">
+                                        <input type="color" id="headerTextColor" value="${currentColors.headerTextColor}" onchange="updateColor('headerTextColor', this.value)">
+                                        <input type="text" id="headerTextColorText" value="${currentColors.headerTextColor}" onchange="updateColorFromText('headerTextColor', this.value)">
+                                    </div>
+                                </div>
+                                <div class="color-item">
+                                    <label>Accent Color</label>
+                                    <div class="color-input-wrapper">
+                                        <input type="color" id="accentColor" value="${currentColors.accentColor}" onchange="updateColor('accentColor', this.value)">
+                                        <input type="text" id="accentColorText" value="${currentColors.accentColor}" onchange="updateColorFromText('accentColor', this.value)">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Banner Colors -->
+                        <div class="color-group">
+                            <h4>🏆 Performance Banner Colors</h4>
+                            <div class="color-row">
+                                <div class="color-item">
+                                    <label>Pass Banner BG</label>
+                                    <div class="color-input-wrapper">
+                                        <input type="color" id="bannerPassBackground" value="${currentColors.bannerPassBackground}" onchange="updateColor('bannerPassBackground', this.value)">
+                                        <input type="text" id="bannerPassBackgroundText" value="${currentColors.bannerPassBackground}" onchange="updateColorFromText('bannerPassBackground', this.value)">
+                                    </div>
+                                </div>
+                                <div class="color-item">
+                                    <label>Pass Banner Text</label>
+                                    <div class="color-input-wrapper">
+                                        <input type="color" id="bannerPassText" value="${currentColors.bannerPassText}" onchange="updateColor('bannerPassText', this.value)">
+                                        <input type="text" id="bannerPassTextText" value="${currentColors.bannerPassText}" onchange="updateColorFromText('bannerPassText', this.value)">
+                                    </div>
+                                </div>
+                                <div class="color-item">
+                                    <label>Fail Banner BG</label>
+                                    <div class="color-input-wrapper">
+                                        <input type="color" id="bannerFailBackground" value="${currentColors.bannerFailBackground}" onchange="updateColor('bannerFailBackground', this.value)">
+                                        <input type="text" id="bannerFailBackgroundText" value="${currentColors.bannerFailBackground}" onchange="updateColorFromText('bannerFailBackground', this.value)">
+                                    </div>
+                                </div>
+                                <div class="color-item">
+                                    <label>Fail Banner Text</label>
+                                    <div class="color-input-wrapper">
+                                        <input type="color" id="bannerFailText" value="${currentColors.bannerFailText}" onchange="updateColor('bannerFailText', this.value)">
+                                        <input type="text" id="bannerFailTextText" value="${currentColors.bannerFailText}" onchange="updateColorFromText('bannerFailText', this.value)">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section Colors -->
+                        <div class="color-group">
+                            <h4>📄 Section Colors</h4>
+                            <div class="color-row">
+                                <div class="color-item">
+                                    <label>Section Header BG</label>
+                                    <div class="color-input-wrapper">
+                                        <input type="color" id="sectionHeaderBackground" value="${currentColors.sectionHeaderBackground}" onchange="updateColor('sectionHeaderBackground', this.value)">
+                                        <input type="text" id="sectionHeaderBackgroundText" value="${currentColors.sectionHeaderBackground}" onchange="updateColorFromText('sectionHeaderBackground', this.value)">
+                                    </div>
+                                </div>
+                                <div class="color-item">
+                                    <label>Section Border</label>
+                                    <div class="color-input-wrapper">
+                                        <input type="color" id="sectionBorderColor" value="${currentColors.sectionBorderColor}" onchange="updateColor('sectionBorderColor', this.value)">
+                                        <input type="text" id="sectionBorderColorText" value="${currentColors.sectionBorderColor}" onchange="updateColorFromText('sectionBorderColor', this.value)">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Color Preview -->
+                    <div class="color-preview-section">
+                        <h4>👁️ Live Preview</h4>
+                        <div class="preview-container">
+                            <div class="preview-item" id="previewHeader" style="background: ${currentColors.headerBackgroundColor}; color: ${currentColors.headerTextColor};">
+                                Report Header Preview
+                            </div>
+                            <div class="preview-item" id="previewPass" style="background: ${currentColors.bannerPassBackground}; color: ${currentColors.bannerPassText};">
+                                ✅ PASS - 87%
+                            </div>
+                            <div class="preview-item" id="previewFail" style="background: ${currentColors.bannerFailBackground}; color: ${currentColors.bannerFailText};">
+                                ❌ FAIL - 65%
+                            </div>
+                        </div>
+                        <div class="preview-container" style="margin-top: 10px;">
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <div style="width: 60px; height: 30px; border-radius: 6px; background: ${currentColors.passColor};" id="previewPassScore"></div>
+                                <span>Pass Score</span>
+                            </div>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <div style="width: 60px; height: 30px; border-radius: 6px; background: ${currentColors.failColor};" id="previewFailScore"></div>
+                                <span>Fail Score</span>
+                            </div>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <div style="width: 60px; height: 30px; border-radius: 6px; background: ${currentColors.accentColor};" id="previewAccent"></div>
+                                <span>Accent</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="color-actions">
+                        <button class="btn btn-secondary" onclick="resetColorsToDefault()">
+                            🔄 Reset to Defaults
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Section Icons Tab -->
+                <div class="tab-content ${currentSubTab === 'icons' ? 'active' : ''}" id="iconsContent">
+                    <div class="settings-section">
+                        <div class="section-title">
+                            <span>🎯</span>
+                            Section Icons
+                        </div>
+                        <p style="color: #6b7280; margin-bottom: 20px; font-size: 14px;">
+                            Click on a section's icon to change it. Icons appear in reports and dashboards.
+                        </p>
+                        
+                        <div class="icon-picker-grid">
+                            ${schema.sections.map(section => `
+                                <div class="section-icon-card" id="iconCard-${section.SectionID}">
+                                    <div class="current-icon-display" 
+                                         onclick="openIconPicker(${section.SectionID}, '${section.SectionName.replace(/'/g, "\\'")}', '${section.SectionIcon || '📋'}')"
+                                         id="iconDisplay-${section.SectionID}">
+                                        ${section.SectionIcon || '📋'}
+                                    </div>
+                                    <div class="section-icon-info">
+                                        <div class="section-icon-name">${section.SectionName}</div>
+                                        <div class="section-icon-number">Section ${section.SectionNumber}</div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Checklist Info Tab -->
+                <div class="tab-content ${currentSubTab === 'checklist' ? 'active' : ''}" id="checklistContent">
+                    <div class="settings-section">
+                        <div class="section-title">
+                            <span>📝</span>
+                            Checklist Information
+                        </div>
+                        <p style="color: #6b7280; margin-bottom: 20px; font-size: 14px;">
+                            Configure the metadata for this checklist schema. This information appears in audit reports.
+                        </p>
+                        
+                        <div class="checklist-info-grid">
+                            <div class="checklist-info-card">
+                                <div class="checklist-info-icon">📅</div>
+                                <div class="checklist-info-content">
+                                    <label class="checklist-info-label">Creation Date</label>
+                                    <input type="date" 
+                                           class="checklist-info-input" 
+                                           id="creationDate"
+                                           value="${currentChecklistInfo.creationDate || ''}"
+                                           onchange="updateChecklistInfo('creationDate', this.value)">
+                                    <p class="checklist-info-hint">The date this checklist was originally created</p>
+                                </div>
+                            </div>
+                            
+                            <div class="checklist-info-card">
+                                <div class="checklist-info-icon">🔄</div>
+                                <div class="checklist-info-content">
+                                    <label class="checklist-info-label">Last Revision Date</label>
+                                    <input type="date" 
+                                           class="checklist-info-input" 
+                                           id="revisionDate"
+                                           value="${currentChecklistInfo.revisionDate || ''}"
+                                           onchange="updateChecklistInfo('revisionDate', this.value)">
+                                    <p class="checklist-info-hint">The date of the most recent revision</p>
+                                </div>
+                            </div>
+                            
+                            <div class="checklist-info-card">
+                                <div class="checklist-info-icon">📋</div>
+                                <div class="checklist-info-content">
+                                    <label class="checklist-info-label">Edition</label>
+                                    <input type="text" 
+                                           class="checklist-info-input" 
+                                           id="edition"
+                                           value="${currentChecklistInfo.edition || ''}"
+                                           placeholder="e.g., 1.0, 2.1, Rev A"
+                                           onchange="updateChecklistInfo('edition', this.value)">
+                                    <p class="checklist-info-hint">Version number or edition identifier</p>
+                                </div>
+                            </div>
+                            
+                            <div class="checklist-info-card">
+                                <div class="checklist-info-icon">🏷️</div>
+                                <div class="checklist-info-content">
+                                    <label class="checklist-info-label">Report Title</label>
+                                    <input type="text" 
+                                           class="checklist-info-input" 
+                                           id="reportTitle"
+                                           value="${currentChecklistInfo.reportTitle || ''}"
+                                           placeholder="e.g., Food Safety Audit Report"
+                                           onchange="updateChecklistInfo('reportTitle', this.value)">
+                                    <p class="checklist-info-hint">The title shown on generated reports</p>
+                                </div>
+                            </div>
+                            
+                            <div class="checklist-info-card">
+                                <div class="checklist-info-icon">🔢</div>
+                                <div class="checklist-info-content">
+                                    <label class="checklist-info-label">Document Number Prefix</label>
+                                    <input type="text" 
+                                           class="checklist-info-input" 
+                                           id="documentPrefix"
+                                           value="${currentChecklistInfo.documentPrefix || ''}"
+                                           placeholder="e.g., GMRL-FSACR"
+                                           onchange="updateChecklistInfo('documentPrefix', this.value)">
+                                    <p class="checklist-info-hint">Prefix for audit document numbers (e.g., GMRL-FSACR-0001)</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Department Names Tab -->
+                <div class="tab-content ${currentSubTab === 'departments' ? 'active' : ''}" id="departmentsContent">
+                    <div class="settings-section">
+                        <div class="section-title">
+                            <span>🏢</span>
+                            Department Report Names
+                        </div>
+                        <p style="color: #6b7280; margin-bottom: 20px; font-size: 14px;">
+                            Customize the header titles for each department's followup report. These names will appear in the generated reports.
+                        </p>
+                        
+                        <div class="checklist-info-grid">
+                            <div class="checklist-info-card">
+                                <div class="checklist-info-icon">🔧</div>
+                                <div class="checklist-info-content">
+                                    <label class="checklist-info-label">Maintenance Department</label>
+                                    <input type="text" 
+                                           class="checklist-info-input dept-name-input" 
+                                           id="deptNameMaintenance"
+                                           value="${currentDepartmentNames.Maintenance || 'Maintenance'}"
+                                           placeholder="e.g., Maintenance Department"
+                                           onchange="updateDepartmentName('Maintenance', this.value)">
+                                    <p class="checklist-info-hint">Header title for Maintenance department reports</p>
+                                </div>
+                            </div>
+                            
+                            <div class="checklist-info-card">
+                                <div class="checklist-info-icon">📦</div>
+                                <div class="checklist-info-content">
+                                    <label class="checklist-info-label">Procurement Department</label>
+                                    <input type="text" 
+                                           class="checklist-info-input dept-name-input" 
+                                           id="deptNameProcurement"
+                                           value="${currentDepartmentNames.Procurement || 'Procurement'}"
+                                           placeholder="e.g., Procurement Department"
+                                           onchange="updateDepartmentName('Procurement', this.value)">
+                                    <p class="checklist-info-hint">Header title for Procurement department reports</p>
+                                </div>
+                            </div>
+                            
+                            <div class="checklist-info-card">
+                                <div class="checklist-info-icon">🧹</div>
+                                <div class="checklist-info-content">
+                                    <label class="checklist-info-label">Cleaning Department</label>
+                                    <input type="text" 
+                                           class="checklist-info-input dept-name-input" 
+                                           id="deptNameCleaning"
+                                           value="${currentDepartmentNames.Cleaning || 'Cleaning'}"
+                                           placeholder="e.g., Cleaning & Sanitation"
+                                           onchange="updateDepartmentName('Cleaning', this.value)">
+                                    <p class="checklist-info-hint">Header title for Cleaning department reports</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 20px; display: flex; gap: 10px;">
+                            <button class="save-btn" id="saveDeptNamesBtn" onclick="saveDepartmentNames()" disabled>
+                                💾 Save Department Names
+                            </button>
+                            <span id="deptNamesSaveStatus" style="color: #10b981; font-size: 14px; align-self: center;"></span>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('settingsPanel').innerHTML = settingsHtml;
+            if (currentSubTab === 'colors') {
+                updateColorPreview();
+            }
+        }
+
+        function updateColor(field, value) {
+            currentColors[field] = value;
+            document.getElementById(field + 'Text').value = value;
+            checkForColorChanges();
+            updateColorPreview();
+        }
+
+        function updateColorFromText(field, value) {
+            if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+                currentColors[field] = value;
+                document.getElementById(field).value = value;
+                checkForColorChanges();
+                updateColorPreview();
+            }
+        }
+
+        // Checklist Info Functions
+        function updateChecklistInfo(field, value) {
+            currentChecklistInfo[field] = value;
+            const input = document.getElementById(field);
+            if (input) {
+                input.classList.add('changed');
+            }
+            checkForChecklistChanges();
+        }
+
+        function checkForChecklistChanges() {
+            hasChecklistChanges = JSON.stringify(currentChecklistInfo) !== JSON.stringify(originalChecklistInfo);
+            updateSaveBar();
+        }
+
+        // Section Icons Functions
+        function openIconPicker(sectionId, sectionName, currentIcon) {
+            currentIconPickerSectionId = sectionId;
+            document.getElementById('iconPickerTitle').textContent = `Select Icon for "${sectionName}"`;
+            
+            // Highlight current icon
+            document.querySelectorAll('.icon-option').forEach(opt => {
+                opt.classList.remove('selected');
+                if (opt.textContent.trim() === currentIcon) {
+                    opt.classList.add('selected');
+                }
+            });
+            
+            document.getElementById('iconPickerModal').classList.add('active');
+        }
+
+        function closeIconPicker() {
+            document.getElementById('iconPickerModal').classList.remove('active');
+            currentIconPickerSectionId = null;
+        }
+
+        function selectIcon(icon) {
+            if (!currentIconPickerSectionId) return;
+            
+            // Update display
+            const display = document.getElementById(`iconDisplay-${currentIconPickerSectionId}`);
+            const card = document.getElementById(`iconCard-${currentIconPickerSectionId}`);
+            
+            if (display) {
+                display.textContent = icon;
+            }
+            if (card) {
+                card.classList.add('changed');
+            }
+            
+            // Store the change
+            currentSectionIcons[currentIconPickerSectionId] = icon;
+            checkForIconChanges();
+            
+            closeIconPicker();
+        }
+
+        function checkForIconChanges() {
+            hasIconChanges = JSON.stringify(currentSectionIcons) !== JSON.stringify(originalSectionIcons);
+            updateSaveBar();
+        }
+
+        function initializeSectionIcons(schema) {
+            originalSectionIcons = {};
+            currentSectionIcons = {};
+            schema.sections.forEach(section => {
+                originalSectionIcons[section.SectionID] = section.SectionIcon || '📋';
+                currentSectionIcons[section.SectionID] = section.SectionIcon || '📋';
+            });
+        }
+
+        function updateColorPreview() {
+            const header = document.getElementById('previewHeader');
+            const pass = document.getElementById('previewPass');
+            const fail = document.getElementById('previewFail');
+            const passScore = document.getElementById('previewPassScore');
+            const failScore = document.getElementById('previewFailScore');
+            const accent = document.getElementById('previewAccent');
+
+            if (header) {
+                header.style.background = currentColors.headerBackgroundColor;
+                header.style.color = currentColors.headerTextColor;
+            }
+            if (pass) {
+                pass.style.background = currentColors.bannerPassBackground;
+                pass.style.color = currentColors.bannerPassText;
+            }
+            if (fail) {
+                fail.style.background = currentColors.bannerFailBackground;
+                fail.style.color = currentColors.bannerFailText;
+            }
+            if (passScore) passScore.style.background = currentColors.passColor;
+            if (failScore) failScore.style.background = currentColors.failColor;
+            if (accent) accent.style.background = currentColors.accentColor;
+        }
+
+        function checkForColorChanges() {
+            hasColorChanges = JSON.stringify(currentColors) !== JSON.stringify(originalColors);
+            updateSaveBar();
+        }
+
+        async function resetColorsToDefault() {
+            if (!confirm('Reset all colors to default values?')) return;
+            
+            currentColors = { ...defaultColors };
+            hasColorChanges = true;
+            
+            const schema = schemas.find(s => s.SchemaID === currentSchemaId);
+            if (schema) renderSettings(schema);
+            
+            updateSaveBar();
+            showToast('Colors reset to defaults. Click Save to apply.', 'success');
+        }
+
+        function markOverallChanged(input) {
+            const value = parseInt(input.value) || 0;
+            const isChanged = value !== originalValues.overallPassingGrade;
+            input.classList.toggle('changed', isChanged);
+            currentValues.overallPassingGrade = value;
+            checkForChanges();
+        }
+
+        function markSectionChanged(input, sectionId) {
+            const value = parseInt(input.value) || 0;
+            const isChanged = value !== originalValues.sections[sectionId];
+            input.classList.toggle('changed', isChanged);
+            currentValues.sections[sectionId] = value;
+            checkForChanges();
+        }
+
+        function updateOverallGrade(value) {
+            currentValues.overallPassingGrade = parseInt(value) || 0;
+            checkForChanges();
+        }
+
+        function updateSectionGrade(sectionId, value) {
+            currentValues.sections[sectionId] = parseInt(value) || 0;
+            checkForChanges();
+        }
+
+        function checkForChanges() {
+            let changeCount = 0;
+
+            if (currentValues.overallPassingGrade !== originalValues.overallPassingGrade) {
+                changeCount++;
+            }
+
+            for (const sectionId in currentValues.sections) {
+                if (currentValues.sections[sectionId] !== originalValues.sections[sectionId]) {
+                    changeCount++;
+                }
+            }
+
+            hasChanges = changeCount > 0;
+            updateSaveBar();
+        }
+
+        function updateSaveBar() {
+            const saveBar = document.getElementById('saveBar');
+            
+            let changeItems = [];
+            if (hasChanges) changeItems.push('grades');
+            if (hasColorChanges) changeItems.push('colors');
+            if (hasIconChanges) changeItems.push('section icons');
+            if (hasChecklistChanges) changeItems.push('checklist info');
+            
+            let changeText = changeItems.length > 0 
+                ? `${changeItems.join(', ')} changed`
+                : '0 unsaved changes';
+            
+            document.getElementById('changesCount').textContent = changeText;
+            saveBar.classList.toggle('visible', hasChanges || hasColorChanges || hasChecklistChanges || hasIconChanges);
+        }
+
+        function discardChanges() {
+            const schema = schemas.find(s => s.SchemaID === currentSchemaId);
+            if (schema) {
+                currentValues = JSON.parse(JSON.stringify(originalValues));
+                currentColors = { ...originalColors };
+                currentChecklistInfo = { ...originalChecklistInfo };
+                currentSectionIcons = { ...originalSectionIcons };
+                hasChanges = false;
+                hasColorChanges = false;
+                hasChecklistChanges = false;
+                hasIconChanges = false;
+                renderSettings(schema);
+                updateSaveBar();
+            }
+        }
+
+        async function saveChanges() {
+            try {
+                const schema = schemas.find(s => s.SchemaID === currentSchemaId);
+                let savedGrades = false;
+                let savedColors = false;
+                let savedChecklist = false;
+                let savedIcons = false;
+
+                // Save grades if changed
+                if (hasChanges) {
+                    const settings = {
+                        overallPassingGrade: currentValues.overallPassingGrade,
+                        sections: Object.entries(currentValues.sections).map(([sectionId, passingGrade]) => {
+                            const section = schema.sections.find(s => s.SectionID === parseInt(sectionId));
+                            return {
+                                sectionId: parseInt(sectionId),
+                                sectionName: section?.SectionName || '',
+                                passingGrade
+                            };
+                        })
+                    };
+
+                    const response = await fetch(`/oe-inspection/api/schema/${currentSchemaId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(settings)
+                    });
+
+                    if (!response.ok) throw new Error('Failed to save grades');
+                    
+                    originalValues = JSON.parse(JSON.stringify(currentValues));
+                    schema.overallPassingGrade = currentValues.overallPassingGrade;
+                    schema.sections.forEach(s => {
+                        s.PassingGrade = currentValues.sections[s.SectionID];
+                    });
+                    savedGrades = true;
+                }
+
+                // Save colors if changed
+                if (hasColorChanges) {
+                    const response = await fetch(`/oe-inspection/api/schema-colors/${currentSchemaId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(currentColors)
+                    });
+
+                    if (!response.ok) throw new Error('Failed to save colors');
+                    
+                    originalColors = { ...currentColors };
+                    savedColors = true;
+                }
+
+                // Save section icons if changed
+                if (hasIconChanges) {
+                    const iconUpdates = Object.entries(currentSectionIcons)
+                        .filter(([sectionId, icon]) => icon !== originalSectionIcons[sectionId])
+                        .map(([sectionId, icon]) => ({ sectionId: parseInt(sectionId), icon }));
+                    
+                    if (iconUpdates.length > 0) {
+                        const response = await fetch(`/oe-inspection/api/section-icons/${currentSchemaId}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ icons: iconUpdates })
+                        });
+
+                        const result = await response.json();
+                        if (!response.ok || !result.success) {
+                            throw new Error(result.error || 'Failed to save section icons');
+                        }
+                        
+                        // Update schema sections with new icons
+                        schema.sections.forEach(s => {
+                            if (currentSectionIcons[s.SectionID]) {
+                                s.SectionIcon = currentSectionIcons[s.SectionID];
+                            }
+                        });
+                        
+                        originalSectionIcons = { ...currentSectionIcons };
+                        savedIcons = true;
+                    }
+                }
+
+                // Save checklist info if changed
+                if (hasChecklistChanges) {
+                    const response = await fetch(`/oe-inspection/api/schema-checklist-info/${currentSchemaId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(currentChecklistInfo)
+                    });
+
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.error || 'Failed to save checklist info');
+                    }
+                    
+                    originalChecklistInfo = { ...currentChecklistInfo };
+                    savedChecklist = true;
+                }
+
+                hasChanges = false;
+                hasColorChanges = false;
+                hasChecklistChanges = false;
+                hasIconChanges = false;
+                updateSaveBar();
+
+                document.querySelectorAll('.changed').forEach(el => el.classList.remove('changed'));
+
+                let savedItems = [];
+                if (savedGrades) savedItems.push('grades');
+                if (savedColors) savedItems.push('colors');
+                if (savedIcons) savedItems.push('section icons');
+                if (savedChecklist) savedItems.push('checklist info');
+                
+                const message = savedItems.length > 0 
+                    ? `Saved: ${savedItems.join(', ')}!`
+                    : 'No changes to save';
+                
+                showToast(message, 'success');
+
+            } catch (error) {
+                console.error('Error saving settings:', error);
+                showToast('Failed to save: ' + error.message, 'error');
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastIcon = document.getElementById('toastIcon');
+            const toastMessage = document.getElementById('toastMessage');
+
+            toastIcon.textContent = type === 'success' ? '✓' : '✗';
+            toastMessage.textContent = message;
+            toast.classList.toggle('error', type === 'error');
+            toast.classList.add('visible');
+
+            setTimeout(() => {
+                toast.classList.remove('visible');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Start Inspection - OE Inspection System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: white;
+            font-size: 32px;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            color: rgba(255,255,255,0.9);
+            font-size: 16px;
+        }
+
+        /* Main Card */
+        .main-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 25px 30px;
+            text-align: center;
+        }
+
+        .card-header h2 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .card-header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .card-body {
+            padding: 30px;
+        }
+
+        /* Form Styles */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .form-group label .required {
+            color: #ef4444;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 15px;
+            transition: all 0.3s;
+            background: #fafafa;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+            background: white;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        /* Store Info Box */
+        .store-info {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 2px solid #667eea;
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .store-info.show {
+            display: block;
+        }
+
+        .store-info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 14px;
+        }
+
+        .store-info-item .label {
+            color: #666;
+        }
+
+        .store-info-item .value {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .schema-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 16px 32px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+            margin-top: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+
+        /* Footer */
+        .card-footer {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        /* Loading */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .loading-overlay.show {
+            display: flex;
+        }
+
+        .loading-box {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            display: none;
+            align-items: center;
+            gap: 10px;
+            z-index: 1001;
+            animation: slideIn 0.3s;
+        }
+
+        .toast.show {
+            display: flex;
+        }
+
+        .toast.success {
+            border-left: 4px solid #10b981;
+        }
+
+        .toast.error {
+            border-left: 4px solid #ef4444;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Responsive */
+        @media (max-width: 500px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+        <span id="toastMessage"></span>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-box">
+            <div class="spinner"></div>
+            <p>Starting audit...</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Start New Inspection</h1>
+            <p>Fill in the inspection details to begin</p>
+        </div>
+
+        <div class="main-card">
+            <div class="card-header">
+                <h2>📋 Inspection Information</h2>
+                <p>Please complete all required fields</p>
+            </div>
+
+            <div class="card-body">
+                <form id="startAuditForm" onsubmit="startAudit(event)">
+                    <!-- Store Selection -->
+                    <div class="form-group">
+                        <label>Store <span class="required">*</span></label>
+                        <select id="storeSelect" required onchange="onStoreChange()">
+                            <option value="">Select a store...</option>
+                        </select>
+                        <div class="store-info" id="storeInfo">
+                            <div class="store-info-item">
+                                <span class="label">Location:</span>
+                                <span class="value" id="storeLocation">-</span>
+                            </div>
+                            <div class="store-info-item">
+                                <span class="label">Template:</span>
+                                <span class="schema-badge" id="storeSchema">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Date and Time In/Out -->
+                    <div class="form-group">
+                        <label>Date of Audit <span class="required">*</span></label>
+                        <input type="date" id="auditDate" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Time In <span class="required">*</span></label>
+                            <input type="time" id="timeIn" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Time Out</label>
+                            <input type="time" id="timeOut">
+                        </div>
+                    </div>
+
+                    <!-- Cycle and Year -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Cycle <span class="required">*</span></label>
+                            <select id="auditCycle" required>
+                                <option value="">Select cycle...</option>
+                                <option value="C1">C1 (Jan/Feb)</option>
+                                <option value="C2">C2 (March/April)</option>
+                                <option value="C3">C3 (May/June)</option>
+                                <option value="C4">C4 (July/August)</option>
+                                <option value="C5">C5 (Sept/Oct)</option>
+                                <option value="C6">C6 (Nov/Dec)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Year <span class="required">*</span></label>
+                            <select id="auditYear" required>
+                                <option value="">Select year...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Auditors -->
+                    <div class="form-group">
+                        <label>Auditor(s) <span class="required">*</span></label>
+                        <input type="text" id="auditors" placeholder="Enter auditor name(s)" required>
+                    </div>
+
+                    <!-- Accompanied By -->
+                    <div class="form-group">
+                        <label>Accompanied By</label>
+                        <input type="text" id="accompaniedBy" placeholder="Enter name of accompanying person (optional)">
+                    </div>
+                </form>
+            </div>
+
+            <div class="card-footer">
+                <button type="submit" form="startAuditForm" class="btn btn-primary" id="startBtn">
+                    <span>📝</span>
+                    Start Filling Inspection
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="window.location.href='/oe-inspection'">
+                    <span>←</span>
+                    Back to OE Inspection
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let stores = [];
+        let selectedStore = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStores();
+            setDefaultValues();
+            populateYears();
+        });
+
+        // Toast notification
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            toastMessage.textContent = message;
+            toast.className = `toast ${type} show`;
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Set default date and time
+        function setDefaultValues() {
+            const now = new Date();
+            
+            // Set today's date
+            const dateStr = now.toISOString().split('T')[0];
+            document.getElementById('auditDate').value = dateStr;
+            
+            // Set current time as Time In
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('timeIn').value = `${hours}:${minutes}`;
+            
+            // Set current cycle based on month
+            const month = now.getMonth() + 1; // 1-12
+            let cycle = 'C1';
+            if (month <= 2) cycle = 'C1';
+            else if (month <= 4) cycle = 'C2';
+            else if (month <= 6) cycle = 'C3';
+            else if (month <= 8) cycle = 'C4';
+            else if (month <= 10) cycle = 'C5';
+            else cycle = 'C6';
+            document.getElementById('auditCycle').value = cycle;
+        }
+
+        // Populate years dropdown
+        function populateYears() {
+            const yearSelect = document.getElementById('auditYear');
+            const currentYear = new Date().getFullYear();
+            
+            for (let year = currentYear; year >= currentYear - 2; year--) {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                yearSelect.appendChild(option);
+            }
+            
+            // Set current year as default
+            yearSelect.value = currentYear;
+        }
+
+        // Load stores from API
+        async function loadStores() {
+            try {
+                const response = await fetch('/oe-inspection/api/stores');
+                const result = await response.json();
+                
+                if (result.success) {
+                    stores = result.data;
+                    const select = document.getElementById('storeSelect');
+                    
+                    stores.forEach(store => {
+                        const option = document.createElement('option');
+                        option.value = store.storeId;
+                        option.textContent = `${store.storeCode} - ${store.storeName}`;
+                        select.appendChild(option);
+                    });
+                } else {
+                    showToast('Failed to load stores', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading stores:', error);
+                showToast('Error loading stores', 'error');
+            }
+        }
+
+        // Handle store selection change
+        function onStoreChange() {
+            const storeId = parseInt(document.getElementById('storeSelect').value);
+            const storeInfo = document.getElementById('storeInfo');
+            
+            if (storeId) {
+                selectedStore = stores.find(s => s.storeId === storeId);
+                
+                if (selectedStore) {
+                    document.getElementById('storeLocation').textContent = selectedStore.location || 'N/A';
+                    document.getElementById('storeSchema').textContent = selectedStore.schemaName;
+                    storeInfo.classList.add('show');
+                }
+            } else {
+                selectedStore = null;
+                storeInfo.classList.remove('show');
+            }
+        }
+
+        // Start audit
+        async function startAudit(e) {
+            e.preventDefault();
+            
+            if (!selectedStore) {
+                showToast('Please select a store', 'error');
+                return;
+            }
+
+            const auditData = {
+                storeId: selectedStore.storeId,
+                storeCode: selectedStore.storeCode,
+                storeName: selectedStore.storeName,
+                schemaId: selectedStore.schemaId,
+                schemaName: selectedStore.schemaName,
+                auditDate: document.getElementById('auditDate').value,
+                timeIn: document.getElementById('timeIn').value,
+                timeOut: document.getElementById('timeOut').value || null,
+                cycle: document.getElementById('auditCycle').value,
+                year: document.getElementById('auditYear').value,
+                auditors: document.getElementById('auditors').value,
+                accompaniedBy: document.getElementById('accompaniedBy').value
+            };
+
+            // Show loading
+            document.getElementById('loadingOverlay').classList.add('show');
+            document.getElementById('startBtn').disabled = true;
+
+            try {
+                // First get the next document number
+                const docResponse = await fetch('/oe-inspection/api/next-document-number');
+                const docResult = await docResponse.json();
+                
+                if (!docResult.success) {
+                    throw new Error('Failed to generate document number');
+                }
+                
+                const inspectionData = {
+                    storeId: selectedStore.storeId,
+                    storeName: selectedStore.storeName,
+                    documentNumber: docResult.documentNumber,
+                    inspectionDate: document.getElementById('auditDate').value,
+                    inspectors: document.getElementById('auditors').value,
+                    accompaniedBy: document.getElementById('accompaniedBy').value
+                };
+                
+                const response = await fetch('/oe-inspection/api/inspections', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(inspectionData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast('Inspection created successfully!', 'success');
+                    // Redirect to inspection filling page with the ID
+                    setTimeout(() => {
+                        window.location.href = `/oe-inspection/fill/${result.data.id}`;
+                    }, 1000);
+                } else {
+                    throw new Error(result.error || 'Failed to start inspection');
+                }
+            } catch (error) {
+                console.error('Error starting audit:', error);
+                showToast('Error: ' + error.message, 'error');
+                document.getElementById('loadingOverlay').classList.remove('show');
+                document.getElementById('startBtn').disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

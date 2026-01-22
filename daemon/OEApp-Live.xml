@@ -45,7 +45,15 @@
     <env name="APP_NAME" value="Operational Excellence App"/>
     <env name="APP_URL" value="https://oeapp.gmrlapps.com"/>
     <env name="REDIRECT_URI" value="https://oeapp.gmrlapps.com/auth/callback"/>
+    <env name="SQL_SERVER" value="localhost"/>
     <env name="SQL_DATABASE" value="OEApp_Live"/>
+    <env name="SQL_USER" value="sa"/>
+    <env name="SQL_PASSWORD" value="Kokowawa123@@"/>
+    <env name="SQL_ENCRYPT" value="false"/>
+    <env name="SQL_TRUST_CERT" value="true"/>
+    <env name="AZURE_TENANT_ID" value="b99fc2f6-d65e-4b48-935b-118659097da7"/>
+    <env name="AZURE_CLIENT_ID" value="9c916e84-9ff1-4e15-9d76-0a87cb974c30"/>
+    <env name="AZURE_CLIENT_SECRET" value="YOUR_AZURE_CLIENT_SECRET_HERE"/>
     <serviceaccount>
         <domain>PAPPS</domain>
         <user>LocalSystem</user>

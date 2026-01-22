@@ -1,0 +1,2927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fill Inspection - OE Inspection System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            min-height: 100vh;
+            color: #1e293b;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            border-bottom: 1px solid rgba(99, 102, 241, 0.3);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .back-btn {
+            background: linear-gradient(135deg, #475569 0%, #334155 100%);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+        }
+
+        .header-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .audit-info {
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.9rem;
+        }
+
+        .audit-info-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .audit-info-label {
+            color: #64748b;
+        }
+
+        .audit-info-value {
+            color: #1e293b;
+            font-weight: 600;
+        }
+
+        .status-badge {
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .status-in-progress {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+
+        .status-completed {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        /* Main Container */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 70px);
+        }
+
+        /* Sidebar - Sections Navigation */
+        .sections-sidebar {
+            width: 280px;
+            background: rgba(255, 255, 255, 0.95);
+            border-right: 1px solid rgba(99, 102, 241, 0.2);
+            overflow-y: auto;
+            padding: 1rem;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .sidebar-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        .section-nav-item {
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
+        }
+
+        .section-nav-item:hover {
+            background: rgba(99, 102, 241, 0.1);
+            border-color: rgba(99, 102, 241, 0.3);
+        }
+
+        .section-nav-item.active {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: rgba(99, 102, 241, 0.5);
+        }
+
+        .section-nav-icon {
+            font-size: 1.25rem;
+        }
+
+        .section-nav-info {
+            flex: 1;
+        }
+
+        .section-nav-name {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #1e293b;
+        }
+
+        .section-nav-progress {
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+
+        .section-nav-score {
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .score-pass { color: #10b981; }
+        .score-fail { color: #ef4444; }
+        .score-na { color: #94a3b8; }
+
+        /* Content Area */
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem;
+        }
+
+        /* Section Header */
+        .section-header {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .section-icon {
+            font-size: 2rem;
+        }
+
+        .section-name {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .section-stats {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .section-stat {
+            text-align: center;
+        }
+
+        .section-stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .section-stat-label {
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+
+        /* Question Card */
+        .question-card {
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .question-card:hover {
+            border-color: rgba(99, 102, 241, 0.4);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .question-card.answered {
+            border-left: 4px solid #10b981;
+        }
+
+        .question-card.answered-partial {
+            border-left: 4px solid #f59e0b;
+        }
+
+        .question-card.answered-no {
+            border-left: 4px solid #ef4444;
+        }
+
+        .question-card.answered-na {
+            border-left: 4px solid #64748b;
+        }
+
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .question-ref {
+            background: #6366f1;
+            color: #ffffff;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .question-coeff {
+            background: #f97316;
+            color: #ffffff;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+
+        .question-title {
+            font-size: 1rem;
+            color: #1e293b;
+            line-height: 1.5;
+            margin-bottom: 1rem;
+        }
+
+        .question-cr {
+            font-size: 0.85rem;
+            color: #64748b;
+            background: rgba(99, 102, 241, 0.05);
+            padding: 0.75rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            font-style: italic;
+        }
+
+        .cr-container {
+            margin-bottom: 1rem;
+        }
+
+        .cr-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .cr-label {
+            font-size: 0.8rem;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .cr-toggle-btn {
+            background: transparent;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            color: #a5b4fc;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .cr-toggle-btn:hover {
+            background: rgba(99, 102, 241, 0.2);
+        }
+
+        .cr-textarea {
+            width: 100%;
+            min-height: 60px;
+            max-height: 200px;
+            padding: 0.75rem;
+            background: rgba(99, 102, 241, 0.05);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 6px;
+            color: #475569;
+            font-size: 0.85rem;
+            font-style: italic;
+            line-height: 1.5;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .cr-textarea:focus {
+            outline: none;
+            border-color: rgba(99, 102, 241, 0.5);
+            background: rgba(99, 102, 241, 0.08);
+        }
+
+        .cr-textarea.readonly {
+            cursor: default;
+            opacity: 0.9;
+        }
+
+        .cr-note {
+            font-size: 0.7rem;
+            color: #64748b;
+            margin-top: 0.25rem;
+            font-style: normal;
+        }
+
+        /* Answer Options */
+        .answer-options {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .answer-btn {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 2px solid rgba(99, 102, 241, 0.3);
+            border-radius: 8px;
+            background: transparent;
+            color: #64748b;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .answer-btn:hover {
+            border-color: rgba(99, 102, 241, 0.5);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .answer-btn.selected-yes {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border-color: #10b981;
+            color: white;
+        }
+
+        .answer-btn.selected-partial {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            border-color: #f59e0b;
+            color: white;
+        }
+
+        .answer-btn.selected-no {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            border-color: #ef4444;
+            color: white;
+        }
+
+        .answer-btn.selected-na {
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+            border-color: #64748b;
+            color: white;
+        }
+
+        /* Finding Section */
+        .finding-section {
+            display: none;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .finding-section.visible {
+            display: block;
+        }
+
+        /* Comment Section */
+        .comment-section {
+            display: none;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .comment-section.visible {
+            display: block;
+        }
+
+        .comment-input {
+            border-color: rgba(16, 185, 129, 0.3) !important;
+        }
+
+        .comment-input:focus {
+            border-color: rgba(16, 185, 129, 0.6) !important;
+        }
+
+        .finding-group {
+            margin-bottom: 1rem;
+        }
+
+        .finding-label {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin-bottom: 0.5rem;
+        }
+
+        .finding-input {
+            width: 100%;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 6px;
+            color: #1e293b;
+            font-size: 0.9rem;
+            resize: vertical;
+        }
+
+        .finding-input:focus {
+            outline: none;
+            border-color: rgba(99, 102, 241, 0.6);
+        }
+
+        .priority-options {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .priority-btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 6px;
+            background: transparent;
+            color: #64748b;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+        }
+
+        .priority-btn.selected-high {
+            background: #ef4444;
+            border-color: #ef4444;
+            color: white;
+        }
+
+        .priority-btn.selected-medium {
+            background: #f59e0b;
+            border-color: #f59e0b;
+            color: white;
+        }
+
+        .priority-btn.selected-low {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            color: white;
+        }
+
+        /* Escalate Section */
+        .escalate-section {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(139, 92, 246, 0.1);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 8px;
+        }
+
+        .escalate-checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+        }
+
+        .escalate-checkbox {
+            width: 20px;
+            height: 20px;
+            accent-color: #8b5cf6;
+            cursor: pointer;
+        }
+
+        .escalate-label {
+            font-size: 0.9rem;
+            color: #c4b5fd;
+            font-weight: 500;
+        }
+
+        .department-dropdown-wrapper {
+            display: none;
+            margin-top: 1rem;
+        }
+
+        .department-dropdown-wrapper.visible {
+            display: block;
+        }
+
+        .department-label {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin-bottom: 0.5rem;
+        }
+
+        .department-select {
+            width: 100%;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 6px;
+            color: #1e293b;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .department-select:focus {
+            outline: none;
+            border-color: rgba(139, 92, 246, 0.6);
+        }
+
+        .department-select option {
+            background: #ffffff;
+            color: #1e293b;
+        }
+
+        /* Picture Button */
+        .picture-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(99, 102, 241, 0.2);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 6px;
+            color: #a5b4fc;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+        }
+
+        .picture-btn:hover {
+            background: rgba(99, 102, 241, 0.3);
+        }
+
+        .picture-btn.has-picture {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: rgba(16, 185, 129, 0.5);
+            color: #6ee7b7;
+        }
+
+        /* Good Observation Button */
+        .good-observation-btn {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #10b981;
+        }
+
+        .good-observation-btn:hover {
+            background: rgba(16, 185, 129, 0.2);
+        }
+
+        .good-observation-btn.has-picture {
+            background: rgba(16, 185, 129, 0.25);
+            border-color: rgba(16, 185, 129, 0.6);
+            color: #059669;
+            font-weight: 600;
+        }
+
+        /* Footer Actions */
+        .footer-actions {
+            position: fixed;
+            bottom: 0;
+            left: 280px;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            border-top: 1px solid rgba(99, 102, 241, 0.3);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .nav-btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .nav-btn.prev {
+            background: linear-gradient(135deg, #475569 0%, #334155 100%);
+            color: white;
+        }
+
+        .nav-btn.next {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+        }
+
+        .complete-btn {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 0.75rem 2rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .complete-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .overall-progress {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .progress-bar {
+            width: 200px;
+            height: 8px;
+            background: rgba(99, 102, 241, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+
+        /* Loading */
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 50vh;
+            gap: 1rem;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(99, 102, 241, 0.3);
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #64748b;
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+            display: none;
+        }
+
+        .toast.success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+
+        .toast.error {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+
+        .toast.show {
+            display: block;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .sections-sidebar {
+                width: 220px;
+            }
+            
+            .footer-actions {
+                left: 220px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sections-sidebar {
+                display: none;
+            }
+            
+            .footer-actions {
+                left: 0;
+            }
+
+            .audit-info {
+                display: none;
+            }
+        }
+
+        /* Image Modal */
+        .image-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .image-modal.show {
+            display: flex;
+        }
+
+        .image-modal-content {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .image-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .image-modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .image-modal-close {
+            background: transparent;
+            border: none;
+            color: #64748b;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+
+        .image-modal-close:hover {
+            color: #ef4444;
+        }
+
+        .image-upload-zone {
+            border: 2px dashed rgba(99, 102, 241, 0.5);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .image-upload-zone:hover {
+            border-color: rgba(99, 102, 241, 0.8);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .image-upload-zone.dragover {
+            border-color: #10b981;
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .upload-text {
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+
+        .image-type-selector {
+            margin-bottom: 1.5rem;
+        }
+
+        .image-type-label {
+            font-size: 0.9rem;
+            color: #64748b;
+            margin-bottom: 0.75rem;
+        }
+
+        .image-type-options {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .image-type-btn {
+            padding: 0.75rem 1.25rem;
+            border: 2px solid rgba(99, 102, 241, 0.3);
+            border-radius: 8px;
+            background: transparent;
+            color: #64748b;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .image-type-btn:hover {
+            border-color: rgba(99, 102, 241, 0.6);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .image-type-btn.selected {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            border-color: #6366f1;
+            color: white;
+        }
+
+        .image-type-btn.type-finding {
+            border-color: rgba(239, 68, 68, 0.5);
+        }
+        .image-type-btn.type-finding.selected {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            border-color: #ef4444;
+        }
+
+        .image-type-btn.type-good {
+            border-color: rgba(16, 185, 129, 0.5);
+        }
+        .image-type-btn.type-good.selected {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border-color: #10b981;
+        }
+
+        .image-type-btn.type-corrective {
+            border-color: rgba(59, 130, 246, 0.5);
+        }
+        .image-type-btn.type-corrective.selected {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border-color: #3b82f6;
+        }
+
+        .image-preview-container {
+            margin-bottom: 1.5rem;
+        }
+
+        .image-preview {
+            width: 100%;
+            max-height: 200px;
+            object-fit: contain;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+
+        .existing-images {
+            margin-bottom: 1.5rem;
+        }
+
+        .existing-images-title {
+            font-size: 0.9rem;
+            color: #64748b;
+            margin-bottom: 0.75rem;
+        }
+
+        .existing-image-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem;
+            background: rgba(99, 102, 241, 0.05);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+
+        .existing-image-thumb {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 6px;
+        }
+
+        .existing-image-info {
+            flex: 1;
+        }
+
+        .existing-image-type {
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .existing-image-type.type-finding { color: #ef4444; }
+        .existing-image-type.type-good { color: #10b981; }
+        .existing-image-type.type-corrective { color: #3b82f6; }
+
+        .existing-image-name {
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+
+        .delete-image-btn {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.5);
+            color: #ef4444;
+            padding: 0.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .delete-image-btn:hover {
+            background: rgba(239, 68, 68, 0.3);
+        }
+
+        .image-modal-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+
+        .modal-btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .modal-btn.cancel {
+            background: rgba(100, 116, 139, 0.3);
+            color: #94a3b8;
+        }
+
+        .modal-btn.upload {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .modal-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Temperature Monitoring Checkbox */
+        .temp-monitor-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-left: auto;
+            padding: 0.5rem 1rem;
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .temp-monitor-toggle:hover {
+            background: rgba(99, 102, 241, 0.2);
+        }
+
+        .temp-monitor-toggle input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #6366f1;
+            cursor: pointer;
+        }
+
+        .temp-monitor-toggle label {
+            font-size: 0.85rem;
+            color: #818cf8;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .temp-monitor-toggle.enabled {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+        }
+
+        .temp-monitor-toggle.enabled label {
+            color: #10b981;
+        }
+
+        /* Fridge Temperature Buttons */
+        .fridge-temp-buttons {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        .fridge-temp-btn {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 2px solid;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .fridge-temp-btn.good-btn {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: rgba(16, 185, 129, 0.5);
+            color: #10b981;
+        }
+
+        .fridge-temp-btn.good-btn:hover {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: #10b981;
+        }
+
+        .fridge-temp-btn.bad-btn {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.5);
+            color: #ef4444;
+        }
+
+        .fridge-temp-btn.bad-btn:hover {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: #ef4444;
+        }
+
+        /* Fridge Modal */
+        .fridge-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .fridge-modal.show {
+            display: flex;
+        }
+
+        .fridge-modal-content {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .fridge-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        .fridge-modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .fridge-modal-title.good {
+            color: #10b981;
+        }
+
+        .fridge-modal-title.bad {
+            color: #ef4444;
+        }
+
+        .fridge-modal-close {
+            background: transparent;
+            border: none;
+            color: #64748b;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            line-height: 1;
+        }
+
+        .fridge-modal-close:hover {
+            color: #ef4444;
+        }
+
+        .fridge-form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .fridge-form-label {
+            display: block;
+            font-size: 0.9rem;
+            color: #475569;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .fridge-form-input,
+        .fridge-form-select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 8px;
+            color: #1e293b;
+            font-size: 0.95rem;
+        }
+
+        .fridge-form-input:focus,
+        .fridge-form-select:focus {
+            outline: none;
+            border-color: rgba(99, 102, 241, 0.6);
+        }
+
+        .fridge-form-select option {
+            background: #ffffff;
+            color: #1e293b;
+        }
+
+        .fridge-picture-zone {
+            border: 2px dashed rgba(99, 102, 241, 0.4);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .fridge-picture-zone:hover {
+            border-color: rgba(99, 102, 241, 0.7);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .fridge-picture-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .fridge-picture-text {
+            color: #64748b;
+            font-size: 0.85rem;
+        }
+
+        .fridge-picture-preview {
+            max-width: 100%;
+            max-height: 150px;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        .fridge-modal-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        .fridge-modal-btn {
+            flex: 1;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .fridge-modal-btn.cancel {
+            background: rgba(100, 116, 139, 0.2);
+            color: #64748b;
+        }
+
+        .fridge-modal-btn.cancel:hover {
+            background: rgba(100, 116, 139, 0.3);
+        }
+
+        .fridge-modal-btn.save-good {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .fridge-modal-btn.save-bad {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .fridge-modal-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        /* Fridge Entries List */
+        .fridge-entries-list {
+            margin-top: 1rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .fridge-entry-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            background: rgba(99, 102, 241, 0.05);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            border-left: 3px solid;
+        }
+
+        .fridge-entry-item.good {
+            border-left-color: #10b981;
+        }
+
+        .fridge-entry-item.bad {
+            border-left-color: #ef4444;
+        }
+
+        .fridge-entry-info {
+            flex: 1;
+        }
+
+        .fridge-entry-section {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #1e293b;
+        }
+
+        .fridge-entry-temps {
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+
+        .fridge-entry-issue {
+            font-size: 0.75rem;
+            color: #ef4444;
+            margin-top: 0.25rem;
+        }
+
+        .fridge-entry-delete {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.5);
+            color: #ef4444;
+            padding: 0.35rem 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .fridge-entry-delete:hover {
+            background: rgba(239, 68, 68, 0.3);
+        }
+
+        .fridge-entry-edit {
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.5);
+            color: #3b82f6;
+            padding: 0.35rem 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-right: 0.5rem;
+        }
+
+        .fridge-entry-edit:hover {
+            background: rgba(59, 130, 246, 0.3);
+        }
+
+        .fridge-entry-actions {
+            display: flex;
+            gap: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <button class="back-btn" onclick="goBack()">
+                ← Back
+            </button>
+            <span class="header-title" id="auditTitle">Loading Audit...</span>
+        </div>
+        <div class="header-right">
+            <div class="audit-info" id="auditInfo">
+                <div class="audit-info-item">
+                    <span class="audit-info-label">Store:</span>
+                    <span class="audit-info-value" id="storeName">-</span>
+                </div>
+                <div class="audit-info-item">
+                    <span class="audit-info-label">Date:</span>
+                    <span class="audit-info-value" id="auditDate">-</span>
+                </div>
+            </div>
+            <span class="status-badge status-in-progress" id="statusBadge">In Progress</span>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Sections Sidebar -->
+        <div class="sections-sidebar">
+            <div class="sidebar-title">📋 Sections</div>
+            <div id="sectionsList"></div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="content-area" id="contentArea">
+            <div class="loading-container" id="loadingContainer">
+                <div class="loading-spinner"></div>
+                <p>Loading audit data...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer Actions -->
+    <div class="footer-actions">
+        <div class="nav-buttons">
+            <button class="nav-btn prev" onclick="prevSection()" id="prevBtn">
+                ← Previous Section
+            </button>
+            <button class="nav-btn next" onclick="nextSection()" id="nextBtn">
+                Next Section →
+            </button>
+        </div>
+        <div class="overall-progress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+            <span class="progress-text" id="progressText">0% Complete</span>
+        </div>
+        <button class="complete-btn" onclick="completeAudit()" id="completeBtn">
+            ✓ Complete Audit
+        </button>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast"></div>
+
+    <!-- Image Upload Modal -->
+    <div class="image-modal" id="imageModal">
+        <div class="image-modal-content">
+            <div class="image-modal-header">
+                <span class="image-modal-title">📷 Manage Pictures</span>
+                <button class="image-modal-close" onclick="closeImageModal()">×</button>
+            </div>
+
+            <!-- Existing Images -->
+            <div class="existing-images" id="existingImages" style="display: none;">
+                <div class="existing-images-title">📎 Attached Images</div>
+                <div id="existingImagesList"></div>
+            </div>
+
+            <!-- Upload Zone -->
+            <div class="image-upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                <div class="upload-icon">📤</div>
+                <div class="upload-text">Click or drag & drop to upload image</div>
+                <input type="file" id="fileInput" accept="image/*" style="display: none;" onchange="handleFileSelect(event)">
+            </div>
+
+            <!-- Image Preview -->
+            <div class="image-preview-container" id="previewContainer" style="display: none;">
+                <img id="imagePreview" class="image-preview" src="" alt="Preview">
+            </div>
+
+            <!-- Image Type Selector -->
+            <div class="image-type-selector" id="typeSelector" style="display: none;">
+                <div class="image-type-label">Select image type:</div>
+                <div class="image-type-options">
+                    <button class="image-type-btn type-finding" onclick="selectImageType('Finding')">
+                        ❌ Finding
+                    </button>
+                    <button class="image-type-btn type-good" onclick="selectImageType('Good')">
+                        ✅ Good Observation
+                    </button>
+                    <button class="image-type-btn type-corrective" onclick="selectImageType('Corrective')">
+                        🔧 Corrective Action
+                    </button>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="image-modal-actions">
+                <button class="modal-btn cancel" onclick="closeImageModal()">Cancel</button>
+                <button class="modal-btn upload" id="uploadBtn" onclick="uploadImage()" disabled>Upload Image</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fridge Temperature Modal - Good -->
+    <div class="fridge-modal" id="fridgeGoodModal">
+        <div class="fridge-modal-content">
+            <div class="fridge-modal-header">
+                <span class="fridge-modal-title good">✅ Add Good Fridge Reading</span>
+                <button class="fridge-modal-close" onclick="closeFridgeModal('good')">×</button>
+            </div>
+            
+            <div class="fridge-form-group">
+                <label class="fridge-form-label">🏪 Section</label>
+                <select class="fridge-form-select" id="fridgeGoodSection">
+                    <option value="">-- Select Section --</option>
+                    <option value="Butchery">Butchery</option>
+                    <option value="Cheese">Cheese</option>
+                    <option value="Chilled">Chilled</option>
+                    <option value="Deli">Deli</option>
+                    <option value="Fishery">Fishery</option>
+                    <option value="Bakery">Bakery</option>
+                    <option value="Fruits & Vegetables">Fruits & Vegetables</option>
+                    <option value="Dairy">Dairy</option>
+                    <option value="Frozen">Frozen</option>
+                    <option value="Retail">Retail</option>
+                </select>
+            </div>
+            
+            <div class="fridge-form-group">
+                <label class="fridge-form-label">🧊 Unit / Fridge Name</label>
+                <input type="text" class="fridge-form-input" id="fridgeGoodUnit" placeholder="e.g., Display Fridge 1">
+            </div>
+            
+            <div class="fridge-form-group">
+                <label class="fridge-form-label">🌡️ Display Temperature (°C)</label>
+                <input type="text" class="fridge-form-input" id="fridgeGoodDisplayTemp" placeholder="e.g., 4.5 or NA">
+            </div>
+            
+            <div class="fridge-form-group">
+                <label class="fridge-form-label">🔬 Probe Temperature (°C)</label>
+                <input type="text" class="fridge-form-input" id="fridgeGoodProbeTemp" placeholder="e.g., 4.2 or NA">
+            </div>
+            
+            <div class="fridge-form-group">
+                <label class="fridge-form-label">📷 Picture</label>
+                <div class="fridge-picture-zone" onclick="document.getElementById('fridgeGoodPicture').click()">
+                    <div class="fridge-picture-icon">📤</div>
+                    <div class="fridge-picture-text">Click to upload picture</div>
+                    <input type="file" id="fridgeGoodPicture" accept="image/*" style="display: none;" onchange="previewFridgePicture('good', this)">
+                </div>
+                <img id="fridgeGoodPreview" class="fridge-picture-preview" style="display: none;">
+            </div>
+            
+            <div class="fridge-modal-actions">
+                <button class="fridge-modal-btn cancel" onclick="closeFridgeModal('good')">Cancel</button>
+                <button class="fridge-modal-btn save-good" onclick="saveFridgeReading('good')">✓ Save Reading</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fridge Temperature Modal - Bad -->
+    <div class="fridge-modal" id="fridgeBadModal">
+        <div class="fridge-modal-content">
+            <div class="fridge-modal-header">
+                <span class="fridge-modal-title bad">❌ Add Bad Fridge Reading</span>
+                <button class="fridge-modal-close" onclick="closeFridgeModal('bad')">×</button>
+            </div>
+            
+            <div class="fridge-form-group">
+                <label class="fridge-form-label">🏪 Section</label>
+                <select class="fridge-form-select" id="fridgeBadSection">
+                    <option value="">-- Select Section --</option>
+                    <option value="Butchery">Butchery</option>
+                    <option value="Cheese">Cheese</option>
+                    <option value="Chilled">Chilled</option>
+                    <option value="Deli">Deli</option>
+                    <option value="Fishery">Fishery</option>
+                    <option value="Bakery">Bakery</option>
+                    <option value="Fruits & Vegetables">Fruits & Vegetables</option>
+                    <option value="Dairy">Dairy</option>
+                    <option value="Frozen">Frozen</option>
+                    <option value="Retail">Retail</option>
+                </select>
+            </div>
+            
+            <div class="fridge-form-group">
+                <label class="fridge-form-label">🧊 Unit / Fridge Name</label>
+                <input type="text" class="fridge-form-input" id="fridgeBadUnit" placeholder="e.g., Display Fridge 1">
+            </div>
+            
+            <div class="fridge-form-group">
+                <label class="fridge-form-label">🌡️ Display Temperature (°C)</label>
+                <input type="text" class="fridge-form-input" id="fridgeBadDisplayTemp" placeholder="e.g., 8.5 or NA">
+            </div>
+            
+            <div class="fridge-form-group">
+                <label class="fridge-form-label">🔬 Probe Temperature (°C)</label>
+                <input type="text" class="fridge-form-input" id="fridgeBadProbeTemp" placeholder="e.g., 9.2 or NA">
+            </div>
+            
+            <div class="fridge-form-group">
+                <label class="fridge-form-label">⚠️ Issue</label>
+                <select class="fridge-form-select" id="fridgeBadIssue">
+                    <option value="">-- Select Issue --</option>
+                    <option value="Inaccurate Temperatures">Inaccurate Temperatures</option>
+                    <option value="High Display Temperature">High Display Temperature</option>
+                    <option value="High Air Temperature">High Air Temperature</option>
+                    <option value="High Air And Display Temperatures">High Air And Display Temperatures</option>
+                    <option value="High Air Temperature And Inaccurate Temperatures">High Air Temperature And Inaccurate Temperatures</option>
+                    <option value="High Display Temperature And Inaccurate Temperatures">High Display Temperature And Inaccurate Temperatures</option>
+                    <option value="High Display And Air Temperatures And Inaccurate Temperatures">High Display And Air Temperatures And Inaccurate Temperatures</option>
+                </select>
+            </div>
+            
+            <div class="fridge-form-group">
+                <label class="fridge-form-label">📷 Picture</label>
+                <div class="fridge-picture-zone" onclick="document.getElementById('fridgeBadPicture').click()">
+                    <div class="fridge-picture-icon">📤</div>
+                    <div class="fridge-picture-text">Click to upload picture</div>
+                    <input type="file" id="fridgeBadPicture" accept="image/*" style="display: none;" onchange="previewFridgePicture('bad', this)">
+                </div>
+                <img id="fridgeBadPreview" class="fridge-picture-preview" style="display: none;">
+            </div>
+            
+            <div class="fridge-modal-actions">
+                <button class="fridge-modal-btn cancel" onclick="closeFridgeModal('bad')">Cancel</button>
+                <button class="fridge-modal-btn save-bad" onclick="saveFridgeReading('bad')">✓ Save Reading</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let auditData = null;
+        let currentSectionIndex = 0;
+        let isReadOnly = false;
+        
+        // Fridge temperature readings storage
+        let fridgeGoodReadings = [];
+        let fridgeBadReadings = [];
+        let currentFridgeResponseId = null;
+        
+        // Edit mode tracking
+        let editingFridgeEntry = null; // { type: 'good'|'bad', responseId: number, index: number }
+        
+        // Track which sections have temperature monitoring enabled
+        let tempMonitoringSections = {};
+
+        // Get audit ID from URL (supports both path params and query params)
+        function getAuditId() {
+            // Check query params first (new format: ?id=X)
+            const urlParams = new URLSearchParams(window.location.search);
+            const queryId = urlParams.get('id');
+            if (queryId) {
+                isReadOnly = urlParams.get('readonly') === 'true';
+                return parseInt(queryId);
+            }
+
+            // Fallback to path params (legacy format: /fill-audit/X)
+            const path = window.location.pathname;
+            const match = path.match(/\/auditor\/fill-audit\/(\d+)/);
+            return match ? parseInt(match[1]) : null;
+        }
+
+        // Initialize
+        async function init() {
+            const auditId = getAuditId();
+            if (!auditId) {
+                showToast('Invalid audit ID', 'error');
+                return;
+            }
+
+            await loadAuditData(auditId);
+            
+            // Load fridge readings if available
+            await loadFridgeReadings();
+            
+            // Re-render to show loaded fridge readings
+            if (auditData && auditData.sections) {
+                renderSection(currentSectionIndex);
+            }
+            
+            // Apply readonly mode if needed
+            if (isReadOnly) {
+                applyReadOnlyMode();
+            }
+        }
+        
+        // Apply readonly mode for viewing completed audits
+        function applyReadOnlyMode() {
+            // Add readonly indicator to header
+            const header = document.querySelector('.header h1');
+            if (header) {
+                header.innerHTML = '📋 View Audit <span style="font-size: 14px; color: #6b7280; font-weight: normal;">(Read Only)</span>';
+            }
+            
+            // Hide Complete Audit button
+            const completeBtn = document.getElementById('completeAuditBtn');
+            if (completeBtn) {
+                completeBtn.style.display = 'none';
+            }
+            
+            // Disable all interactive elements
+            document.querySelectorAll('.answer-btn').forEach(btn => {
+                btn.style.pointerEvents = 'none';
+                btn.style.opacity = '0.8';
+            });
+            
+            document.querySelectorAll('textarea').forEach(textarea => {
+                textarea.setAttribute('readonly', true);
+                textarea.style.backgroundColor = '#f3f4f6';
+            });
+            
+            document.querySelectorAll('.upload-area').forEach(area => {
+                area.style.display = 'none';
+            });
+        }
+
+        // Load audit data
+        async function loadAuditData(auditId) {
+            try {
+                const response = await fetch(`/api/audits/${auditId}`);
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to load audit');
+                }
+
+                auditData = result.data;
+                renderAudit();
+            } catch (error) {
+                console.error('Error loading audit:', error);
+                showToast(error.message, 'error');
+                document.getElementById('loadingContainer').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">⚠️</div>
+                        <p>Failed to load audit: ${error.message}</p>
+                        <button class="back-btn" onclick="goBack()" style="margin-top: 1rem;">Go Back</button>
+                    </div>
+                `;
+            }
+        }
+
+        // Render audit
+        function renderAudit() {
+            // Update header
+            document.getElementById('auditTitle').textContent = auditData.documentNumber;
+            document.getElementById('storeName').textContent = `${auditData.storeCode} - ${auditData.storeName}`;
+            document.getElementById('auditDate').textContent = new Date(auditData.auditDate).toLocaleDateString();
+            
+            if (auditData.status === 'Completed') {
+                document.getElementById('statusBadge').textContent = 'Completed';
+                document.getElementById('statusBadge').classList.remove('status-in-progress');
+                document.getElementById('statusBadge').classList.add('status-completed');
+            }
+
+            // Render sections sidebar
+            renderSectionsList();
+
+            // Render first section content
+            renderSection(0);
+
+            // Update progress
+            updateProgress();
+        }
+
+        // Render sections list in sidebar
+        function renderSectionsList() {
+            const container = document.getElementById('sectionsList');
+            container.innerHTML = '';
+
+            auditData.sections.forEach((section, index) => {
+                const answered = section.items.filter(i => i.selectedChoice).length;
+                const total = section.items.length;
+                const score = calculateSectionScore(section);
+
+                const div = document.createElement('div');
+                div.className = `section-nav-item ${index === currentSectionIndex ? 'active' : ''}`;
+                div.onclick = () => selectSection(index);
+                div.innerHTML = `
+                    <span class="section-nav-icon">${getSectionIcon(section.sectionIcon, section.sectionNumber)}</span>
+                    <div class="section-nav-info">
+                        <div class="section-nav-name">${section.sectionName}</div>
+                        <div class="section-nav-progress">${answered}/${total} answered</div>
+                    </div>
+                    <span class="section-nav-score ${getScoreClass(score)}">${score !== null ? score + '%' : '-'}</span>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // Get section icon - uses database icon if available, falls back to defaults
+        function getSectionIcon(sectionIcon, sectionNumber) {
+            if (sectionIcon) return sectionIcon;
+            const icons = ['🥫', '❄️', '🍽️', '👨‍🍳', '🧹', '🧼', '🚻', '🗑️', '🛠️', '🧪', '📋', '🏛️', '📜'];
+            return icons[(sectionNumber || 1) - 1] || '📝';
+        }
+
+        // Calculate section score
+        function calculateSectionScore(section) {
+            const answered = section.items.filter(i => i.selectedChoice && i.selectedChoice !== 'NA');
+            if (answered.length === 0) return null;
+
+            const total = answered.reduce((sum, i) => sum + i.coeff, 0);
+            const scored = answered.reduce((sum, i) => sum + (i.value || 0), 0);
+            return total > 0 ? parseFloat(((scored / total) * 100).toFixed(2)) : null;
+        }
+
+        // Get score class
+        function getScoreClass(score) {
+            if (score === null) return 'score-na';
+            return score >= 83 ? 'score-pass' : 'score-fail';
+        }
+
+        // Select section
+        function selectSection(index) {
+            currentSectionIndex = index;
+            renderSection(index);
+            renderSectionsList();
+        }
+
+        // Render section content
+        function renderSection(index) {
+            const section = auditData.sections[index];
+            const container = document.getElementById('contentArea');
+            
+            const score = calculateSectionScore(section);
+            const answered = section.items.filter(i => i.selectedChoice).length;
+            const sectionId = section.sectionId || section.sectionNumber;
+            const isTempMonitoringEnabled = tempMonitoringSections[sectionId] === true;
+
+            container.innerHTML = `
+                <div class="section-header">
+                    <div class="section-title">
+                        <span class="section-icon">${getSectionIcon(section.sectionIcon, section.sectionNumber)}</span>
+                        <span class="section-name">${section.sectionName}</span>
+                    </div>
+                    <div class="section-stats">
+                        <div class="section-stat">
+                            <div class="section-stat-value ${getScoreClass(score)}">${score !== null ? score + '%' : '-'}</div>
+                            <div class="section-stat-label">Score</div>
+                        </div>
+                        <div class="section-stat">
+                            <div class="section-stat-value">${answered}/${section.items.length}</div>
+                            <div class="section-stat-label">Answered</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="temp-monitor-toggle ${isTempMonitoringEnabled ? 'enabled' : ''}" onclick="toggleTempMonitoring(${sectionId})">
+                    <input type="checkbox" id="tempMonitor-${sectionId}" ${isTempMonitoringEnabled ? 'checked' : ''} onclick="event.stopPropagation(); toggleTempMonitoring(${sectionId})">
+                    <label for="tempMonitor-${sectionId}">🌡️ Enable Temperature Readings</label>
+                </div>
+                
+                <div id="questionsList">
+                    ${section.items.map((item, qIndex) => renderQuestion(item, index, qIndex)).join('')}
+                </div>
+            `;
+        }
+
+        // Render question card
+        function renderQuestion(item, sectionIndex, questionIndex) {
+            const answerClass = item.selectedChoice ? 
+                (item.selectedChoice === 'Yes' ? 'answered' :
+                 item.selectedChoice === 'Partially' ? 'answered-partial' :
+                 item.selectedChoice === 'No' ? 'answered-no' : 'answered-na') : '';
+
+            const showFinding = item.selectedChoice === 'No' || item.selectedChoice === 'Partially';
+            const showComment = item.selectedChoice === 'Yes' || item.selectedChoice === 'NA';
+            
+            // Check if temperature monitoring is enabled for this section
+            const section = auditData.sections[sectionIndex];
+            const sectionId = section ? (section.sectionId || section.sectionNumber) : null;
+            const isTempMonitoringEnabled = sectionId && tempMonitoringSections[sectionId] === true;
+
+            return `
+                <div class="question-card ${answerClass}" id="q-${item.responseId}">
+                    <div class="question-header">
+                        <span class="question-ref">${item.referenceValue || '-'}</span>
+                        <span class="question-coeff">Coeff: ${item.coeff}</span>
+                    </div>
+                    <div class="question-title">${item.title}</div>
+                    
+                    <div class="answer-options">
+                        ${getAnswerButtons(item)}
+                    </div>
+                    
+                    ${isTempMonitoringEnabled ? renderFridgeTempButtons(item.responseId) : ''}
+                    
+                    <!-- Finding section for No/Partially -->
+                    <div class="finding-section ${showFinding ? 'visible' : ''}" id="finding-${item.responseId}">
+                        <div class="finding-group">
+                            <div class="finding-label">📝 Finding</div>
+                            <textarea class="finding-input" rows="2" 
+                                placeholder="Describe the finding or issue..."
+                                onchange="updateFinding(${item.responseId}, 'finding', this.value)"
+                            >${item.finding || ''}</textarea>
+                        </div>
+                        <div class="finding-group">
+                            <div class="finding-label">⚠️ Priority</div>
+                            <div class="priority-options">
+                                <button class="priority-btn ${item.priority === 'High' ? 'selected-high' : ''}" 
+                                    onclick="setPriority(${item.responseId}, 'High')">High</button>
+                                <button class="priority-btn ${item.priority === 'Medium' ? 'selected-medium' : ''}" 
+                                    onclick="setPriority(${item.responseId}, 'Medium')">Medium</button>
+                                <button class="priority-btn ${item.priority === 'Low' ? 'selected-low' : ''}" 
+                                    onclick="setPriority(${item.responseId}, 'Low')">Low</button>
+                            </div>
+                        </div>
+                        ${renderCRField(item)}
+                        <div class="finding-group">
+                            <button class="picture-btn ${item.hasPicture ? 'has-picture' : ''}" 
+                                onclick="takePicture(${item.responseId})">
+                                📷 ${item.hasPicture ? 'Picture Added' : 'Add Picture'}
+                            </button>
+                        </div>
+                        
+                        <!-- Escalate Section -->
+                        <div class="escalate-section">
+                            <label class="escalate-checkbox-wrapper">
+                                <input type="checkbox" class="escalate-checkbox" 
+                                    id="escalate-${item.responseId}"
+                                    ${item.escalate ? 'checked' : ''}
+                                    onchange="toggleEscalate(${item.responseId}, this.checked)">
+                                <span class="escalate-label">🚨 Escalate to Department</span>
+                            </label>
+                            <div class="department-dropdown-wrapper ${item.escalate ? 'visible' : ''}" id="dept-wrapper-${item.responseId}">
+                                <div class="department-label">📋 Assign to Department</div>
+                                <select class="department-select" id="dept-${item.responseId}" 
+                                    onchange="setDepartment(${item.responseId}, this.value)">
+                                    <option value="">-- Select Department --</option>
+                                    <option value="Maintenance" ${item.department === 'Maintenance' ? 'selected' : ''}>Maintenance</option>
+                                    <option value="Procurement" ${item.department === 'Procurement' ? 'selected' : ''}>Procurement</option>
+                                    <option value="Cleaning" ${item.department === 'Cleaning' ? 'selected' : ''}>Cleaning</option>
+                                    <option value="Procurement, Maintenance" ${item.department === 'Procurement, Maintenance' ? 'selected' : ''}>Procurement, Maintenance</option>
+                                    <option value="Maintenance, Cleaning" ${item.department === 'Maintenance, Cleaning' ? 'selected' : ''}>Maintenance, Cleaning</option>
+                                    <option value="Procurement, Cleaning" ${item.department === 'Procurement, Cleaning' ? 'selected' : ''}>Procurement, Cleaning</option>
+                                    <option value="Procurement, Maintenance, Cleaning" ${item.department === 'Procurement, Maintenance, Cleaning' ? 'selected' : ''}>Procurement, Maintenance, Cleaning</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Comment section for Yes/NA -->
+                    <div class="comment-section ${showComment ? 'visible' : ''}" id="comment-${item.responseId}">
+                        <div class="finding-group">
+                            <div class="finding-label">💬 Comment (optional)</div>
+                            <textarea class="finding-input comment-input" rows="2" 
+                                placeholder="Add any additional comments..."
+                                onchange="updateFinding(${item.responseId}, 'comment', this.value)"
+                            >${item.comment || ''}</textarea>
+                        </div>
+                        <div class="finding-group">
+                            <button class="picture-btn good-observation-btn ${item.hasGoodPicture ? 'has-picture' : ''}" 
+                                onclick="takePicture(${item.responseId}, 'Good')">
+                                📷 ${item.hasGoodPicture ? 'Good Observation Added' : 'Add Good Observation'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Get answer buttons HTML
+        function getAnswerButtons(item) {
+            const options = (item.answerOptions || 'Yes,Partially,No,NA').split(',');
+            return options.map(opt => {
+                const selected = item.selectedChoice === opt;
+                const selectedClass = selected ? 
+                    (opt === 'Yes' ? 'selected-yes' :
+                     opt === 'Partially' ? 'selected-partial' :
+                     opt === 'No' ? 'selected-no' : 'selected-na') : '';
+                return `
+                    <button class="answer-btn ${selectedClass}" 
+                        onclick="selectAnswer(${item.responseId}, '${opt}', ${item.coeff})">
+                        ${opt}
+                    </button>
+                `;
+            }).join('');
+        }
+
+        // Render CR (Corrective Action) field
+        function renderCRField(item) {
+            if (!item.cr && !item.crNote) return '';
+            
+            const crValue = item.cr || '';
+            const crNote = item.crNote || '';
+            
+            return `
+                <div class="cr-container">
+                    <div class="cr-header">
+                        <span class="cr-label">📋 Corrective Action</span>
+                        <button class="cr-toggle-btn" onclick="toggleCREdit(${item.responseId})">
+                            ✏️ Edit/Add Note
+                        </button>
+                    </div>
+                    <textarea class="cr-textarea" 
+                        id="cr-${item.responseId}"
+                        rows="3"
+                        placeholder="Corrective action details..."
+                        onchange="updateCR(${item.responseId}, this.value)"
+                    >${escapeHtml(crValue)}</textarea>
+                    <div class="cr-note">💡 You can edit this field to add notes or clarifications</div>
+                </div>
+            `;
+        }
+
+        // Escape HTML for safe display
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Toggle CR field edit mode
+        function toggleCREdit(responseId) {
+            const textarea = document.getElementById(`cr-${responseId}`);
+            if (textarea) {
+                textarea.focus();
+                textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+            }
+        }
+
+        // Update CR field
+        async function updateCR(responseId, value) {
+            try {
+                const item = findItem(responseId);
+                const response = await fetch(`/api/audits/response/${responseId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        selectedChoice: item.selectedChoice,
+                        coeff: item.coeff,
+                        cr: value
+                    })
+                });
+
+                const result = await response.json();
+                if (!result.success) throw new Error(result.error);
+
+                // Update local data
+                if (item) item.cr = value;
+                showToast('Corrective action updated', 'success');
+
+            } catch (error) {
+                console.error('Error updating CR:', error);
+                showToast('Failed to save corrective action', 'error');
+            }
+        }
+
+        // Select answer
+        async function selectAnswer(responseId, choice, coeff) {
+            try {
+                const response = await fetch(`/api/audits/response/${responseId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ selectedChoice: choice, coeff })
+                });
+
+                const result = await response.json();
+                if (!result.success) throw new Error(result.error);
+
+                // Update local data
+                const item = findItem(responseId);
+                if (item) {
+                    item.selectedChoice = choice;
+                    item.value = choice === 'Yes' ? coeff : choice === 'Partially' ? coeff * 0.5 : 0;
+                }
+
+                // Re-render
+                renderSection(currentSectionIndex);
+                renderSectionsList();
+                updateProgress();
+
+            } catch (error) {
+                console.error('Error saving answer:', error);
+                showToast('Failed to save answer', 'error');
+            }
+        }
+
+        // Update finding
+        async function updateFinding(responseId, field, value) {
+            try {
+                const item = findItem(responseId);
+                const body = { 
+                    selectedChoice: item.selectedChoice,
+                    coeff: item.coeff,
+                    [field]: value
+                };
+
+                const response = await fetch(`/api/audits/response/${responseId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                const result = await response.json();
+                if (!result.success) throw new Error(result.error);
+
+                // Update local data
+                if (item) item[field] = value;
+
+            } catch (error) {
+                console.error('Error updating finding:', error);
+                showToast('Failed to save finding', 'error');
+            }
+        }
+
+        // Set priority
+        async function setPriority(responseId, priority) {
+            try {
+                const item = findItem(responseId);
+                const response = await fetch(`/api/audits/response/${responseId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        selectedChoice: item.selectedChoice,
+                        coeff: item.coeff,
+                        priority 
+                    })
+                });
+
+                const result = await response.json();
+                if (!result.success) throw new Error(result.error);
+
+                // Update local data and re-render
+                if (item) item.priority = priority;
+                renderSection(currentSectionIndex);
+
+            } catch (error) {
+                console.error('Error setting priority:', error);
+                showToast('Failed to save priority', 'error');
+            }
+        }
+
+        // Toggle escalate checkbox
+        async function toggleEscalate(responseId, checked) {
+            try {
+                const item = findItem(responseId);
+                const response = await fetch(`/api/audits/response/${responseId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        selectedChoice: item.selectedChoice,
+                        coeff: item.coeff,
+                        escalate: checked,
+                        department: checked ? item.department : null
+                    })
+                });
+
+                const result = await response.json();
+                if (!result.success) throw new Error(result.error);
+
+                // Update local data
+                if (item) {
+                    item.escalate = checked;
+                    if (!checked) item.department = null;
+                }
+
+                // Show/hide department dropdown
+                const deptWrapper = document.getElementById(`dept-wrapper-${responseId}`);
+                if (deptWrapper) {
+                    deptWrapper.classList.toggle('visible', checked);
+                }
+
+                showToast(checked ? 'Escalation enabled' : 'Escalation disabled', 'success');
+
+            } catch (error) {
+                console.error('Error toggling escalate:', error);
+                showToast('Failed to save escalation', 'error');
+            }
+        }
+
+        // Set department
+        async function setDepartment(responseId, department) {
+            try {
+                const item = findItem(responseId);
+                const response = await fetch(`/api/audits/response/${responseId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        selectedChoice: item.selectedChoice,
+                        coeff: item.coeff,
+                        department: department || null
+                    })
+                });
+
+                const result = await response.json();
+                if (!result.success) throw new Error(result.error);
+
+                // Update local data
+                if (item) item.department = department;
+                showToast('Department assigned', 'success');
+
+            } catch (error) {
+                console.error('Error setting department:', error);
+                showToast('Failed to save department', 'error');
+            }
+        }
+
+        // Image Modal State
+        let currentImageResponseId = null;
+        let selectedImageFile = null;
+        let selectedImageType = null;
+
+        // Open image modal
+        function takePicture(responseId, defaultType = null) {
+            currentImageResponseId = responseId;
+            selectedImageFile = null;
+            selectedImageType = defaultType;
+            
+            // Reset modal state
+            document.getElementById('previewContainer').style.display = 'none';
+            document.getElementById('typeSelector').style.display = 'none';
+            document.getElementById('uploadBtn').disabled = true;
+            document.querySelectorAll('.image-type-btn').forEach(btn => btn.classList.remove('selected'));
+            document.getElementById('fileInput').value = '';
+            
+            // Pre-select type if provided
+            if (defaultType) {
+                const typeBtn = document.querySelector(`.image-type-btn.type-${defaultType.toLowerCase()}`);
+                if (typeBtn) {
+                    typeBtn.classList.add('selected');
+                }
+            }
+            
+            // Load existing images
+            loadExistingImages(responseId);
+            
+            // Show modal
+            document.getElementById('imageModal').classList.add('show');
+        }
+
+        // Close image modal
+        function closeImageModal() {
+            document.getElementById('imageModal').classList.remove('show');
+            currentImageResponseId = null;
+            selectedImageFile = null;
+            selectedImageType = null;
+        }
+
+        // Handle file select
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            if (!file.type.startsWith('image/')) {
+                showToast('Please select an image file', 'error');
+                return;
+            }
+            
+            selectedImageFile = file;
+            
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('imagePreview').src = e.target.result;
+                document.getElementById('previewContainer').style.display = 'block';
+                document.getElementById('typeSelector').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Select image type
+        function selectImageType(type) {
+            selectedImageType = type;
+            document.querySelectorAll('.image-type-btn').forEach(btn => btn.classList.remove('selected'));
+            event.target.classList.add('selected');
+            document.getElementById('uploadBtn').disabled = !selectedImageFile;
+        }
+
+        // Upload image
+        async function uploadImage() {
+            if (!selectedImageFile || !selectedImageType) {
+                showToast('Please select an image and type', 'error');
+                return;
+            }
+            
+            try {
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    const base64 = e.target.result.split(',')[1];
+                    
+                    const response = await fetch(`/api/audits/pictures`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            responseId: currentImageResponseId,
+                            auditId: auditData.auditId,
+                            fileName: selectedImageFile.name,
+                            contentType: selectedImageFile.type,
+                            pictureType: selectedImageType,
+                            fileData: base64
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    if (!result.success) throw new Error(result.error);
+                    
+                    showToast('Image uploaded successfully!', 'success');
+                    
+                    // Update local data
+                    const item = findItem(currentImageResponseId);
+                    if (item) {
+                        if (selectedImageType === 'Good') {
+                            item.hasGoodPicture = true;
+                        } else {
+                            item.hasPicture = true;
+                        }
+                        if (!item.pictures) item.pictures = [];
+                        item.pictures.push({
+                            pictureId: result.data.pictureId,
+                            pictureType: selectedImageType,
+                            fileName: selectedImageFile.name
+                        });
+                        
+                        // Update UI button text
+                        renderSection(currentSectionIndex);
+                    }
+                    
+                    // Reload images list
+                    loadExistingImages(currentImageResponseId);
+                    
+                    // Reset upload form
+                    document.getElementById('previewContainer').style.display = 'none';
+                    document.getElementById('typeSelector').style.display = 'none';
+                    document.getElementById('uploadBtn').disabled = true;
+                    document.querySelectorAll('.image-type-btn').forEach(btn => btn.classList.remove('selected'));
+                    document.getElementById('fileInput').value = '';
+                    selectedImageFile = null;
+                    selectedImageType = null;
+                    
+                    // Re-render section to update picture button
+                    renderSection(currentSectionIndex);
+                };
+                reader.readAsDataURL(selectedImageFile);
+                
+            } catch (error) {
+                console.error('Error uploading image:', error);
+                showToast('Failed to upload image', 'error');
+            }
+        }
+
+        // Load existing images for a response
+        async function loadExistingImages(responseId) {
+            try {
+                const response = await fetch(`/api/audits/pictures/${responseId}`);
+                const result = await response.json();
+                
+                const container = document.getElementById('existingImages');
+                const list = document.getElementById('existingImagesList');
+                
+                if (result.success && result.data.length > 0) {
+                    list.innerHTML = result.data.map(pic => `
+                        <div class="existing-image-item">
+                            <img src="data:${pic.contentType};base64,${pic.fileData}" class="existing-image-thumb" alt="${pic.fileName}">
+                            <div class="existing-image-info">
+                                <div class="existing-image-type type-${pic.pictureType.toLowerCase()}">${getTypeLabel(pic.pictureType)}</div>
+                                <div class="existing-image-name">${pic.fileName}</div>
+                            </div>
+                            <button class="delete-image-btn" onclick="deleteImage(${pic.pictureId})">🗑️</button>
+                        </div>
+                    `).join('');
+                    container.style.display = 'block';
+                } else {
+                    container.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error loading images:', error);
+            }
+        }
+
+        // Get type label with icon
+        function getTypeLabel(type) {
+            switch (type) {
+                case 'Finding': return '❌ Finding';
+                case 'Good': return '✅ Good Observation';
+                case 'Corrective': return '🔧 Corrective Action';
+                default: return type;
+            }
+        }
+
+        // Delete image
+        async function deleteImage(pictureId) {
+            if (!confirm('Are you sure you want to delete this image?')) return;
+            
+            try {
+                const response = await fetch(`/api/audits/pictures/${pictureId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                if (!result.success) throw new Error(result.error);
+                
+                showToast('Image deleted', 'success');
+                loadExistingImages(currentImageResponseId);
+                
+                // Re-render section
+                renderSection(currentSectionIndex);
+                
+            } catch (error) {
+                console.error('Error deleting image:', error);
+                showToast('Failed to delete image', 'error');
+            }
+        }
+
+        // Setup drag and drop
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadZone = document.getElementById('uploadZone');
+            
+            uploadZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadZone.classList.add('dragover');
+            });
+            
+            uploadZone.addEventListener('dragleave', () => {
+                uploadZone.classList.remove('dragover');
+            });
+            
+            uploadZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadZone.classList.remove('dragover');
+                const file = e.dataTransfer.files[0];
+                if (file) {
+                    document.getElementById('fileInput').files = e.dataTransfer.files;
+                    handleFileSelect({ target: { files: [file] } });
+                }
+            });
+        });
+
+        // Find item by responseId
+        function findItem(responseId) {
+            for (const section of auditData.sections) {
+                const item = section.items.find(i => i.responseId === responseId);
+                if (item) return item;
+            }
+            return null;
+        }
+
+        // Update overall progress
+        function updateProgress() {
+            let totalAnswered = 0;
+            let totalQuestions = 0;
+
+            auditData.sections.forEach(section => {
+                totalQuestions += section.items.length;
+                totalAnswered += section.items.filter(i => i.selectedChoice).length;
+            });
+
+            const percentage = totalQuestions > 0 ? Math.round((totalAnswered / totalQuestions) * 100) : 0;
+            document.getElementById('progressFill').style.width = percentage + '%';
+            document.getElementById('progressText').textContent = `${percentage}% Complete (${totalAnswered}/${totalQuestions})`;
+        }
+
+        // Navigate sections
+        function prevSection() {
+            if (currentSectionIndex > 0) {
+                showToast('✓ Progress saved', 'success');
+                selectSection(currentSectionIndex - 1);
+                // Scroll to top of content area
+                document.getElementById('contentArea').scrollTop = 0;
+            }
+        }
+
+        function nextSection() {
+            if (currentSectionIndex < auditData.sections.length - 1) {
+                showToast('✓ Progress saved', 'success');
+                selectSection(currentSectionIndex + 1);
+                // Scroll to top of content area
+                document.getElementById('contentArea').scrollTop = 0;
+            }
+        }
+
+        // Complete audit
+        async function completeAudit() {
+            // Check if all questions are answered
+            let unanswered = 0;
+            auditData.sections.forEach(section => {
+                unanswered += section.items.filter(i => !i.selectedChoice).length;
+            });
+
+            if (unanswered > 0) {
+                if (!confirm(`There are still ${unanswered} unanswered questions. Are you sure you want to complete the audit?`)) {
+                    return;
+                }
+            }
+
+            try {
+                const response = await fetch(`/api/audits/${auditData.auditId}/complete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+                if (!result.success) throw new Error(result.error);
+
+                showToast(`Audit completed! Final score: ${Math.round(result.data.totalScore)}%`, 'success');
+                
+                // Update status
+                document.getElementById('statusBadge').textContent = 'Completed';
+                document.getElementById('statusBadge').classList.remove('status-in-progress');
+                document.getElementById('statusBadge').classList.add('status-completed');
+
+                // Redirect after delay
+                setTimeout(() => {
+                    window.location.href = '/oe-inspection/list';
+                }, 2000);
+
+            } catch (error) {
+                console.error('Error completing audit:', error);
+                showToast('Failed to complete audit: ' + error.message, 'error');
+            }
+        }
+
+        // Go back
+        function goBack() {
+            window.location.href = '/oe-inspection';
+        }
+
+        // Show toast
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type} show`;
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // ==========================================
+        // Temperature Monitoring Toggle
+        // ==========================================
+        
+        // Toggle temperature monitoring for a section
+        async function toggleTempMonitoring(sectionId) {
+            tempMonitoringSections[sectionId] = !tempMonitoringSections[sectionId];
+            renderSection(currentSectionIndex);
+            
+            // Save to server immediately
+            try {
+                await saveFridgeReadingsToServer();
+                showToast(
+                    tempMonitoringSections[sectionId] 
+                        ? '🌡️ Temperature readings enabled for this section' 
+                        : 'Temperature readings disabled for this section',
+                    tempMonitoringSections[sectionId] ? 'success' : 'info'
+                );
+            } catch (error) {
+                console.error('Error saving temp monitoring state:', error);
+                showToast('Settings saved locally', 'info');
+            }
+        }
+
+        // ==========================================
+        // Fridge Temperature Functions
+        // ==========================================
+        
+        // Render fridge temperature buttons for sections with temp monitoring enabled
+        function renderFridgeTempButtons(responseId) {
+            const goodCount = fridgeGoodReadings.filter(r => r.responseId === responseId).length;
+            const badCount = fridgeBadReadings.filter(r => r.responseId === responseId).length;
+            
+            return `
+                <div class="fridge-temp-buttons">
+                    <button class="fridge-temp-btn good-btn" onclick="openFridgeModal('good', ${responseId})">
+                        ✅ Good ${goodCount > 0 ? '(' + goodCount + ')' : ''}
+                    </button>
+                    <button class="fridge-temp-btn bad-btn" onclick="openFridgeModal('bad', ${responseId})">
+                        ❌ Bad ${badCount > 0 ? '(' + badCount + ')' : ''}
+                    </button>
+                </div>
+                ${renderFridgeEntriesList(responseId)}
+            `;
+        }
+        
+        // Render list of fridge entries for a question
+        function renderFridgeEntriesList(responseId) {
+            const goodEntries = fridgeGoodReadings.filter(r => r.responseId === responseId);
+            const badEntries = fridgeBadReadings.filter(r => r.responseId === responseId);
+            
+            if (goodEntries.length === 0 && badEntries.length === 0) {
+                return '';
+            }
+            
+            let html = '<div class="fridge-entries-list">';
+            
+            goodEntries.forEach((entry, idx) => {
+                html += `
+                    <div class="fridge-entry-item good">
+                        <div class="fridge-entry-info">
+                            <div class="fridge-entry-section">✅ ${entry.section} - ${entry.unit}</div>
+                            <div class="fridge-entry-temps">Display: ${entry.displayTemp}°C | Probe: ${entry.probeTemp}°C</div>
+                        </div>
+                        <div class="fridge-entry-actions">
+                            <button class="fridge-entry-edit" onclick="editFridgeEntry('good', ${responseId}, ${idx})">✏️</button>
+                            <button class="fridge-entry-delete" onclick="deleteFridgeEntry('good', ${responseId}, ${idx})">🗑️</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            badEntries.forEach((entry, idx) => {
+                html += `
+                    <div class="fridge-entry-item bad">
+                        <div class="fridge-entry-info">
+                            <div class="fridge-entry-section">❌ ${entry.section} - ${entry.unit}</div>
+                            <div class="fridge-entry-temps">Display: ${entry.displayTemp}°C | Probe: ${entry.probeTemp}°C</div>
+                            <div class="fridge-entry-issue">⚠️ ${entry.issue}</div>
+                        </div>
+                        <div class="fridge-entry-actions">
+                            <button class="fridge-entry-edit" onclick="editFridgeEntry('bad', ${responseId}, ${idx})">✏️</button>
+                            <button class="fridge-entry-delete" onclick="deleteFridgeEntry('bad', ${responseId}, ${idx})">🗑️</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            return html;
+        }
+        
+        // Open fridge modal
+        function openFridgeModal(type, responseId) {
+            currentFridgeResponseId = responseId;
+            editingFridgeEntry = null; // Clear edit mode
+            const modal = document.getElementById(type === 'good' ? 'fridgeGoodModal' : 'fridgeBadModal');
+            modal.classList.add('show');
+            
+            // Reset form
+            resetFridgeForm(type);
+            
+            // Update modal title for add mode
+            const titleEl = modal.querySelector('.fridge-modal-title');
+            if (titleEl) {
+                titleEl.innerHTML = type === 'good' ? '✅ Add Good Fridge Reading' : '❌ Add Bad Fridge Reading';
+            }
+        }
+        
+        // Edit fridge entry
+        function editFridgeEntry(type, responseId, index) {
+            const entries = type === 'good' 
+                ? fridgeGoodReadings.filter(r => r.responseId === responseId)
+                : fridgeBadReadings.filter(r => r.responseId === responseId);
+            
+            const entry = entries[index];
+            if (!entry) {
+                showToast('Entry not found', 'error');
+                return;
+            }
+            
+            // Set edit mode
+            editingFridgeEntry = { type, responseId, index };
+            currentFridgeResponseId = responseId;
+            
+            // Open modal
+            const modal = document.getElementById(type === 'good' ? 'fridgeGoodModal' : 'fridgeBadModal');
+            modal.classList.add('show');
+            
+            // Update modal title for edit mode
+            const titleEl = modal.querySelector('.fridge-modal-title');
+            if (titleEl) {
+                titleEl.innerHTML = type === 'good' ? '✏️ Edit Good Fridge Reading' : '✏️ Edit Bad Fridge Reading';
+            }
+            
+            // Populate form with existing values
+            const prefix = type === 'good' ? 'fridgeGood' : 'fridgeBad';
+            document.getElementById(prefix + 'Section').value = entry.section || '';
+            document.getElementById(prefix + 'Unit').value = entry.unit || '';
+            document.getElementById(prefix + 'DisplayTemp').value = entry.displayTemp || '';
+            document.getElementById(prefix + 'ProbeTemp').value = entry.probeTemp || '';
+            
+            if (type === 'bad' && entry.issue) {
+                document.getElementById('fridgeBadIssue').value = entry.issue;
+            }
+            
+            // Show existing picture if available
+            if (entry.picture) {
+                const preview = document.getElementById(prefix + 'Preview');
+                preview.src = entry.picture;
+                preview.style.display = 'block';
+            }
+        }
+        
+        // Close fridge modal
+        function closeFridgeModal(type) {
+            const modal = document.getElementById(type === 'good' ? 'fridgeGoodModal' : 'fridgeBadModal');
+            modal.classList.remove('show');
+            currentFridgeResponseId = null;
+            editingFridgeEntry = null;
+            resetFridgeForm(type);
+        }
+        
+        // Reset fridge form
+        function resetFridgeForm(type) {
+            const prefix = type === 'good' ? 'fridgeGood' : 'fridgeBad';
+            document.getElementById(prefix + 'Section').value = '';
+            document.getElementById(prefix + 'Unit').value = '';
+            document.getElementById(prefix + 'DisplayTemp').value = '';
+            document.getElementById(prefix + 'ProbeTemp').value = '';
+            document.getElementById(prefix + 'Picture').value = '';
+            document.getElementById(prefix + 'Preview').style.display = 'none';
+            document.getElementById(prefix + 'Preview').src = '';
+            
+            if (type === 'bad') {
+                document.getElementById('fridgeBadIssue').value = '';
+            }
+        }
+        
+        // Preview fridge picture
+        function previewFridgePicture(type, input) {
+            const preview = document.getElementById(type === 'good' ? 'fridgeGoodPreview' : 'fridgeBadPreview');
+            
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        
+        // Save fridge reading
+        async function saveFridgeReading(type) {
+            const prefix = type === 'good' ? 'fridgeGood' : 'fridgeBad';
+            
+            const section = document.getElementById(prefix + 'Section').value;
+            const unit = document.getElementById(prefix + 'Unit').value;
+            const displayTemp = document.getElementById(prefix + 'DisplayTemp').value;
+            const probeTemp = document.getElementById(prefix + 'ProbeTemp').value;
+            const pictureInput = document.getElementById(prefix + 'Picture');
+            
+            // Validation
+            if (!section) {
+                showToast('Please select a section', 'error');
+                return;
+            }
+            if (!unit) {
+                showToast('Please enter the unit/fridge name', 'error');
+                return;
+            }
+            if (!displayTemp) {
+                showToast('Please enter the display temperature', 'error');
+                return;
+            }
+            if (!probeTemp) {
+                showToast('Please enter the probe temperature', 'error');
+                return;
+            }
+            
+            let issue = '';
+            if (type === 'bad') {
+                issue = document.getElementById('fridgeBadIssue').value;
+                if (!issue) {
+                    showToast('Please select an issue', 'error');
+                    return;
+                }
+            }
+            
+            // Get picture as base64 (keep existing picture if editing and no new file selected)
+            let picture = null;
+            if (pictureInput.files && pictureInput.files[0]) {
+                picture = await fileToBase64(pictureInput.files[0]);
+            } else if (editingFridgeEntry) {
+                // Keep existing picture when editing
+                const existingEntries = type === 'good' 
+                    ? fridgeGoodReadings.filter(r => r.responseId === editingFridgeEntry.responseId)
+                    : fridgeBadReadings.filter(r => r.responseId === editingFridgeEntry.responseId);
+                const existingEntry = existingEntries[editingFridgeEntry.index];
+                if (existingEntry) {
+                    picture = existingEntry.picture;
+                }
+            }
+            
+            // Create reading object - keep temperature as text to support NA values
+            const reading = {
+                responseId: currentFridgeResponseId,
+                section: section,
+                unit: unit,
+                displayTemp: displayTemp.trim(),
+                probeTemp: probeTemp.trim(),
+                picture: picture,
+                timestamp: new Date().toISOString()
+            };
+            
+            if (type === 'bad') {
+                reading.issue = issue;
+            }
+            
+            // Check if we're editing or adding
+            if (editingFridgeEntry && editingFridgeEntry.type === type) {
+                // Edit mode - replace existing entry
+                const entries = type === 'good' 
+                    ? fridgeGoodReadings.filter(r => r.responseId === editingFridgeEntry.responseId)
+                    : fridgeBadReadings.filter(r => r.responseId === editingFridgeEntry.responseId);
+                const entryToUpdate = entries[editingFridgeEntry.index];
+                const mainArray = type === 'good' ? fridgeGoodReadings : fridgeBadReadings;
+                const mainIndex = mainArray.indexOf(entryToUpdate);
+                if (mainIndex > -1) {
+                    mainArray[mainIndex] = reading;
+                }
+            } else {
+                // Add mode - push new entry
+                if (type === 'bad') {
+                    fridgeBadReadings.push(reading);
+                } else {
+                    fridgeGoodReadings.push(reading);
+                }
+            }
+            
+            // Save to server
+            try {
+                await saveFridgeReadingsToServer();
+                showToast(`${type === 'good' ? 'Good' : 'Bad'} fridge reading ${editingFridgeEntry ? 'updated' : 'saved'}`, 'success');
+            } catch (error) {
+                console.error('Error saving fridge reading:', error);
+                showToast('Reading saved locally (server sync pending)', 'success');
+            }
+            
+            // Close modal and refresh display
+            closeFridgeModal(type);
+            renderSection(currentSectionIndex);
+        }
+        
+        // Convert file to base64
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        // Delete fridge entry
+        function deleteFridgeEntry(type, responseId, index) {
+            if (!confirm('Are you sure you want to delete this reading?')) return;
+            
+            if (type === 'good') {
+                const entries = fridgeGoodReadings.filter(r => r.responseId === responseId);
+                const entryToDelete = entries[index];
+                const mainIndex = fridgeGoodReadings.indexOf(entryToDelete);
+                if (mainIndex > -1) {
+                    fridgeGoodReadings.splice(mainIndex, 1);
+                }
+            } else {
+                const entries = fridgeBadReadings.filter(r => r.responseId === responseId);
+                const entryToDelete = entries[index];
+                const mainIndex = fridgeBadReadings.indexOf(entryToDelete);
+                if (mainIndex > -1) {
+                    fridgeBadReadings.splice(mainIndex, 1);
+                }
+            }
+            
+            // Save to server
+            saveFridgeReadingsToServer().catch(console.error);
+            
+            // Refresh display
+            renderSection(currentSectionIndex);
+            showToast('Reading deleted', 'success');
+        }
+        
+        // Save fridge readings to server
+        async function saveFridgeReadingsToServer() {
+            if (!auditData) return;
+            
+            const response = await fetch(`/api/audits/${auditData.auditId}/fridge-readings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    documentNumber: auditData.documentNumber,
+                    goodReadings: fridgeGoodReadings,
+                    badReadings: fridgeBadReadings,
+                    enabledSections: tempMonitoringSections
+                })
+            });
+            
+            const result = await response.json();
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to save fridge readings');
+            }
+            
+            return result;
+        }
+        
+        // Load fridge readings from server
+        async function loadFridgeReadings() {
+            if (!auditData) return;
+            
+            try {
+                const response = await fetch(`/api/audits/${auditData.auditId}/fridge-readings`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    fridgeGoodReadings = result.data.goodReadings || [];
+                    fridgeBadReadings = result.data.badReadings || [];
+                    tempMonitoringSections = result.data.enabledSections || {};
+                    console.log(`Loaded ${fridgeGoodReadings.length} good and ${fridgeBadReadings.length} bad fridge readings`);
+                    console.log(`Enabled temp monitoring for sections:`, Object.keys(tempMonitoringSections).filter(k => tempMonitoringSections[k]));
+                }
+            } catch (error) {
+                console.warn('Could not load fridge readings:', error.message);
+            }
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

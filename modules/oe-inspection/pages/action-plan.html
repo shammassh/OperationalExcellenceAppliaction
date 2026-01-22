@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Action Plan - OE Inspection System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .action-plan-container {
+            max-width: 1800px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        /* Header Styles */
+        .report-header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .report-header h1 {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .report-info {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .info-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-group label {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 2px;
+        }
+
+        .info-value {
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .header-actions button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .header-actions button:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .back-btn {
+            background: rgba(255,255,255,0.1) !important;
+        }
+
+        /* Summary Section */
+        .summary-section {
+            padding: 25px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .summary-section h2 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        .summary-stats {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            min-width: 120px;
+        }
+
+        .stat-number {
+            display: block;
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .stat-item.high .stat-number { color: #ef4444; }
+        .stat-item.medium .stat-number { color: #f59e0b; }
+        .stat-item.low .stat-number { color: #3b82f6; }
+        .stat-item.no .stat-number { color: #dc2626; }
+        .stat-item.partial .stat-number { color: #f59e0b; }
+
+        /* Instructions Section */
+        .instructions-section {
+            padding: 20px 25px;
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            margin: 0;
+        }
+
+        .instructions-section h3 {
+            color: #1565c0;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .instructions-section ol {
+            margin-left: 20px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .instructions-section li {
+            margin-bottom: 5px;
+        }
+
+        /* Filter Section */
+        .filter-section {
+            padding: 20px 25px;
+            background: #fff;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .filter-group label {
+            font-size: 12px;
+            color: #6b7280;
+            font-weight: 600;
+        }
+
+        .filter-group select {
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            min-width: 150px;
+        }
+
+        /* Table Styles */
+        .table-container {
+            overflow-x: auto;
+            padding: 20px;
+        }
+
+        .action-plan-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .action-plan-table th {
+            background: #2c3e50;
+            color: white;
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: 600;
+            white-space: nowrap;
+            font-size: 12px;
+        }
+
+        .action-plan-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #e9ecef;
+            vertical-align: top;
+            font-size: 13px;
+        }
+
+        .action-plan-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .ref-col {
+            font-weight: 600;
+            color: #2c3e50;
+            white-space: nowrap;
+        }
+
+        .section-col {
+            white-space: nowrap;
+        }
+
+        .section-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+
+        .answer-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .answer-no {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .answer-partial {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .priority-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .priority-high {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .priority-medium {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .priority-low {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .finding-col {
+            max-width: 200px;
+            min-width: 150px;
+        }
+
+        .question-title {
+            font-weight: 500;
+            margin-bottom: 6px;
+            font-size: 12px;
+        }
+
+        .finding-text {
+            color: #6b7280;
+            font-size: 11px;
+        }
+
+        .escalate-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 500;
+            background: #fae8ff;
+            color: #86198f;
+            margin-top: 4px;
+        }
+
+        /* Input Fields */
+        .input-col {
+            min-width: 120px;
+        }
+
+        .action-input {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 50px;
+        }
+
+        .action-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+
+        .deadline-input {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+
+        .deadline-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .person-input {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+
+        .person-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .status-select {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 11px;
+            background: white;
+        }
+
+        .status-select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .status-pending { background-color: #fef3c7; }
+        .status-in-progress { background-color: #dbeafe; }
+        .status-completed { background-color: #d1fae5; }
+        .status-deferred { background-color: #f3f4f6; }
+
+        /* Picture Upload */
+        .picture-section {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .picture-upload-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 5px 8px;
+            background: #f3f4f6;
+            border: 1px dashed #9ca3af;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 10px;
+            color: #4b5563;
+            transition: all 0.2s;
+        }
+
+        .picture-upload-btn:hover {
+            background: #e5e7eb;
+            border-color: #6b7280;
+        }
+
+        .picture-input {
+            display: none;
+        }
+
+        .picture-preview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .picture-thumb {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            object-fit: cover;
+            cursor: pointer;
+            border: 1px solid #e5e7eb;
+            transition: all 0.2s;
+        }
+
+        .picture-thumb:hover {
+            border-color: #667eea;
+            transform: scale(1.05);
+        }
+
+        .picture-thumb-wrapper {
+            position: relative;
+        }
+
+        .remove-picture {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 16px;
+            height: 16px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Lightbox */
+        .lightbox-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .lightbox-overlay.show {
+            display: flex;
+        }
+
+        .lightbox-content {
+            max-width: 90%;
+            max-height: 90%;
+            position: relative;
+        }
+
+        .lightbox-image {
+            max-width: 100%;
+            max-height: 85vh;
+            border-radius: 8px;
+        }
+
+        .lightbox-close {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 32px;
+            cursor: pointer;
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 1001;
+            animation: slideIn 0.3s ease;
+        }
+
+        .toast.success {
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
+
+        .toast.error {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+
+        .toast.info {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Save Button */
+        .save-btn {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+        }
+
+        .save-btn:hover {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .empty-state .icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .empty-state h3 {
+            font-size: 20px;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+
+        .empty-state p {
+            color: #6b7280;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #e5e7eb;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Print Styles */
+        @media print {
+            .header-actions, .filter-section, .instructions-section {
+                display: none !important;
+            }
+
+            .report-header {
+                background: #2c3e50 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .action-plan-table th {
+                background: #2c3e50 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .action-input, .deadline-input, .person-input, .status-select {
+                border: none;
+                background: transparent;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .report-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .summary-stats {
+                flex-direction: column;
+            }
+
+            .stat-item {
+                width: 100%;
+            }
+
+            .filter-section {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="action-plan-container">
+        <!-- Header -->
+        <div class="report-header">
+            <div class="header-content">
+                <h1>🎯 ACTION PLAN</h1>
+                <div class="report-info" id="reportInfo">
+                    <div class="info-group">
+                        <label>Document Number:</label>
+                        <span class="info-value" id="docNumber">Loading...</span>
+                    </div>
+                    <div class="info-group">
+                        <label>Store:</label>
+                        <span class="info-value" id="storeName">Loading...</span>
+                    </div>
+                    <div class="info-group">
+                        <label>Audit Date:</label>
+                        <span class="info-value" id="auditDate">Loading...</span>
+                    </div>
+                    <div class="info-group">
+                        <label>Total Score:</label>
+                        <span class="info-value" id="totalScore">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="back-btn" onclick="goBack()">
+                    ← Back
+                </button>
+                <button class="save-btn" onclick="saveActionPlan()">
+                    💾 Save
+                </button>
+                <button onclick="window.print()">
+                    🖨️ Print
+                </button>
+                <button onclick="exportToCSV()">
+                    📊 Export CSV
+                </button>
+            </div>
+        </div>
+
+        <!-- Summary Section -->
+        <div class="summary-section">
+            <h2>📋 Action Items Summary</h2>
+            <div class="summary-stats" id="summaryStats">
+                <div class="stat-item">
+                    <span class="stat-number" id="totalItems">0</span>
+                    <span class="stat-label">Total Items</span>
+                </div>
+                <div class="stat-item no">
+                    <span class="stat-number" id="noItems">0</span>
+                    <span class="stat-label">No (Non-Compliant)</span>
+                </div>
+                <div class="stat-item partial">
+                    <span class="stat-number" id="partialItems">0</span>
+                    <span class="stat-label">Partially Compliant</span>
+                </div>
+                <div class="stat-item high">
+                    <span class="stat-number" id="highPriority">0</span>
+                    <span class="stat-label">High Priority</span>
+                </div>
+                <div class="stat-item medium">
+                    <span class="stat-number" id="mediumPriority">0</span>
+                    <span class="stat-label">Medium Priority</span>
+                </div>
+                <div class="stat-item low">
+                    <span class="stat-number" id="lowPriority">0</span>
+                    <span class="stat-label">Low Priority</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="instructions-section">
+            <h3>📝 Instructions for Store Manager</h3>
+            <ol>
+                        <li><strong>Review each finding</strong> and understand the corrective action needed</li>
+                        <li><strong>Fill in the Action to be Taken</strong> column with specific actions you will implement</li>
+                        <li><strong>Set realistic deadlines</strong> for each action by Priority</li>
+                        <li><strong>Assign responsible person</strong> for each action</li>
+                        <li><strong>Update status</strong> as actions progress</li>
+                        <li><strong>Upload pictures</strong> of completed actions where applicable</li>
+                        <li><strong>Write down the updates and comments related to each finding</li>
+            </ol>
+        </div>
+
+        <!-- Filters -->
+        <div class="filter-section">
+            <div class="filter-group">
+                <label>Section</label>
+                <select id="sectionFilter" onchange="applyFilters()">
+                    <option value="">All Sections</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Answer</label>
+                <select id="answerFilter" onchange="applyFilters()">
+                    <option value="">All</option>
+                    <option value="No">No</option>
+                    <option value="Partially">Partially</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Priority</label>
+                <select id="priorityFilter" onchange="applyFilters()">
+                    <option value="">All Priorities</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Status</label>
+                <select id="statusFilter" onchange="applyFilters()">
+                    <option value="">All Statuses</option>
+                    <option value="Pending">Pending</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Deferred">Deferred</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Escalated</label>
+                <select id="escalateFilter" onchange="applyFilters()">
+                    <option value="">All</option>
+                    <option value="true">Escalated Only</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Table Container -->
+        <div class="table-container" id="tableContainer">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>Loading action items...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lightbox -->
+    <div class="lightbox-overlay" id="lightbox" onclick="closeLightbox()">
+        <div class="lightbox-content" onclick="event.stopPropagation()">
+            <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+            <img class="lightbox-image" id="lightboxImg" src="" alt="Full size image">
+        </div>
+    </div>
+
+    <script>
+        let auditData = null;
+        let actionItems = [];
+        let filteredItems = [];
+        let savedResponses = {};
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const auditId = urlParams.get('id');
+            
+            if (!auditId) {
+                showError('No audit ID provided');
+                return;
+            }
+
+            await loadAuditData(auditId);
+        });
+
+        function goBack() {
+            window.location.href = '/oe-inspection/list';
+        }
+
+        async function loadAuditData(auditId) {
+            try {
+                const response = await fetch(`/api/audits/${auditId}`);
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to load audit');
+                }
+
+                auditData = result.data;
+                
+                // Load saved action plan responses
+                await loadSavedResponses();
+                
+                extractActionItems();
+                updateHeader();
+                updateSummary();
+                populateFilters();
+                applyFilters();
+
+            } catch (error) {
+                console.error('Error loading audit:', error);
+                showError(error.message);
+            }
+        }
+
+        async function loadSavedResponses() {
+            try {
+                const response = await fetch(`/api/action-plan/${auditData.documentNumber}`);
+                const result = await response.json();
+                
+                if (result.success && result.actions) {
+                    // Index by referenceValue for easy lookup
+                    result.actions.forEach(action => {
+                        savedResponses[action.ReferenceValue] = action;
+                    });
+                    console.log('Loaded saved responses:', Object.keys(savedResponses).length);
+                }
+            } catch (error) {
+                console.warn('No saved responses found:', error.message);
+            }
+        }
+
+        function extractActionItems() {
+            actionItems = [];
+            
+            for (const section of auditData.sections) {
+                for (const item of section.items) {
+                    // Filter for No or Partially answers
+                    if (item.selectedChoice === 'No' || item.selectedChoice === 'Partially') {
+                        // Check for saved response
+                        const saved = savedResponses[item.referenceValue] || {};
+                        
+                        // Parse pictures - could be in PicturesPaths or Pictures field
+                        let pictures = [];
+                        const picturesData = saved.PicturesPaths || saved.Pictures;
+                        if (picturesData) {
+                            try {
+                                pictures = typeof picturesData === 'string' ? JSON.parse(picturesData) : picturesData;
+                            } catch (e) {
+                                console.warn('Error parsing pictures:', e);
+                            }
+                        }
+                        
+                        actionItems.push({
+                            responseId: item.responseId,
+                            sectionNumber: section.sectionNumber,
+                            sectionName: section.sectionName,
+                            referenceValue: item.referenceValue || '-',
+                            title: item.title,
+                            selectedChoice: item.selectedChoice,
+                            finding: item.finding || '',
+                            priority: item.priority || '',
+                            escalate: item.escalate,
+                            department: item.department || '',
+                            // Editable fields - use saved or empty
+                            actionTaken: saved.ActionTaken || '',
+                            deadline: saved.Deadline ? saved.Deadline.split('T')[0] : '',
+                            personInCharge: saved.PersonInCharge || '',
+                            status: saved.Status || 'Pending',
+                            pictures: pictures
+                        });
+                    }
+                }
+            }
+
+            // Sort by section number, then reference value
+            actionItems.sort((a, b) => {
+                if (a.sectionNumber !== b.sectionNumber) {
+                    return a.sectionNumber - b.sectionNumber;
+                }
+                return (a.referenceValue || '').localeCompare(b.referenceValue || '');
+            });
+        }
+
+        function updateHeader() {
+            document.getElementById('docNumber').textContent = auditData.documentNumber || '-';
+            document.getElementById('storeName').textContent = `${auditData.storeCode} - ${auditData.storeName}`;
+            document.getElementById('auditDate').textContent = formatDate(auditData.auditDate);
+            document.getElementById('totalScore').textContent = auditData.totalScore !== null 
+                ? `${Math.round(auditData.totalScore)}%` 
+                : '-';
+        }
+
+        function updateSummary() {
+            const noCount = actionItems.filter(i => i.selectedChoice === 'No').length;
+            const partialCount = actionItems.filter(i => i.selectedChoice === 'Partially').length;
+            const highCount = actionItems.filter(i => i.priority === 'High').length;
+            const mediumCount = actionItems.filter(i => i.priority === 'Medium').length;
+            const lowCount = actionItems.filter(i => i.priority === 'Low').length;
+
+            document.getElementById('totalItems').textContent = actionItems.length;
+            document.getElementById('noItems').textContent = noCount;
+            document.getElementById('partialItems').textContent = partialCount;
+            document.getElementById('highPriority').textContent = highCount;
+            document.getElementById('mediumPriority').textContent = mediumCount;
+            document.getElementById('lowPriority').textContent = lowCount;
+        }
+
+        function populateFilters() {
+            const sections = [...new Set(actionItems.map(i => i.sectionName))];
+            const sectionSelect = document.getElementById('sectionFilter');
+            
+            sections.forEach(section => {
+                const option = document.createElement('option');
+                option.value = section;
+                option.textContent = section;
+                sectionSelect.appendChild(option);
+            });
+        }
+
+        function applyFilters() {
+            const section = document.getElementById('sectionFilter').value;
+            const answer = document.getElementById('answerFilter').value;
+            const priority = document.getElementById('priorityFilter').value;
+            const status = document.getElementById('statusFilter').value;
+            const escalate = document.getElementById('escalateFilter').value;
+
+            filteredItems = actionItems.filter(item => {
+                if (section && item.sectionName !== section) return false;
+                if (answer && item.selectedChoice !== answer) return false;
+                if (priority && item.priority !== priority) return false;
+                if (status && item.status !== status) return false;
+                if (escalate === 'true' && !item.escalate) return false;
+                return true;
+            });
+
+            renderTable();
+        }
+
+        function renderTable() {
+            const container = document.getElementById('tableContainer');
+
+            if (filteredItems.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">✅</div>
+                        <h3>No Action Items Found</h3>
+                        <p>There are no items matching the current filter criteria.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const tableHtml = `
+                <table class="action-plan-table">
+                    <thead>
+                        <tr>
+                            <th>Ref #</th>
+                            <th>Section</th>
+                            <th>Finding</th>
+                            <th>Answer</th>
+                            <th>Priority</th>
+                            <th>Action Taken</th>
+                            <th>Deadline</th>
+                            <th>Person in Charge</th>
+                            <th>Status</th>
+                            <th>Pictures</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filteredItems.map((item, index) => renderRow(item, index)).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            container.innerHTML = tableHtml;
+        }
+
+        function renderRow(item, index) {
+            const answerClass = item.selectedChoice === 'No' ? 'answer-no' : 'answer-partial';
+            const priorityClass = item.priority ? `priority-${item.priority.toLowerCase()}` : '';
+            const statusClass = item.status ? `status-${item.status.toLowerCase().replace(' ', '-')}` : '';
+
+            return `
+                <tr data-index="${index}" data-ref="${item.referenceValue}">
+                    <td class="ref-col">${item.referenceValue}</td>
+                    <td class="section-col">
+                        <span class="section-badge">${item.sectionName}</span>
+                        ${item.escalate ? `<div class="escalate-badge">🚨 ${item.department || 'Escalated'}</div>` : ''}
+                    </td>
+                    <td class="finding-col">
+                        <div class="finding-text">${escapeHtml(item.finding || item.title)}</div>
+                    </td>
+                    <td>
+                        <span class="answer-badge ${answerClass}">${item.selectedChoice}</span>
+                    </td>
+                    <td>
+                        ${item.priority ? `<span class="priority-badge ${priorityClass}">${item.priority}</span>` : '-'}
+                    </td>
+                    <td class="input-col">
+                        <textarea class="action-input" 
+                            data-field="actionTaken" 
+                            data-index="${index}"
+                            placeholder="Describe action taken..."
+                            onchange="updateItem(${index}, 'actionTaken', this.value)">${escapeHtml(item.actionTaken)}</textarea>
+                    </td>
+                    <td class="input-col">
+                        <input type="date" class="deadline-input" 
+                            data-field="deadline" 
+                            data-index="${index}"
+                            value="${item.deadline}"
+                            onchange="updateItem(${index}, 'deadline', this.value)">
+                    </td>
+                    <td class="input-col">
+                        <input type="text" class="person-input" 
+                            data-field="personInCharge" 
+                            data-index="${index}"
+                            placeholder="Name"
+                            value="${escapeHtml(item.personInCharge)}"
+                            onchange="updateItem(${index}, 'personInCharge', this.value)">
+                    </td>
+                    <td class="input-col">
+                        <select class="status-select ${statusClass}" 
+                            data-field="status" 
+                            data-index="${index}"
+                            onchange="updateItem(${index}, 'status', this.value); updateStatusColor(this)">
+                            <option value="Pending" ${item.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                            <option value="In Progress" ${item.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                            <option value="Completed" ${item.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                            <option value="Deferred" ${item.status === 'Deferred' ? 'selected' : ''}>Deferred</option>
+                        </select>
+                    </td>
+                    <td class="input-col">
+                        <div class="picture-section">
+                            <label class="picture-upload-btn">
+                                📷 Add
+                                <input type="file" class="picture-input" 
+                                    accept="image/*" 
+                                    multiple
+                                    data-index="${index}"
+                                    onchange="handlePictureUpload(${index}, this.files)">
+                            </label>
+                            <div class="picture-preview" id="preview-${index}">
+                                ${(item.pictures || []).map((pic, picIndex) => `
+                                    <div class="picture-thumb-wrapper">
+                                        <img src="${pic}" class="picture-thumb" onclick="openLightbox('${pic}')">
+                                        <button class="remove-picture" onclick="removePicture(${index}, ${picIndex})">×</button>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        function updateItem(index, field, value) {
+            // Find the actual item in actionItems array
+            const item = filteredItems[index];
+            if (item) {
+                // Find in main array
+                const mainIndex = actionItems.findIndex(i => i.referenceValue === item.referenceValue);
+                if (mainIndex !== -1) {
+                    actionItems[mainIndex][field] = value;
+                }
+                item[field] = value;
+            }
+        }
+
+        function updateStatusColor(select) {
+            select.className = 'status-select';
+            const status = select.value.toLowerCase().replace(' ', '-');
+            select.classList.add(`status-${status}`);
+        }
+
+        function handlePictureUpload(index, files) {
+            const item = filteredItems[index];
+            const mainIndex = actionItems.findIndex(i => i.referenceValue === item.referenceValue);
+            
+            for (const file of files) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const base64 = e.target.result;
+                    
+                    if (mainIndex !== -1) {
+                        if (!actionItems[mainIndex].pictures) actionItems[mainIndex].pictures = [];
+                        actionItems[mainIndex].pictures.push(base64);
+                    }
+                    if (!item.pictures) item.pictures = [];
+                    item.pictures.push(base64);
+                    
+                    // Update preview
+                    updatePicturePreview(index);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function updatePicturePreview(index) {
+            const item = filteredItems[index];
+            const previewContainer = document.getElementById(`preview-${index}`);
+            
+            if (previewContainer) {
+                previewContainer.innerHTML = (item.pictures || []).map((pic, picIndex) => `
+                    <div class="picture-thumb-wrapper">
+                        <img src="${pic}" class="picture-thumb" onclick="openLightbox('${pic}')">
+                        <button class="remove-picture" onclick="removePicture(${index}, ${picIndex})">×</button>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function removePicture(index, picIndex) {
+            const item = filteredItems[index];
+            const mainIndex = actionItems.findIndex(i => i.referenceValue === item.referenceValue);
+            
+            if (mainIndex !== -1 && actionItems[mainIndex].pictures) {
+                actionItems[mainIndex].pictures.splice(picIndex, 1);
+            }
+            if (item.pictures) {
+                item.pictures.splice(picIndex, 1);
+            }
+            
+            updatePicturePreview(index);
+        }
+
+        function openLightbox(src) {
+            document.getElementById('lightboxImg').src = src;
+            document.getElementById('lightbox').classList.add('show');
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.remove('show');
+        }
+
+        async function saveActionPlan() {
+            try {
+                showToast('Saving...', 'info');
+                
+                const actions = actionItems.map(item => ({
+                    referenceValue: item.referenceValue,
+                    section: item.sectionName,
+                    finding: item.finding || item.title,
+                    priority: item.priority,
+                    actionTaken: item.actionTaken,
+                    deadline: item.deadline || null,
+                    personInCharge: item.personInCharge,
+                    status: item.status,
+                    pictures: item.pictures || []
+                }));
+
+                const response = await fetch('/api/action-plan/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        documentNumber: auditData.documentNumber,
+                        actions: actions,
+                        updatedBy: 'Store Manager'
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast('Action plan saved successfully!', 'success');
+                } else {
+                    showToast('Failed to save: ' + (result.message || result.error), 'error');
+                }
+
+            } catch (error) {
+                console.error('Error saving action plan:', error);
+                showToast('Failed to save action plan', 'error');
+            }
+        }
+
+        function showToast(message, type) {
+            // Remove existing toast
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            if (type !== 'info') {
+                setTimeout(() => toast.remove(), 3000);
+            }
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-GB', { 
+                day: '2-digit', 
+                month: 'short', 
+                year: 'numeric' 
+            });
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showError(message) {
+            document.getElementById('tableContainer').innerHTML = `
+                <div class="empty-state">
+                    <div class="icon">⚠️</div>
+                    <h3>Error</h3>
+                    <p>${message}</p>
+                    <button onclick="goBack()" style="margin-top: 16px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer;">Go Back</button>
+                </div>
+            `;
+        }
+
+        function exportToCSV() {
+            if (filteredItems.length === 0) {
+                alert('No items to export');
+                return;
+            }
+
+            const headers = ['Reference', 'Section', 'Question', 'Finding', 'Answer', 'Priority', 'Action Taken', 'Deadline', 'Person in Charge', 'Status', 'Escalated', 'Department'];
+            const rows = filteredItems.map(item => [
+                item.referenceValue,
+                item.sectionName,
+                item.title,
+                item.finding || '',
+                item.selectedChoice,
+                item.priority || '',
+                item.actionTaken || '',
+                item.deadline || '',
+                item.personInCharge || '',
+                item.status || '',
+                item.escalate ? 'Yes' : 'No',
+                item.department || ''
+            ]);
+
+            let csv = headers.join(',') + '\n';
+            rows.forEach(row => {
+                csv += row.map(cell => `"${(cell || '').replace(/"/g, '""')}"`).join(',') + '\n';
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Action_Plan_${auditData.documentNumber}_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Keyboard shortcut for save
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                saveActionPlan();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -23,6 +23,7 @@ const adminModule = require('./modules/admin');
 const operationalExcellenceModule = require('./modules/operational-excellence');
 const hrModule = require('./modules/hr');
 const personnelModule = require('./modules/personnel');
+const oeInspectionModule = require('./modules/oe-inspection');
 
 const app = express();
 const PORT = process.env.PORT || 3010;
@@ -52,6 +53,7 @@ app.use('/notifications', requireAuth, notificationsRoutes);
 app.use('/stores', requireAuth, storesModule);
 app.use('/admin', requireAuth, adminModule);
 app.use('/operational-excellence', requireAuth, operationalExcellenceModule);
+app.use('/oe-inspection', requireAuth, oeInspectionModule);
 app.use('/hr', requireAuth, hrModule);
 app.use('/personnel', requireAuth, personnelModule);
 
@@ -115,18 +117,18 @@ app.get('/dashboard', requireAuth, (req, res) => {
     // Define which roles can see which departments
     const rolePermissions = {
         // System Admin and OE Department can see all
-        'System Administrator': ['stores', 'ohs', 'oe', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Senior Inspector': ['stores', 'ohs', 'oe', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Inspector': ['stores', 'ohs', 'oe', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Implementation Inspector': ['stores', 'ohs', 'oe', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Head of Operational Excellence': ['stores', 'ohs', 'oe', 'thirdparty', 'security', 'hr', 'personnel'],
+        'System Administrator': ['stores', 'ohs', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
+        'Senior Inspector': ['stores', 'ohs', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
+        'Inspector': ['stores', 'ohs', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
+        'Implementation Inspector': ['stores', 'ohs', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
+        'Head of Operational Excellence': ['stores', 'ohs', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
         
         // Executives can see all
-        'Chief People & Support Officer': ['stores', 'ohs', 'oe', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Head of Talent Management': ['stores', 'ohs', 'oe', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Head of Operational Assurance and Support': ['stores', 'ohs', 'oe', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Lead Support and Execution Coordinator': ['stores', 'ohs', 'oe', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Head of Operations': ['stores', 'ohs', 'oe', 'thirdparty', 'security', 'hr', 'personnel'],
+        'Chief People & Support Officer': ['stores', 'ohs', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
+        'Head of Talent Management': ['stores', 'ohs', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
+        'Head of Operational Assurance and Support': ['stores', 'ohs', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
+        'Lead Support and Execution Coordinator': ['stores', 'ohs', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
+        'Head of Operations': ['stores', 'ohs', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
         
         // Store-Level Users
         'Area Manager': ['stores', 'personnel'],
@@ -172,6 +174,7 @@ app.get('/dashboard', requireAuth, (req, res) => {
         { id: 'personnel', icon: '👤', title: 'Personnel', href: '/personnel', desc: 'Personnel forms & requests' },
         { id: 'ohs', icon: '🦺', title: 'Occupational Health & Safety', href: '/ohs', desc: 'OHS incidents & inspections' },
         { id: 'oe', icon: '📋', title: 'Operational Excellence', href: '/operational-excellence', desc: 'Audits, action plans & reports' },
+        { id: 'oe-inspection', icon: '🔍', title: 'OE Inspection', href: '/oe-inspection', desc: 'OE inspections, reports & action plans' },
         { id: 'thirdparty', icon: '🤝', title: 'Third-Party Services', href: '/third-party', desc: 'Service providers & compliance' },
         { id: 'security', icon: '🔒', title: 'Security Department', href: '/security', desc: 'Security incidents & inspections' },
         { id: 'hr', icon: '👥', title: 'HR & Talent', href: '/hr', desc: 'Employee relations & cases' }
