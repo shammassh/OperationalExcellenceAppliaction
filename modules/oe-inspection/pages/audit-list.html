@@ -769,7 +769,7 @@
 
         async function loadAudits() {
             try {
-                const response = await fetch('/api/audits/list');
+                const response = await fetch('/oe-inspection/api/audits/list');
                 
                 // Handle authentication errors
                 if (response.status === 401) {
@@ -1043,11 +1043,11 @@
         // View published report (for StoreManager)
         async function viewPublishedReport(auditId) {
             try {
-                const response = await fetch(`/api/audits/${auditId}/published-report`);
+                const response = await fetch(`/oe-inspection/api/audits/${auditId}/published-report`);
                 const data = await response.json();
                 
                 if (data.success && data.hasReport) {
-                    window.open(`/api/audits/reports/${data.fileName}`, '_blank');
+                    window.open(`/oe-inspection/api/audits/reports/${data.fileName}`, '_blank');
                 } else {
                     alert('Report not yet published. Please contact the auditor.');
                 }
@@ -1064,7 +1064,7 @@
             for (const audit of filteredAudits) {
                 if (audit.Status === 'Completed') {
                     try {
-                        const response = await fetch(`/api/audits/${audit.AuditID}/published-report`);
+                        const response = await fetch(`/oe-inspection/api/audits/${audit.AuditID}/published-report`);
                         const data = await response.json();
                         
                         if (data.success && data.hasReport) {
@@ -1092,7 +1092,7 @@
             document.body.appendChild(loading);
             
             try {
-                const response = await fetch(`/api/audits/${auditId}/generate-report`, {
+                const response = await fetch(`/oe-inspection/api/audits/${auditId}/generate-report`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -1103,7 +1103,7 @@
                 }
                 
                 // Open the generated report in a new tab
-                window.open(`/api/audits/reports/${result.fileName}`, '_blank');
+                window.open(`/oe-inspection/api/audits/reports/${result.fileName}`, '_blank');
                 
             } catch (error) {
                 console.error('Error generating full report:', error);
@@ -1152,7 +1152,7 @@
             document.body.appendChild(loading);
             
             try {
-                const response = await fetch(`/api/audits/${auditId}/department-report/${department}`);
+                const response = await fetch(`/oe-inspection/api/audits/${auditId}/department-report/${department}`);
                 const result = await response.json();
                 
                 if (!result.success) {
@@ -1197,7 +1197,11 @@
                 'Low': { bg: '#d1fae5', text: '#065f46' }
             };
             
-            let itemsHTML = report.items.map((item, index) => {
+            // Safety check for items
+            const items = report.items || [];
+            const byPriority = report.byPriority || { high: 0, medium: 0, low: 0 };
+            
+            let itemsHTML = items.map((item, index) => {
                 const pColor = priorityColors[item.priority] || priorityColors['Medium'];
                 
                 let picturesHTML = '';
@@ -1280,19 +1284,19 @@
         <div class="summary">
             <div class="summary-item">
                 <div class="label">Total Items</div>
-                <div class="value">${report.totalItems}</div>
+                <div class="value">${items.length}</div>
             </div>
             <div class="summary-item" style="border-left-color: #ef4444;">
                 <div class="label">High Priority</div>
-                <div class="value" style="color: #ef4444;">${report.byPriority.high}</div>
+                <div class="value" style="color: #ef4444;">${byPriority.high}</div>
             </div>
             <div class="summary-item" style="border-left-color: #f59e0b;">
                 <div class="label">Medium Priority</div>
-                <div class="value" style="color: #f59e0b;">${report.byPriority.medium}</div>
+                <div class="value" style="color: #f59e0b;">${byPriority.medium}</div>
             </div>
             <div class="summary-item" style="border-left-color: #10b981;">
                 <div class="label">Low Priority</div>
-                <div class="value" style="color: #10b981;">${report.byPriority.low}</div>
+                <div class="value" style="color: #10b981;">${byPriority.low}</div>
             </div>
         </div>
         <div class="content">
@@ -1347,9 +1351,12 @@
 
         // Generate Finding Picture Gallery HTML for department reports
         function generateFindingGalleryHTML(report, colors) {
+            // Safety check for items
+            const items = report.items || [];
+            
             // Collect only finding pictures (not corrective)
             const allPictures = [];
-            for (const item of report.items) {
+            for (const item of items) {
                 if (item.pictures && item.pictures.length > 0) {
                     // Get only Finding type pictures
                     const findingPics = item.pictures.filter(p => 
@@ -1426,9 +1433,12 @@
 
         // Generate Good Observation Picture Gallery HTML for department reports
         function generateGoodGalleryHTML(report, colors) {
+            // Safety check for items
+            const items = report.items || [];
+            
             // Collect only good observation pictures
             const allPictures = [];
-            for (const item of report.items) {
+            for (const item of items) {
                 if (item.pictures && item.pictures.length > 0) {
                     // Get only Good type pictures
                     const goodPics = item.pictures.filter(p => 
@@ -1497,9 +1507,12 @@
 
         // Generate Corrective Action Picture Gallery HTML for department reports
         function generateCorrectiveGalleryHTML(report, colors) {
+            // Safety check for items
+            const items = report.items || [];
+            
             // Collect only corrective pictures
             const allPictures = [];
-            for (const item of report.items) {
+            for (const item of items) {
                 if (item.pictures && item.pictures.length > 0) {
                     // Get only Corrective type pictures
                     const correctivePics = item.pictures.filter(p => 
@@ -1589,18 +1602,65 @@
                 return;
             }
 
+            // Show loading state
+            const btn = event.target;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳';
+            btn.disabled = true;
+
             try {
-                const response = await fetch(`/api/audits/${auditId}`, {
+                const response = await fetch(`/oe-inspection/api/audits/${auditId}`, {
                     method: 'DELETE'
                 });
 
-                if (!response.ok) throw new Error('Failed to delete audit');
+                const result = await response.json();
+                
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || 'Failed to delete audit');
+                }
 
-                await loadAudits();
+                // Remove the row from the DOM immediately for instant feedback
+                const row = btn.closest('tr');
+                if (row) {
+                    row.style.transition = 'opacity 0.3s';
+                    row.style.opacity = '0';
+                    setTimeout(() => row.remove(), 300);
+                }
+                
+                // Update the audits array
+                audits = audits.filter(a => a.AuditID !== auditId);
+                
+                // Show success message
+                showToast('Audit deleted successfully', 'success');
             } catch (error) {
                 console.error('Error deleting audit:', error);
-                alert('Failed to delete audit: ' + error.message);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                showToast('Failed to delete audit: ' + error.message, 'error');
             }
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 25px;
+                background: ${type === 'success' ? '#10b981' : '#ef4444'};
+                color: white;
+                border-radius: 8px;
+                font-weight: 600;
+                z-index: 9999;
+                animation: slideIn 0.3s ease;
+            `;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
         }
     </script>
 </body>

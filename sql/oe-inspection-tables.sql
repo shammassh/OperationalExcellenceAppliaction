@@ -303,3 +303,98 @@ PRINT '=====================================================';
 PRINT 'OE Inspection Module tables created successfully!';
 PRINT '=====================================================';
 GO
+
+-- =====================================================
+-- OE Inspection Pictures Table (Item pictures storage)
+-- =====================================================
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'OE_InspectionPictures')
+BEGIN
+    CREATE TABLE OE_InspectionPictures (
+        Id INT PRIMARY KEY IDENTITY(1,1),
+        ItemId INT NOT NULL,
+        InspectionId INT NOT NULL,
+        FileName NVARCHAR(255),
+        ContentType NVARCHAR(100),
+        PictureType NVARCHAR(50), -- Finding, Good, Corrective
+        FileData NVARCHAR(MAX), -- Base64 encoded
+        CreatedAt DATETIME2 DEFAULT GETDATE(),
+        
+        CONSTRAINT FK_OE_InspectionPictures_Item FOREIGN KEY (ItemId) REFERENCES OE_InspectionItems(Id) ON DELETE CASCADE
+    );
+    
+    CREATE INDEX IX_OE_InspectionPictures_ItemId ON OE_InspectionPictures(ItemId);
+    CREATE INDEX IX_OE_InspectionPictures_InspectionId ON OE_InspectionPictures(InspectionId);
+    
+    PRINT 'OE_InspectionPictures table created';
+END
+GO
+
+-- =====================================================
+-- OE Fridge Readings Table (Temperature monitoring)
+-- =====================================================
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'OE_FridgeReadings')
+BEGIN
+    CREATE TABLE OE_FridgeReadings (
+        Id INT PRIMARY KEY IDENTITY(1,1),
+        InspectionId INT NOT NULL,
+        DocumentNumber NVARCHAR(50),
+        ReadingType NVARCHAR(20), -- Good, Bad
+        UnitTemp NVARCHAR(20),
+        DisplayTemp NVARCHAR(20),
+        ProbeTemp NVARCHAR(20),
+        Issue NVARCHAR(MAX),
+        SectionName NVARCHAR(200),
+        CreatedAt DATETIME2 DEFAULT GETDATE(),
+        
+        CONSTRAINT FK_OE_FridgeReadings_Inspection FOREIGN KEY (InspectionId) REFERENCES OE_Inspections(Id) ON DELETE CASCADE
+    );
+    
+    CREATE INDEX IX_OE_FridgeReadings_InspectionId ON OE_FridgeReadings(InspectionId);
+    
+    PRINT 'OE_FridgeReadings table created';
+END
+GO
+
+-- =====================================================
+-- Add missing columns to OE_InspectionItems
+-- =====================================================
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('OE_InspectionItems') AND name = 'Escalate')
+BEGIN
+    ALTER TABLE OE_InspectionItems ADD Escalate BIT DEFAULT 0;
+    PRINT 'Added Escalate column to OE_InspectionItems';
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('OE_InspectionItems') AND name = 'Department')
+BEGIN
+    ALTER TABLE OE_InspectionItems ADD Department NVARCHAR(100);
+    PRINT 'Added Department column to OE_InspectionItems';
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('OE_InspectionTemplateSections') AND name = 'PassingGrade')
+BEGIN
+    ALTER TABLE OE_InspectionTemplateSections ADD PassingGrade INT DEFAULT 80;
+    PRINT 'Added PassingGrade column to OE_InspectionTemplateSections';
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('OE_InspectionItems') AND name = 'AnswerOptions')
+BEGIN
+    ALTER TABLE OE_InspectionItems ADD AnswerOptions NVARCHAR(200) DEFAULT 'Yes,Partially,No,NA';
+    PRINT 'Added AnswerOptions column to OE_InspectionItems';
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('OE_InspectionItems') AND name = 'Criteria')
+BEGIN
+    ALTER TABLE OE_InspectionItems ADD Criteria NVARCHAR(MAX);
+    PRINT 'Added Criteria column to OE_InspectionItems';
+END
+GO
+
+PRINT '';
+PRINT '=====================================================';
+PRINT 'OE Inspection Module additional tables created!';
+PRINT '=====================================================';
+GO

@@ -549,7 +549,8 @@
                     documentNumber: docResult.documentNumber,
                     inspectionDate: document.getElementById('auditDate').value,
                     inspectors: document.getElementById('auditors').value,
-                    accompaniedBy: document.getElementById('accompaniedBy').value
+                    accompaniedBy: document.getElementById('accompaniedBy').value,
+                    templateId: selectedStore.templateId || null
                 };
                 
                 const response = await fetch('/oe-inspection/api/inspections', {

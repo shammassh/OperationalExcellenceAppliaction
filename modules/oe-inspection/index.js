@@ -8,6 +8,7 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const sql = require('mssql');
+const fs = require('fs');
 
 // Database config
 const dbConfig = {
@@ -200,6 +201,18 @@ router.get('/', async (req, res) => {
                             <div class="card-title">Template Builder</div>
                             <div class="card-desc">Create and manage inspection templates with sections and questions.</div>
                         </a>
+                        
+                        <a href="/oe-inspection/store-management" class="card">
+                            <div class="card-icon">🏪</div>
+                            <div class="card-title">Store Management</div>
+                            <div class="card-desc">Add, edit, and manage stores. Assign store managers.</div>
+                        </a>
+                        
+                        <a href="/oe-inspection/department-reports" class="card">
+                            <div class="card-icon">📋</div>
+                            <div class="card-title">Department Reports</div>
+                            <div class="card-desc">View reports filtered by department (Maintenance, Procurement, Cleaning).</div>
+                        </a>
                     </div>
                 </div>
             </body>
@@ -250,6 +263,133 @@ router.get('/template-builder', (req, res) => {
     res.sendFile(path.join(__dirname, 'pages', 'template-builder.html'));
 });
 
+// Store Management Page
+router.get('/store-management', (req, res) => {
+    res.sendFile(path.join(__dirname, 'pages', 'store-management.html'));
+});
+
+// Department Reports Page
+router.get('/department-reports', (req, res) => {
+    res.sendFile(path.join(__dirname, 'pages', 'department-reports.html'));
+});
+
+// ==========================================
+// Department Reports API Routes
+// ==========================================
+
+// Get department reports list
+router.get('/api/department-reports/list/:department', async (req, res) => {
+    try {
+        const { department } = req.params;
+        const pool = await sql.connect(dbConfig);
+        
+        // Get all completed inspections with department-specific action items
+        const result = await pool.request()
+            .input('department', sql.NVarChar, department)
+            .query(`
+                SELECT DISTINCT 
+                    i.Id as reportId,
+                    i.DocumentNumber as documentNumber,
+                    i.StoreName as storeName,
+                    i.InspectionDate as auditDate,
+                    i.ReportGeneratedAt as generatedAt,
+                    i.Inspectors as generatedBy,
+                    (SELECT COUNT(*) FROM OE_InspectionItems it 
+                     WHERE it.InspectionId = i.Id AND it.Department = @department) as totalItems,
+                    (SELECT COUNT(*) FROM OE_InspectionItems it 
+                     WHERE it.InspectionId = i.Id AND it.Department = @department AND it.Priority = 'High') as highPriority,
+                    (SELECT COUNT(*) FROM OE_InspectionItems it 
+                     WHERE it.InspectionId = i.Id AND it.Department = @department AND it.Priority = 'Medium') as mediumPriority,
+                    (SELECT COUNT(*) FROM OE_InspectionItems it 
+                     WHERE it.InspectionId = i.Id AND it.Department = @department AND it.Priority = 'Low') as lowPriority
+                FROM OE_Inspections i
+                WHERE EXISTS (
+                    SELECT 1 FROM OE_InspectionItems it 
+                    WHERE it.InspectionId = i.Id AND it.Department = @department
+                )
+                ORDER BY i.InspectionDate DESC
+            `);
+        
+        res.json({ success: true, data: result.recordset });
+    } catch (error) {
+        console.error('Error fetching department reports:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get department report details
+router.get('/api/department-reports/view/:reportId', async (req, res) => {
+    try {
+        const { reportId } = req.params;
+        const department = req.query.department || 'Maintenance';
+        const pool = await sql.connect(dbConfig);
+        
+        // Get audit info
+        const auditResult = await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .query(`SELECT * FROM OE_Inspections WHERE Id = @reportId`);
+        
+        if (auditResult.recordset.length === 0) {
+            return res.status(404).json({ success: false, error: 'Report not found' });
+        }
+        
+        const audit = auditResult.recordset[0];
+        
+        // Get department-specific items
+        const itemsResult = await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .input('department', sql.NVarChar, department)
+            .query(`
+                SELECT * FROM OE_InspectionItems 
+                WHERE InspectionId = @reportId AND Department = @department
+                ORDER BY SectionOrder, ItemOrder
+            `);
+        
+        const items = itemsResult.recordset.map(item => ({
+            referenceValue: item.ReferenceValue || '',
+            section: item.SectionName || '',
+            title: item.Question || '',
+            finding: item.Finding || '',
+            correctiveAction: item.CorrectedAction || '',
+            priority: item.Priority || 'Medium',
+            pictures: [] // TODO: Add pictures support
+        }));
+        
+        // Calculate priority counts
+        const highCount = items.filter(i => i.priority === 'High').length;
+        const mediumCount = items.filter(i => i.priority === 'Medium').length;
+        const lowCount = items.filter(i => i.priority === 'Low').length;
+        
+        // Build report data structure matching expected format
+        const reportData = {
+            department,
+            departmentDisplayName: department,
+            audit: {
+                documentNumber: audit.DocumentNumber || '',
+                storeName: audit.StoreName || '',
+                storeCode: audit.StoreId || '',
+                auditDate: audit.InspectionDate,
+                cycle: audit.Cycle || 'C1',
+                year: audit.Year || new Date().getFullYear(),
+                auditors: audit.Inspectors || ''
+            },
+            items,
+            totalItems: items.length,
+            byPriority: {
+                high: highCount,
+                medium: mediumCount,
+                low: lowCount
+            },
+            generatedAt: new Date().toISOString()
+        };
+        
+        res.json({ success: true, data: { reportData } });
+    } catch (error) {
+        console.error('Error fetching department report:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // ==========================================
 // Template Builder API Routes
 // ==========================================
@@ -286,7 +426,7 @@ router.post('/api/templates/schemas', async (req, res) => {
         const result = await pool.request()
             .input('name', sql.NVarChar, schemaName)
             .input('desc', sql.NVarChar, description || '')
-            .input('createdBy', sql.NVarChar, req.currentUser?.email || 'System')
+            .input('createdBy', sql.Int, req.currentUser?.id || 1)
             .query(`
                 INSERT INTO OE_InspectionTemplates (TemplateName, Description, CreatedBy, CreatedAt, IsActive)
                 OUTPUT INSERTED.Id as schemaId
@@ -439,7 +579,7 @@ router.get('/api/templates/sections/:sectionId/items', async (req, res) => {
         const result = await pool.request()
             .input('sectionId', sql.Int, req.params.sectionId)
             .query(`
-                SELECT Id as itemId, ReferenceValue as referenceValue, Title as title, Coeff as coeff, Answer as answer, CR as cr
+                SELECT Id as itemId, ReferenceValue as referenceValue, Question as title, Coefficient as coeff, AnswerOptions as answer, Criteria as cr
                 FROM OE_InspectionTemplateItems
                 WHERE SectionId = @sectionId AND IsActive = 1
                 ORDER BY ReferenceValue
@@ -460,14 +600,14 @@ router.post('/api/templates/sections/:sectionId/items', async (req, res) => {
         const result = await pool.request()
             .input('sectionId', sql.Int, req.params.sectionId)
             .input('ref', sql.NVarChar, referenceValue)
-            .input('title', sql.NVarChar, title)
-            .input('coeff', sql.Int, coeff || 2)
+            .input('question', sql.NVarChar, title)
+            .input('coeff', sql.Decimal(5,2), coeff || 2)
             .input('answer', sql.NVarChar, answer || 'Yes,Partially,No,NA')
-            .input('cr', sql.NVarChar, cr || '')
+            .input('criteria', sql.NVarChar, cr || '')
             .query(`
-                INSERT INTO OE_InspectionTemplateItems (SectionId, ReferenceValue, Title, Coeff, Answer, CR, IsActive)
+                INSERT INTO OE_InspectionTemplateItems (SectionId, ReferenceValue, Question, Coefficient, AnswerOptions, Criteria, IsActive)
                 OUTPUT INSERTED.Id as itemId
-                VALUES (@sectionId, @ref, @title, @coeff, @answer, @cr, 1)
+                VALUES (@sectionId, @ref, @question, @coeff, @answer, @criteria, 1)
             `);
         await pool.close();
         res.json({ success: true, data: { itemId: result.recordset[0].itemId } });
@@ -507,11 +647,11 @@ router.post('/api/templates/sections/:sectionId/items/bulk', async (req, res) =>
             await pool.request()
                 .input('sectionId', sql.Int, sectionId)
                 .input('ref', sql.NVarChar, item.referenceValue)
-                .input('title', sql.NVarChar, item.title)
+                .input('question', sql.NVarChar, item.title)
                 .input('coeff', sql.Int, item.coeff || 2)
                 .input('answer', sql.NVarChar, item.answer || 'Yes,Partially,No,NA')
-                .input('cr', sql.NVarChar, item.cr || '')
-                .query(`INSERT INTO OE_InspectionTemplateItems (SectionId, ReferenceValue, Title, Coeff, Answer, CR, IsActive) VALUES (@sectionId, @ref, @title, @coeff, @answer, @cr, 1)`);
+                .input('criteria', sql.NVarChar, item.cr || '')
+                .query(`INSERT INTO OE_InspectionTemplateItems (SectionId, ReferenceValue, Question, Coefficient, AnswerOptions, Criteria, IsActive) VALUES (@sectionId, @ref, @question, @coeff, @answer, @criteria, 1)`);
             created++;
             existingRefs.add(refLower);
         }
@@ -532,11 +672,11 @@ router.put('/api/templates/items/:itemId', async (req, res) => {
         await pool.request()
             .input('id', sql.Int, req.params.itemId)
             .input('ref', sql.NVarChar, referenceValue)
-            .input('title', sql.NVarChar, title)
+            .input('question', sql.NVarChar, title)
             .input('coeff', sql.Int, coeff || 2)
             .input('answer', sql.NVarChar, answer || 'Yes,Partially,No,NA')
-            .input('cr', sql.NVarChar, cr || '')
-            .query(`UPDATE OE_InspectionTemplateItems SET ReferenceValue = @ref, Title = @title, Coeff = @coeff, Answer = @answer, CR = @cr WHERE Id = @id`);
+            .input('criteria', sql.NVarChar, cr || '')
+            .query(`UPDATE OE_InspectionTemplateItems SET ReferenceValue = @ref, Question = @question, Coefficient = @coeff, AnswerOptions = @answer, Criteria = @criteria WHERE Id = @id`);
         await pool.close();
         res.json({ success: true });
     } catch (error) {
@@ -571,6 +711,196 @@ router.delete('/api/templates/sections/:sectionId/items/all', async (req, res) =
         res.json({ success: true, data: { deleted: result.recordset[0].deleted } });
     } catch (error) {
         console.error('Error deleting items:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// ==========================================
+// Store Management Routes
+// ==========================================
+
+// Get all stores
+router.get('/api/stores', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request().query(`
+            SELECT 
+                s.Id as storeId,
+                s.StoreCode as storeCode,
+                s.StoreName as storeName,
+                s.Location as location,
+                s.TemplateId as templateId,
+                t.TemplateName as templateName,
+                s.IsActive as isActive,
+                s.CreatedDate as createdDate
+            FROM Stores s
+            LEFT JOIN OE_InspectionTemplates t ON s.TemplateId = t.Id
+            ORDER BY s.StoreName
+        `);
+        await pool.close();
+        res.json({ success: true, data: result.recordset });
+    } catch (error) {
+        console.error('Error fetching stores:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Create store
+router.post('/api/stores', async (req, res) => {
+    try {
+        const { storeCode, storeName, location, templateId } = req.body;
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request()
+            .input('code', sql.NVarChar, storeCode)
+            .input('name', sql.NVarChar, storeName)
+            .input('location', sql.NVarChar, location || null)
+            .input('templateId', sql.Int, templateId || null)
+            .input('createdBy', sql.NVarChar, req.currentUser?.email || 'System')
+            .query(`
+                INSERT INTO Stores (StoreCode, StoreName, Location, TemplateId, IsActive, CreatedDate, CreatedBy)
+                OUTPUT INSERTED.Id as storeId
+                VALUES (@code, @name, @location, @templateId, 1, GETDATE(), @createdBy)
+            `);
+        await pool.close();
+        res.json({ success: true, data: { storeId: result.recordset[0].storeId } });
+    } catch (error) {
+        console.error('Error creating store:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Update store
+router.put('/api/stores/:storeId', async (req, res) => {
+    try {
+        const { storeCode, storeName, location, templateId, isActive } = req.body;
+        const pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('id', sql.Int, req.params.storeId)
+            .input('code', sql.NVarChar, storeCode)
+            .input('name', sql.NVarChar, storeName)
+            .input('location', sql.NVarChar, location || null)
+            .input('templateId', sql.Int, templateId || null)
+            .input('isActive', sql.Bit, isActive)
+            .query(`
+                UPDATE Stores 
+                SET StoreCode = @code, StoreName = @name, Location = @location, 
+                    TemplateId = @templateId, IsActive = @isActive
+                WHERE Id = @id
+            `);
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating store:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Delete store
+router.delete('/api/stores/:storeId', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('id', sql.Int, req.params.storeId)
+            .query(`DELETE FROM Stores WHERE Id = @id`);
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting store:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Get available managers (users with Store Manager role)
+router.get('/api/stores/available-managers', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request().query(`
+            SELECT 
+                u.Id as userId,
+                u.Email as email,
+                u.DisplayName as displayName,
+                r.RoleName as role
+            FROM Users u
+            JOIN UserRoles r ON u.RoleId = r.Id
+            WHERE u.IsActive = 1 AND u.IsApproved = 1
+            AND r.RoleName IN ('Store Manager', 'Duty Manager', 'Area Manager')
+            ORDER BY u.DisplayName
+        `);
+        await pool.close();
+        res.json({ success: true, data: result.recordset });
+    } catch (error) {
+        console.error('Error fetching available managers:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Get manager assignments (grouped by store)
+router.get('/api/stores/manager-assignments', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request().query(`
+            SELECT 
+                sma.StoreId as storeId,
+                sma.UserId as userId,
+                sma.IsPrimary as isPrimary,
+                u.Email as email,
+                u.DisplayName as displayName
+            FROM StoreManagerAssignments sma
+            JOIN Users u ON sma.UserId = u.Id
+            ORDER BY sma.StoreId, sma.IsPrimary DESC
+        `);
+        await pool.close();
+        
+        // Group by storeId
+        const assignments = {};
+        result.recordset.forEach(row => {
+            if (!assignments[row.storeId]) {
+                assignments[row.storeId] = [];
+            }
+            assignments[row.storeId].push({
+                userId: row.userId,
+                email: row.email,
+                displayName: row.displayName,
+                isPrimary: row.isPrimary
+            });
+        });
+        
+        res.json({ success: true, data: assignments });
+    } catch (error) {
+        console.error('Error fetching manager assignments:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Assign managers to store
+router.post('/api/stores/:storeId/managers', async (req, res) => {
+    try {
+        const { userIds } = req.body;
+        const storeId = parseInt(req.params.storeId);
+        const pool = await sql.connect(dbConfig);
+        
+        // Remove existing assignments
+        await pool.request()
+            .input('storeId', sql.Int, storeId)
+            .query(`DELETE FROM StoreManagerAssignments WHERE StoreId = @storeId`);
+        
+        // Add new assignments
+        for (let i = 0; i < userIds.length; i++) {
+            await pool.request()
+                .input('storeId', sql.Int, storeId)
+                .input('userId', sql.Int, userIds[i])
+                .input('isPrimary', sql.Bit, i === 0) // First one is primary
+                .input('assignedBy', sql.Int, req.currentUser?.id || null)
+                .query(`
+                    INSERT INTO StoreManagerAssignments (StoreId, UserId, IsPrimary, AssignedAt, AssignedBy)
+                    VALUES (@storeId, @userId, @isPrimary, GETDATE(), @assignedBy)
+                `);
+        }
+        
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error assigning managers:', error);
         res.json({ success: false, error: error.message });
     }
 });
@@ -657,11 +987,11 @@ router.get('/api/next-document-number', async (req, res) => {
         `);
         const prefix = prefixResult.recordset[0]?.SettingValue || 'GMRL-OEI';
         
-        // Get max document number
+        // Get max document number - extract number after last hyphen
         const maxResult = await pool.request()
             .input('prefix', sql.NVarChar, prefix + '-%')
             .query(`
-                SELECT MAX(CAST(SUBSTRING(DocumentNumber, LEN(@prefix), 10) AS INT)) as maxNum
+                SELECT MAX(CAST(RIGHT(DocumentNumber, 4) AS INT)) as maxNum
                 FROM OE_Inspections
                 WHERE DocumentNumber LIKE @prefix
             `);
@@ -680,11 +1010,12 @@ router.get('/api/next-document-number', async (req, res) => {
 // Start new inspection
 router.post('/api/inspections', async (req, res) => {
     try {
-        const { storeId, storeName, documentNumber, inspectionDate, inspectors, accompaniedBy } = req.body;
+        const { storeId, storeName, documentNumber, inspectionDate, inspectors, accompaniedBy, templateId } = req.body;
         const userId = req.currentUser?.id || 1;
         
         const pool = await sql.connect(dbConfig);
         
+        // Create the inspection
         const result = await pool.request()
             .input('documentNumber', sql.NVarChar, documentNumber)
             .input('storeId', sql.Int, storeId)
@@ -700,6 +1031,71 @@ router.post('/api/inspections', async (req, res) => {
             `);
         
         const inspectionId = result.recordset[0].Id;
+        
+        // Get template ID (use provided or get default)
+        let useTemplateId = templateId;
+        if (!useTemplateId) {
+            const defaultTemplate = await pool.request().query(`
+                SELECT TOP 1 Id FROM OE_InspectionTemplates WHERE IsDefault = 1 AND IsActive = 1
+            `);
+            useTemplateId = defaultTemplate.recordset[0]?.Id;
+        }
+        
+        if (useTemplateId) {
+            // Copy sections from template
+            const templateSections = await pool.request()
+                .input('templateId', sql.Int, useTemplateId)
+                .query(`
+                    SELECT Id, SectionName, SectionIcon, SectionOrder, PassingGrade
+                    FROM OE_InspectionTemplateSections
+                    WHERE TemplateId = @templateId AND IsActive = 1
+                    ORDER BY SectionOrder
+                `);
+            
+            for (const section of templateSections.recordset) {
+                // Insert section
+                const sectionResult = await pool.request()
+                    .input('inspectionId', sql.Int, inspectionId)
+                    .input('sectionName', sql.NVarChar, section.SectionName)
+                    .input('sectionIcon', sql.NVarChar, section.SectionIcon)
+                    .input('sectionOrder', sql.Int, section.SectionOrder)
+                    .query(`
+                        INSERT INTO OE_InspectionSections (InspectionId, SectionName, SectionIcon, SectionOrder)
+                        OUTPUT INSERTED.Id
+                        VALUES (@inspectionId, @sectionName, @sectionIcon, @sectionOrder)
+                    `);
+                
+                // Copy items for this section
+                const templateItems = await pool.request()
+                    .input('sectionId', sql.Int, section.Id)
+                    .query(`
+                        SELECT ReferenceValue, Question, Coefficient, AnswerOptions, Criteria, ItemOrder
+                        FROM OE_InspectionTemplateItems
+                        WHERE SectionId = @sectionId AND IsActive = 1
+                        ORDER BY ItemOrder
+                    `);
+                
+                for (const item of templateItems.recordset) {
+                    await pool.request()
+                        .input('inspectionId', sql.Int, inspectionId)
+                        .input('sectionName', sql.NVarChar, section.SectionName)
+                        .input('sectionOrder', sql.Int, section.SectionOrder)
+                        .input('itemOrder', sql.Int, item.ItemOrder)
+                        .input('referenceValue', sql.NVarChar, item.ReferenceValue)
+                        .input('question', sql.NVarChar, item.Question)
+                        .input('coefficient', sql.Decimal(5,2), item.Coefficient || 1)
+                        .input('answerOptions', sql.NVarChar, item.AnswerOptions || 'Yes,Partially,No,NA')
+                        .input('criteria', sql.NVarChar, item.Criteria)
+                        .query(`
+                            INSERT INTO OE_InspectionItems 
+                                (InspectionId, SectionName, SectionOrder, ItemOrder, ReferenceValue, Question, Coefficient, AnswerOptions, Criteria)
+                            VALUES 
+                                (@inspectionId, @sectionName, @sectionOrder, @itemOrder, @referenceValue, @question, @coefficient, @answerOptions, @criteria)
+                        `);
+                }
+            }
+        }
+        
         await pool.close();
         
         res.json({ success: true, data: { id: inspectionId, documentNumber } });
@@ -896,6 +1292,1051 @@ router.get('/api/stats', async (req, res) => {
         res.json({ success: true, data: stats.recordset[0] });
     } catch (error) {
         res.json({ success: true, data: { total: 0, drafts: 0, completed: 0, today: 0 } });
+    }
+});
+
+// ==========================================
+// Audit API Routes (for audit-list.html compatibility)
+// ==========================================
+
+// Get all audits for list view
+router.get('/api/audits/list', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request().query(`
+            SELECT 
+                i.Id as AuditID,
+                i.DocumentNumber,
+                i.StoreId,
+                i.StoreName,
+                i.InspectionDate as AuditDate,
+                i.Inspectors as Auditors,
+                i.AccompaniedBy,
+                i.Cycle as AuditCycle,
+                i.Year as AuditYear,
+                i.Status,
+                i.Score as TotalScore,
+                i.TotalPoints,
+                i.MaxPoints,
+                i.Comments,
+                i.CreatedAt,
+                i.CompletedAt,
+                i.TimeIn,
+                i.TimeOut,
+                u.DisplayName as CreatedByName,
+                t.TemplateName as SchemaName,
+                ISNULL(s.SettingValue, '83') as PassingGrade
+            FROM OE_Inspections i
+            LEFT JOIN Users u ON i.CreatedBy = u.Id
+            LEFT JOIN OE_InspectionTemplates t ON t.IsDefault = 1 AND t.IsActive = 1
+            LEFT JOIN OE_InspectionSettings s ON s.SettingKey = 'PASSING_SCORE'
+            ORDER BY i.CreatedAt DESC
+        `);
+        await pool.close();
+        res.json({ success: true, audits: result.recordset });
+    } catch (error) {
+        console.error('Error fetching audits list:', error);
+        res.json({ success: false, audits: [], error: error.message });
+    }
+});
+
+// Get single audit
+router.get('/api/audits/:auditId', async (req, res) => {
+    try {
+        const { auditId } = req.params;
+        const pool = await sql.connect(dbConfig);
+        
+        // Get audit details
+        const auditResult = await pool.request()
+            .input('id', sql.Int, auditId)
+            .query(`
+                SELECT 
+                    i.Id, i.DocumentNumber, i.StoreId, i.StoreName, i.InspectionDate,
+                    i.TimeIn, i.TimeOut, i.Inspectors, i.AccompaniedBy, i.Cycle, i.Year,
+                    i.Status, i.Score, i.TotalPoints, i.MaxPoints, i.Comments,
+                    i.CreatedBy, i.CreatedAt, i.UpdatedAt, i.CompletedAt, i.ApprovedBy, i.ApprovedAt,
+                    COALESCE(i.TemplateId, t.Id) as TemplateId,
+                    t.TemplateName
+                FROM OE_Inspections i
+                LEFT JOIN OE_InspectionTemplates t ON t.IsDefault = 1 AND t.IsActive = 1
+                WHERE i.Id = @id
+            `);
+        
+        if (auditResult.recordset.length === 0) {
+            await pool.close();
+            return res.status(404).json({ success: false, error: 'Audit not found' });
+        }
+        
+        const audit = auditResult.recordset[0];
+        
+        // Check if sections exist
+        let sectionsResult = await pool.request()
+            .input('inspectionId', sql.Int, auditId)
+            .query(`
+                SELECT 
+                    s.Id as sectionId,
+                    s.SectionName as sectionName,
+                    s.SectionOrder as sectionNumber,
+                    s.SectionIcon as sectionIcon,
+                    s.Score as sectionScore,
+                    s.TotalPoints as totalPoints,
+                    s.MaxPoints as maxPoints
+                FROM OE_InspectionSections s
+                WHERE s.InspectionId = @inspectionId
+                ORDER BY s.SectionOrder
+            `);
+        
+        // If no sections exist, populate from template
+        const templateId = audit.TemplateId ? parseInt(audit.TemplateId) : null;
+        if (sectionsResult.recordset.length === 0 && templateId) {
+            // Get template sections
+            const templateSections = await pool.request()
+                .input('templateId', sql.Int, templateId)
+                .query(`
+                    SELECT Id, SectionName, SectionIcon, SectionOrder, PassingGrade
+                    FROM OE_InspectionTemplateSections
+                    WHERE TemplateId = @templateId AND IsActive = 1
+                    ORDER BY SectionOrder
+                `);
+            
+            for (const section of templateSections.recordset) {
+                // Insert section
+                await pool.request()
+                    .input('inspectionId', sql.Int, auditId)
+                    .input('sectionName', sql.NVarChar, section.SectionName)
+                    .input('sectionIcon', sql.NVarChar, section.SectionIcon)
+                    .input('sectionOrder', sql.Int, section.SectionOrder)
+                    .query(`
+                        INSERT INTO OE_InspectionSections (InspectionId, SectionName, SectionIcon, SectionOrder)
+                        VALUES (@inspectionId, @sectionName, @sectionIcon, @sectionOrder)
+                    `);
+                
+                // Copy items for this section
+                const templateItems = await pool.request()
+                    .input('sectionId', sql.Int, section.Id)
+                    .query(`
+                        SELECT ReferenceValue, Question, Coefficient, AnswerOptions, Criteria, ItemOrder
+                        FROM OE_InspectionTemplateItems
+                        WHERE SectionId = @sectionId AND IsActive = 1
+                        ORDER BY ItemOrder
+                    `);
+                
+                for (const item of templateItems.recordset) {
+                    await pool.request()
+                        .input('inspectionId', sql.Int, auditId)
+                        .input('sectionName', sql.NVarChar, section.SectionName)
+                        .input('sectionOrder', sql.Int, section.SectionOrder)
+                        .input('itemOrder', sql.Int, item.ItemOrder)
+                        .input('referenceValue', sql.NVarChar, item.ReferenceValue)
+                        .input('question', sql.NVarChar, item.Question)
+                        .input('coefficient', sql.Decimal(5,2), item.Coefficient || 1)
+                        .input('answerOptions', sql.NVarChar, item.AnswerOptions || 'Yes,Partially,No,NA')
+                        .input('criteria', sql.NVarChar, item.Criteria)
+                        .query(`
+                            INSERT INTO OE_InspectionItems 
+                                (InspectionId, SectionName, SectionOrder, ItemOrder, ReferenceValue, Question, Coefficient, AnswerOptions, Criteria)
+                            VALUES 
+                                (@inspectionId, @sectionName, @sectionOrder, @itemOrder, @referenceValue, @question, @coefficient, @answerOptions, @criteria)
+                        `);
+                }
+            }
+            
+            // Re-fetch sections
+            sectionsResult = await pool.request()
+                .input('inspectionId', sql.Int, auditId)
+                .query(`
+                    SELECT 
+                        s.Id as sectionId,
+                        s.SectionName as sectionName,
+                        s.SectionOrder as sectionNumber,
+                        s.SectionIcon as sectionIcon,
+                        s.Score as sectionScore,
+                        s.TotalPoints as totalPoints,
+                        s.MaxPoints as maxPoints
+                    FROM OE_InspectionSections s
+                    WHERE s.InspectionId = @inspectionId
+                    ORDER BY s.SectionOrder
+                `);
+        }
+        
+        // Get items for each section
+        const sections = [];
+        for (const section of sectionsResult.recordset) {
+            const itemsResult = await pool.request()
+                .input('inspectionId', sql.Int, auditId)
+                .input('sectionName', sql.NVarChar, section.sectionName)
+                .query(`
+                    SELECT 
+                        Id as responseId,
+                        ReferenceValue as referenceValue,
+                        Question as title,
+                        Coefficient as coeff,
+                        AnswerOptions as answerOptions,
+                        Answer as selectedChoice,
+                        Score as value,
+                        Finding as finding,
+                        Comment as comment,
+                        CorrectedAction as cr,
+                        Priority as priority,
+                        HasPicture as hasPicture,
+                        Escalate as escalate,
+                        Department as department,
+                        Criteria as criteria
+                    FROM OE_InspectionItems
+                    WHERE InspectionId = @inspectionId AND SectionName = @sectionName
+                    ORDER BY ItemOrder
+                `);
+            section.items = itemsResult.recordset;
+            sections.push(section);
+        }
+        
+        await pool.close();
+        res.json({ 
+            success: true, 
+            data: {
+                auditId: audit.Id,
+                documentNumber: audit.DocumentNumber,
+                storeId: audit.StoreId,
+                storeCode: audit.StoreName?.split(' - ')[0] || '',
+                storeName: audit.StoreName,
+                auditDate: audit.InspectionDate,
+                auditors: audit.Inspectors,
+                accompaniedBy: audit.AccompaniedBy,
+                cycle: audit.Cycle,
+                year: audit.Year,
+                status: audit.Status,
+                score: audit.Score,
+                templateId: audit.TemplateId,
+                templateName: audit.TemplateName,
+                sections
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching audit:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Delete audit
+router.delete('/api/audits/:auditId', async (req, res) => {
+    try {
+        const { auditId } = req.params;
+        const pool = await sql.connect(dbConfig);
+        
+        // Delete related records first
+        await pool.request()
+            .input('id', sql.Int, auditId)
+            .query(`DELETE FROM OE_FridgeReadings WHERE InspectionId = @id`);
+        
+        await pool.request()
+            .input('id', sql.Int, auditId)
+            .query(`DELETE FROM OE_InspectionActionItems WHERE InspectionId = @id`);
+        
+        await pool.request()
+            .input('id', sql.Int, auditId)
+            .query(`DELETE FROM OE_InspectionItems WHERE InspectionId = @id`);
+        
+        await pool.request()
+            .input('id', sql.Int, auditId)
+            .query(`DELETE FROM OE_InspectionSections WHERE InspectionId = @id`);
+        
+        // Finally delete the audit itself
+        const result = await pool.request()
+            .input('id', sql.Int, auditId)
+            .query(`DELETE FROM OE_Inspections WHERE Id = @id; SELECT @@ROWCOUNT as deleted`);
+        
+        await pool.close();
+        
+        if (result.recordset[0].deleted === 0) {
+            return res.status(404).json({ success: false, error: 'Audit not found' });
+        }
+        
+        res.json({ success: true, message: 'Audit deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting audit:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get published report for an audit
+router.get('/api/audits/:auditId/published-report', async (req, res) => {
+    try {
+        const { auditId } = req.params;
+        const fs = require('fs');
+        const reportsDir = path.join(__dirname, '..', '..', 'reports', 'oe-inspection');
+        
+        // Look for existing report files for this audit
+        if (fs.existsSync(reportsDir)) {
+            const files = fs.readdirSync(reportsDir);
+            const reportFile = files.find(f => f.includes(`audit-${auditId}`) && f.endsWith('.html'));
+            if (reportFile) {
+                return res.json({ success: true, fileName: reportFile });
+            }
+        }
+        
+        res.json({ success: false, message: 'No published report found' });
+    } catch (error) {
+        console.error('Error fetching published report:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Serve report files
+router.get('/api/audits/reports/:fileName', (req, res) => {
+    const { fileName } = req.params;
+    const reportsDir = path.join(__dirname, '..', '..', 'reports', 'oe-inspection');
+    const filePath = path.join(reportsDir, fileName);
+    
+    // Security check - prevent directory traversal
+    if (!filePath.startsWith(reportsDir)) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    const fs = require('fs');
+    if (fs.existsSync(filePath)) {
+        res.sendFile(filePath);
+    } else {
+        res.status(404).json({ error: 'Report not found' });
+    }
+});
+
+// Generate report for an audit
+router.post('/api/audits/:auditId/generate-report', async (req, res) => {
+    try {
+        const { auditId } = req.params;
+        const pool = await sql.connect(dbConfig);
+        
+        // 1. Get audit header
+        const auditResult = await pool.request()
+            .input('auditId', sql.Int, auditId)
+            .query(`
+                SELECT i.*, t.TemplateName, t.Description as TemplateDescription
+                FROM OE_Inspections i
+                LEFT JOIN OE_InspectionTemplates t ON i.TemplateId = t.Id
+                WHERE i.Id = @auditId
+            `);
+        
+        if (auditResult.recordset.length === 0) {
+            return res.status(404).json({ success: false, error: 'Audit not found' });
+        }
+        const audit = auditResult.recordset[0];
+        
+        // 2. Get all items for this audit
+        const itemsResult = await pool.request()
+            .input('auditId', sql.Int, auditId)
+            .query(`
+                SELECT * FROM OE_InspectionItems
+                WHERE InspectionId = @auditId
+                ORDER BY SectionOrder, ItemOrder
+            `);
+        
+        // 3. Group items by section and calculate scores
+        const sectionMap = new Map();
+        for (const item of itemsResult.recordset) {
+            const sectionName = item.SectionName || 'General';
+            if (!sectionMap.has(sectionName)) {
+                sectionMap.set(sectionName, {
+                    SectionName: sectionName,
+                    SectionOrder: item.SectionOrder || 0,
+                    items: [],
+                    earnedScore: 0,
+                    maxScore: 0
+                });
+            }
+            const section = sectionMap.get(sectionName);
+            section.items.push(item);
+            
+            // Calculate scores
+            if (item.Answer && item.Answer !== 'NA') {
+                section.maxScore += parseFloat(item.Coefficient || 0);
+                section.earnedScore += parseFloat(item.Score || 0);
+            }
+        }
+        
+        const sections = Array.from(sectionMap.values()).sort((a, b) => a.SectionOrder - b.SectionOrder);
+        
+        // 4. Get findings (non-compliant items)
+        const findings = itemsResult.recordset.filter(item => 
+            item.Answer === 'No' || item.Answer === 'Partially' || item.Finding
+        );
+        
+        // 5. Get fridge readings if any
+        const fridgeResult = await pool.request()
+            .input('auditId', sql.Int, auditId)
+            .query(`
+                SELECT * FROM OE_FridgeReadings 
+                WHERE InspectionId = @auditId
+                ORDER BY Id
+            `);
+        
+        // Calculate overall score
+        const totalEarned = sections.reduce((sum, s) => sum + s.earnedScore, 0);
+        const totalMax = sections.reduce((sum, s) => sum + s.maxScore, 0);
+        const overallScore = totalMax > 0 ? Math.round((totalEarned / totalMax) * 100) : 0;
+        
+        // Get settings for threshold
+        const settingsResult = await pool.request().query(`SELECT TOP 1 * FROM OE_InspectionSettings`);
+        const threshold = settingsResult.recordset[0]?.PassingGrade || 83;
+        
+        // Build report data
+        const reportData = {
+            audit,
+            sections: sections.map(s => ({
+                ...s,
+                Percentage: s.maxScore > 0 ? Math.round((s.earnedScore / s.maxScore) * 100) : 0
+            })),
+            findings,
+            fridgeReadings: fridgeResult.recordset,
+            overallScore,
+            threshold,
+            generatedAt: new Date().toISOString()
+        };
+        
+        // Generate HTML report
+        const html = generateReportHTML(reportData);
+        
+        // Save report to file
+        const reportsDir = path.join(__dirname, '..', '..', 'reports', 'oe-inspection');
+        if (!fs.existsSync(reportsDir)) {
+            fs.mkdirSync(reportsDir, { recursive: true });
+        }
+        
+        const fileName = `OE_Report_${audit.DocumentNumber}_${new Date().toISOString().split('T')[0]}.html`;
+        const filePath = path.join(reportsDir, fileName);
+        fs.writeFileSync(filePath, html, 'utf8');
+        
+        // Update audit with report info
+        await pool.request()
+            .input('auditId', sql.Int, auditId)
+            .input('fileName', sql.NVarChar, fileName)
+            .query(`UPDATE OE_Inspections SET ReportFileName = @fileName, ReportGeneratedAt = GETDATE() WHERE Id = @auditId`);
+        
+        console.log(`✅ Report generated: ${fileName}`);
+        res.json({ success: true, fileName, overallScore });
+        
+    } catch (error) {
+        console.error('Error generating report:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Helper function to generate HTML report
+function generateReportHTML(data) {
+    const { audit, sections, findings, pictures, fridgeReadings, overallScore, threshold, generatedAt } = data;
+    const passedClass = overallScore >= threshold ? 'pass' : 'fail';
+    const passedText = overallScore >= threshold ? 'PASS ✅' : 'FAIL ❌';
+    
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OE Inspection Report - ${audit.DocumentNumber}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f5f5f5; color: #333; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white; padding: 30px; border-radius: 12px; margin-bottom: 20px; }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .header-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
+        .header-item { background: rgba(255,255,255,0.1); padding: 10px 15px; border-radius: 8px; }
+        .header-item label { font-size: 12px; opacity: 0.8; display: block; }
+        .header-item span { font-size: 16px; font-weight: 600; }
+        .score-card { background: white; border-radius: 12px; padding: 30px; margin-bottom: 20px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .score-value { font-size: 72px; font-weight: bold; }
+        .score-value.pass { color: #10b981; }
+        .score-value.fail { color: #ef4444; }
+        .score-label { font-size: 24px; margin-top: 10px; }
+        .score-label.pass { color: #10b981; }
+        .score-label.fail { color: #ef4444; }
+        .section-card { background: white; border-radius: 12px; margin-bottom: 20px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .section-header { background: #f8fafc; padding: 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+        .section-title { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .section-score { font-size: 24px; font-weight: bold; }
+        .section-score.pass { color: #10b981; }
+        .section-score.fail { color: #ef4444; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background: #f8fafc; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748b; }
+        tr:hover { background: #f8fafc; }
+        .choice-yes { color: #10b981; font-weight: 600; }
+        .choice-no { color: #ef4444; font-weight: 600; }
+        .choice-partial { color: #f59e0b; font-weight: 600; }
+        .choice-na { color: #94a3b8; }
+        .findings-card { background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .findings-title { color: #dc2626; font-size: 20px; font-weight: 600; margin-bottom: 15px; }
+        .finding-item { background: white; border-radius: 8px; padding: 15px; margin-bottom: 10px; border-left: 4px solid #ef4444; }
+        .finding-ref { font-weight: 600; color: #1e40af; }
+        .finding-question { margin: 5px 0; }
+        .finding-detail { color: #64748b; font-size: 14px; }
+        .footer { text-align: center; padding: 20px; color: #64748b; font-size: 14px; }
+        @media print { body { background: white; } .container { max-width: 100%; padding: 0; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 OE Inspection Report</h1>
+            <div class="header-info">
+                <div class="header-item"><label>Document Number</label><span>${audit.DocumentNumber}</span></div>
+                <div class="header-item"><label>Store</label><span>${audit.StoreName}</span></div>
+                <div class="header-item"><label>Inspection Date</label><span>${new Date(audit.InspectionDate).toLocaleDateString()}</span></div>
+                <div class="header-item"><label>Inspectors</label><span>${audit.Inspectors || 'N/A'}</span></div>
+                <div class="header-item"><label>Accompanied By</label><span>${audit.AccompaniedBy || 'N/A'}</span></div>
+                <div class="header-item"><label>Status</label><span>${audit.Status}</span></div>
+            </div>
+        </div>
+        
+        <div class="score-card">
+            <div class="score-value ${passedClass}">${overallScore}%</div>
+            <div class="score-label ${passedClass}">${passedText}</div>
+            <div style="color: #64748b; margin-top: 10px;">Threshold: ${threshold}%</div>
+        </div>
+        
+        ${sections.map(section => `
+        <div class="section-card">
+            <div class="section-header">
+                <div class="section-title">${section.SectionIcon || '📋'} ${section.SectionName}</div>
+                <div class="section-score ${section.Percentage >= threshold ? 'pass' : 'fail'}">${section.Percentage}%</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Question</th>
+                        <th>Answer</th>
+                        <th>Score</th>
+                        <th>Finding</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${(section.items || []).map(item => `
+                    <tr>
+                        <td>${item.ReferenceValue || '-'}</td>
+                        <td>${item.Question || '-'}</td>
+                        <td class="${item.Answer === 'Yes' ? 'choice-yes' : item.Answer === 'No' ? 'choice-no' : item.Answer === 'Partially' ? 'choice-partial' : 'choice-na'}">${item.Answer || '-'}</td>
+                        <td>${item.Score ?? '-'} / ${item.Coefficient || 0}</td>
+                        <td>${item.Finding || '-'}</td>
+                    </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+        `).join('')}
+        
+        ${findings.length > 0 ? `
+        <div class="findings-card">
+            <div class="findings-title">⚠️ Findings Summary (${findings.length} items)</div>
+            ${findings.map(f => `
+            <div class="finding-item">
+                <div class="finding-ref">[${f.ReferenceValue || 'N/A'}] ${f.SectionName}</div>
+                <div class="finding-question">${f.Question}</div>
+                <div class="finding-detail">Answer: ${f.Answer} | Finding: ${f.Finding || 'N/A'}</div>
+            </div>
+            `).join('')}
+        </div>
+        ` : ''}
+        
+        ${fridgeReadings.length > 0 ? `
+        <div class="section-card">
+            <div class="section-header">
+                <div class="section-title">🌡️ Fridge Temperature Readings</div>
+            </div>
+            <table>
+                <thead>
+                    <tr><th>Unit</th><th>Display (°C)</th><th>Probe (°C)</th><th>Status</th><th>Issue</th></tr>
+                </thead>
+                <tbody>
+                    ${fridgeReadings.map(r => `
+                    <tr>
+                        <td>${r.UnitName || 'N/A'}</td>
+                        <td>${r.DisplayTemp ?? 'N/A'}</td>
+                        <td>${r.ProbeTemp ?? 'N/A'}</td>
+                        <td>${r.IsCompliant ? '✅ OK' : '❌ Issue'}</td>
+                        <td>${r.Issue || '-'}</td>
+                    </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+        ` : ''}
+        
+        <div class="footer">
+            Report generated on ${new Date(generatedAt).toLocaleString()}
+        </div>
+    </div>
+</body>
+</html>`;
+}
+
+// Get department report
+router.get('/api/audits/:auditId/department-report/:department', async (req, res) => {
+    try {
+        const { auditId, department } = req.params;
+        
+        const pool = await sql.connect(dbConfig);
+        
+        // Get audit info
+        const auditResult = await pool.request()
+            .input('auditId', sql.Int, auditId)
+            .query(`
+                SELECT i.*, s.StoreName 
+                FROM OE_Inspections i
+                LEFT JOIN Stores s ON i.StoreId = s.Id
+                WHERE i.Id = @auditId
+            `);
+        
+        if (auditResult.recordset.length === 0) {
+            await pool.close();
+            return res.status(404).json({ success: false, error: 'Audit not found' });
+        }
+        
+        const audit = auditResult.recordset[0];
+        
+        // Get items for this department with escalate flag
+        const itemsResult = await pool.request()
+            .input('inspectionId', sql.Int, auditId)
+            .input('department', sql.NVarChar, department)
+            .query(`
+                SELECT Id, SectionName, ReferenceValue, Question, Answer, Score, 
+                       Finding, Comment, CorrectedAction, Priority, Escalate, Department,
+                       HasPicture, PictureUrl
+                FROM OE_InspectionItems 
+                WHERE InspectionId = @inspectionId 
+                  AND Department = @department
+                  AND Escalate = 1
+                ORDER BY SectionOrder, ItemOrder
+            `);
+        
+        // Build items array (pictures stored as URLs, not separate table)
+        const items = itemsResult.recordset.map(item => ({
+            id: item.Id,
+            section: item.SectionName,
+            referenceValue: item.ReferenceValue || '-',
+            title: item.Question,
+            answer: item.Answer,
+            finding: item.Finding,
+            correctiveAction: item.CorrectedAction,
+            priority: item.Priority || 'Medium',
+            // PictureUrl may contain comma-separated URLs or JSON array
+            pictures: item.PictureUrl ? [{
+                fileName: 'picture',
+                contentType: 'image/jpeg',
+                pictureType: 'finding',
+                url: item.PictureUrl
+            }] : [],
+            goodPictures: [],
+            correctivePictures: []
+        }));
+        
+        await pool.close();
+        
+        // Calculate statistics
+        const byPriority = {
+            high: items.filter(i => i.priority === 'High').length,
+            medium: items.filter(i => i.priority === 'Medium').length,
+            low: items.filter(i => i.priority === 'Low').length
+        };
+        
+        const departmentDisplayNames = {
+            'Maintenance': 'Maintenance',
+            'Procurement': 'Procurement',
+            'Cleaning': 'Cleaning'
+        };
+        
+        res.json({
+            success: true,
+            data: {
+                department: department,
+                departmentDisplayName: departmentDisplayNames[department] || department,
+                audit: {
+                    id: audit.Id,
+                    documentNumber: audit.DocumentNumber,
+                    storeName: audit.StoreName,
+                    auditDate: audit.InspectionDate,
+                    cycle: audit.Cycle,
+                    year: audit.Year,
+                    auditors: audit.Auditors
+                },
+                items: items,
+                totalItems: items.length,
+                byPriority: byPriority
+            }
+        });
+    } catch (error) {
+        console.error('Error generating department report:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Update audit response item
+router.put('/api/audits/response/:responseId', async (req, res) => {
+    try {
+        const { responseId } = req.params;
+        const { selectedChoice, coeff, finding, comment, cr, priority, escalate, department } = req.body;
+        
+        const pool = await sql.connect(dbConfig);
+        
+        // First get current values to preserve unset fields
+        const currentResult = await pool.request()
+            .input('id', sql.Int, responseId)
+            .query(`SELECT Answer, Score, Finding, Comment, CorrectedAction, Priority, Escalate, Department FROM OE_InspectionItems WHERE Id = @id`);
+        
+        const current = currentResult.recordset[0] || {};
+        
+        // Calculate value based on choice
+        let value = 0;
+        const choice = selectedChoice !== undefined ? selectedChoice : current.Answer;
+        const coefficient = coeff !== undefined ? coeff : 1;
+        if (choice === 'Yes') value = coefficient;
+        else if (choice === 'Partially') value = coefficient * 0.5;
+        else if (choice === 'No' || choice === 'NA') value = 0;
+        
+        // Use provided values or keep existing
+        const finalEscalate = escalate !== undefined ? (escalate ? 1 : 0) : current.Escalate;
+        const finalDepartment = department !== undefined ? (department || null) : current.Department;
+        const finalFinding = finding !== undefined ? (finding || null) : current.Finding;
+        const finalComment = comment !== undefined ? (comment || null) : current.Comment;
+        const finalCr = cr !== undefined ? (cr || null) : current.CorrectedAction;
+        const finalPriority = priority !== undefined ? (priority || null) : current.Priority;
+        
+        await pool.request()
+            .input('id', sql.Int, responseId)
+            .input('selectedChoice', sql.NVarChar, choice || null)
+            .input('value', sql.Decimal(5,2), value)
+            .input('finding', sql.NVarChar, finalFinding)
+            .input('comment', sql.NVarChar, finalComment)
+            .input('cr', sql.NVarChar, finalCr)
+            .input('priority', sql.NVarChar, finalPriority)
+            .input('escalate', sql.Bit, finalEscalate)
+            .input('department', sql.NVarChar, finalDepartment)
+            .query(`
+                UPDATE OE_InspectionItems 
+                SET Answer = @selectedChoice,
+                    Score = @value,
+                    Finding = @finding,
+                    Comment = @comment,
+                    CorrectedAction = @cr,
+                    Priority = @priority,
+                    Escalate = @escalate,
+                    Department = @department
+                WHERE Id = @id
+            `);
+        
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating response:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Upload picture for audit item
+router.post('/api/audits/pictures', async (req, res) => {
+    try {
+        const { responseId, auditId, fileName, contentType, pictureType, fileData } = req.body;
+        
+        const pool = await sql.connect(dbConfig);
+        
+        const result = await pool.request()
+            .input('responseId', sql.Int, responseId)
+            .input('auditId', sql.Int, auditId)
+            .input('fileName', sql.NVarChar, fileName)
+            .input('contentType', sql.NVarChar, contentType)
+            .input('pictureType', sql.NVarChar, pictureType)
+            .input('fileData', sql.NVarChar(sql.MAX), fileData)
+            .query(`
+                INSERT INTO OE_InspectionPictures (ItemId, InspectionId, FileName, ContentType, PictureType, FileData, CreatedAt)
+                OUTPUT INSERTED.Id as pictureId
+                VALUES (@responseId, @auditId, @fileName, @contentType, @pictureType, @fileData, GETDATE())
+            `);
+        
+        // Update the item to mark it has picture
+        await pool.request()
+            .input('id', sql.Int, responseId)
+            .query(`UPDATE OE_InspectionItems SET HasPicture = 1 WHERE Id = @id`);
+        
+        await pool.close();
+        res.json({ success: true, data: { pictureId: result.recordset[0].pictureId } });
+    } catch (error) {
+        console.error('Error uploading picture:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get pictures for a response
+router.get('/api/audits/pictures/:responseId', async (req, res) => {
+    try {
+        const { responseId } = req.params;
+        const pool = await sql.connect(dbConfig);
+        
+        const result = await pool.request()
+            .input('responseId', sql.Int, responseId)
+            .query(`
+                SELECT Id as pictureId, FileName as fileName, ContentType as contentType, 
+                       PictureType as pictureType, FileData as fileData
+                FROM OE_InspectionPictures
+                WHERE ItemId = @responseId
+                ORDER BY CreatedAt
+            `);
+        
+        await pool.close();
+        res.json({ success: true, data: result.recordset });
+    } catch (error) {
+        console.error('Error fetching pictures:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Delete a picture
+router.delete('/api/audits/pictures/:pictureId', async (req, res) => {
+    try {
+        const { pictureId } = req.params;
+        const pool = await sql.connect(dbConfig);
+        
+        await pool.request()
+            .input('id', sql.Int, pictureId)
+            .query(`DELETE FROM OE_InspectionPictures WHERE Id = @id`);
+        
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting picture:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Complete audit
+router.post('/api/audits/:auditId/complete', async (req, res) => {
+    try {
+        const { auditId } = req.params;
+        const pool = await sql.connect(dbConfig);
+        
+        // Calculate total score
+        const scoreResult = await pool.request()
+            .input('auditId', sql.Int, auditId)
+            .query(`
+                SELECT 
+                    ISNULL(SUM(Score), 0) as totalPoints,
+                    ISNULL(SUM(Coefficient), 0) as maxPoints
+                FROM OE_InspectionItems
+                WHERE InspectionId = @auditId AND Answer IS NOT NULL AND Answer != 'NA'
+            `);
+        
+        const { totalPoints, maxPoints } = scoreResult.recordset[0];
+        const totalScore = maxPoints > 0 ? (totalPoints / maxPoints) * 100 : 0;
+        
+        // Update audit status
+        await pool.request()
+            .input('auditId', sql.Int, auditId)
+            .input('score', sql.Decimal(5,2), totalScore)
+            .input('totalPoints', sql.Decimal(10,2), totalPoints)
+            .input('maxPoints', sql.Decimal(10,2), maxPoints)
+            .query(`
+                UPDATE OE_Inspections 
+                SET Status = 'Completed', 
+                    Score = @score,
+                    TotalPoints = @totalPoints,
+                    MaxPoints = @maxPoints,
+                    CompletedAt = GETDATE(),
+                    UpdatedAt = GETDATE()
+                WHERE Id = @auditId
+            `);
+        
+        await pool.close();
+        res.json({ success: true, data: { totalScore } });
+    } catch (error) {
+        console.error('Error completing audit:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Save fridge readings
+router.post('/api/audits/:auditId/fridge-readings', async (req, res) => {
+    try {
+        const { auditId } = req.params;
+        const { documentNumber, goodReadings, badReadings, enabledSections } = req.body;
+        
+        const pool = await sql.connect(dbConfig);
+        
+        // Delete existing readings
+        await pool.request()
+            .input('auditId', sql.Int, auditId)
+            .query(`DELETE FROM OE_FridgeReadings WHERE InspectionId = @auditId`);
+        
+        // Insert good readings
+        for (const reading of (goodReadings || [])) {
+            await pool.request()
+                .input('auditId', sql.Int, auditId)
+                .input('documentNumber', sql.NVarChar, documentNumber)
+                .input('readingType', sql.NVarChar, 'Good')
+                .input('unitTemp', sql.NVarChar, reading.unit || null)
+                .input('displayTemp', sql.NVarChar, reading.display || null)
+                .input('probeTemp', sql.NVarChar, reading.probe || null)
+                .input('sectionName', sql.NVarChar, reading.sectionName || null)
+                .query(`
+                    INSERT INTO OE_FridgeReadings (InspectionId, DocumentNumber, ReadingType, UnitTemp, DisplayTemp, ProbeTemp, SectionName, CreatedAt)
+                    VALUES (@auditId, @documentNumber, @readingType, @unitTemp, @displayTemp, @probeTemp, @sectionName, GETDATE())
+                `);
+        }
+        
+        // Insert bad readings
+        for (const reading of (badReadings || [])) {
+            await pool.request()
+                .input('auditId', sql.Int, auditId)
+                .input('documentNumber', sql.NVarChar, documentNumber)
+                .input('readingType', sql.NVarChar, 'Bad')
+                .input('unitTemp', sql.NVarChar, reading.unit || null)
+                .input('displayTemp', sql.NVarChar, reading.display || null)
+                .input('probeTemp', sql.NVarChar, reading.probe || null)
+                .input('issue', sql.NVarChar, reading.issue || null)
+                .input('sectionName', sql.NVarChar, reading.sectionName || null)
+                .query(`
+                    INSERT INTO OE_FridgeReadings (InspectionId, DocumentNumber, ReadingType, UnitTemp, DisplayTemp, ProbeTemp, Issue, SectionName, CreatedAt)
+                    VALUES (@auditId, @documentNumber, @readingType, @unitTemp, @displayTemp, @probeTemp, @issue, @sectionName, GETDATE())
+                `);
+        }
+        
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error saving fridge readings:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get fridge readings
+router.get('/api/audits/:auditId/fridge-readings', async (req, res) => {
+    try {
+        const { auditId } = req.params;
+        const pool = await sql.connect(dbConfig);
+        
+        const result = await pool.request()
+            .input('auditId', sql.Int, auditId)
+            .query(`
+                SELECT Id, ReadingType, UnitTemp as unit, DisplayTemp as display, 
+                       ProbeTemp as probe, Issue as issue, SectionName as sectionName
+                FROM OE_FridgeReadings
+                WHERE InspectionId = @auditId
+                ORDER BY CreatedAt
+            `);
+        
+        await pool.close();
+        
+        const goodReadings = result.recordset.filter(r => r.ReadingType === 'Good');
+        const badReadings = result.recordset.filter(r => r.ReadingType === 'Bad');
+        
+        // Build enabledSections from the data
+        const enabledSections = {};
+        result.recordset.forEach(r => {
+            if (r.sectionName) enabledSections[r.sectionName] = true;
+        });
+        
+        res.json({ success: true, data: { goodReadings, badReadings, enabledSections } });
+    } catch (error) {
+        console.error('Error fetching fridge readings:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get action plan for a document
+router.get('/api/action-plan/:documentNumber', async (req, res) => {
+    try {
+        const { documentNumber } = req.params;
+        const pool = await sql.connect(dbConfig);
+        
+        const result = await pool.request()
+            .input('documentNumber', sql.NVarChar, documentNumber)
+            .query(`
+                SELECT 
+                    a.Id, a.ReferenceValue, a.SectionName, a.Finding, 
+                    a.SuggestedAction, a.Action, a.Responsible as PersonInCharge, 
+                    a.Deadline, a.Priority, a.Status, a.Department
+                FROM OE_InspectionActionItems a
+                INNER JOIN OE_Inspections i ON a.InspectionId = i.Id
+                WHERE i.DocumentNumber = @documentNumber
+                ORDER BY a.Priority DESC, a.ReferenceValue
+            `);
+        
+        await pool.close();
+        res.json({ success: true, actions: result.recordset });
+    } catch (error) {
+        console.error('Error fetching action plan:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Save action plan
+router.post('/api/action-plan/save', async (req, res) => {
+    try {
+        const { documentNumber, actions, updatedBy } = req.body;
+        const pool = await sql.connect(dbConfig);
+        
+        // Get the inspection ID
+        const inspResult = await pool.request()
+            .input('documentNumber', sql.NVarChar, documentNumber)
+            .query(`SELECT Id FROM OE_Inspections WHERE DocumentNumber = @documentNumber`);
+        
+        if (inspResult.recordset.length === 0) {
+            await pool.close();
+            return res.status(404).json({ success: false, error: 'Inspection not found' });
+        }
+        
+        const inspectionId = inspResult.recordset[0].Id;
+        
+        for (const action of (actions || [])) {
+            // Check if action exists
+            const existingResult = await pool.request()
+                .input('inspectionId', sql.Int, inspectionId)
+                .input('referenceValue', sql.NVarChar, action.referenceValue)
+                .query(`
+                    SELECT Id FROM OE_InspectionActionItems 
+                    WHERE InspectionId = @inspectionId AND ReferenceValue = @referenceValue
+                `);
+            
+            if (existingResult.recordset.length > 0) {
+                // Update existing
+                await pool.request()
+                    .input('id', sql.Int, existingResult.recordset[0].Id)
+                    .input('action', sql.NVarChar, action.action || null)
+                    .input('responsible', sql.NVarChar, action.personInCharge || null)
+                    .input('deadline', sql.Date, action.deadline || null)
+                    .input('status', sql.NVarChar, action.status || 'Open')
+                    .query(`
+                        UPDATE OE_InspectionActionItems 
+                        SET Action = @action, Responsible = @responsible, 
+                            Deadline = @deadline, Status = @status, UpdatedAt = GETDATE()
+                        WHERE Id = @id
+                    `);
+            } else {
+                // Insert new
+                await pool.request()
+                    .input('inspectionId', sql.Int, inspectionId)
+                    .input('referenceValue', sql.NVarChar, action.referenceValue)
+                    .input('sectionName', sql.NVarChar, action.section || null)
+                    .input('finding', sql.NVarChar, action.finding || null)
+                    .input('suggestedAction', sql.NVarChar, action.suggestedAction || null)
+                    .input('action', sql.NVarChar, action.action || null)
+                    .input('responsible', sql.NVarChar, action.personInCharge || null)
+                    .input('deadline', sql.Date, action.deadline || null)
+                    .input('priority', sql.NVarChar, action.priority || 'Medium')
+                    .input('status', sql.NVarChar, action.status || 'Open')
+                    .query(`
+                        INSERT INTO OE_InspectionActionItems 
+                            (InspectionId, ReferenceValue, SectionName, Finding, SuggestedAction, 
+                             Action, Responsible, Deadline, Priority, Status, CreatedAt)
+                        VALUES 
+                            (@inspectionId, @referenceValue, @sectionName, @finding, @suggestedAction,
+                             @action, @responsible, @deadline, @priority, @status, GETDATE())
+                    `);
+            }
+        }
+        
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error saving action plan:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 

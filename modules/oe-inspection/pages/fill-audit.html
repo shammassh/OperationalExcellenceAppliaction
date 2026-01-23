@@ -1672,9 +1672,9 @@
                 return parseInt(queryId);
             }
 
-            // Fallback to path params (legacy format: /fill-audit/X)
+            // Check path params for /oe-inspection/fill/X format
             const path = window.location.pathname;
-            const match = path.match(/\/auditor\/fill-audit\/(\d+)/);
+            const match = path.match(/\/oe-inspection\/fill\/(\d+)/) || path.match(/\/auditor\/fill-audit\/(\d+)/);
             return match ? parseInt(match[1]) : null;
         }
 
@@ -1730,12 +1730,26 @@
             document.querySelectorAll('.upload-area').forEach(area => {
                 area.style.display = 'none';
             });
+            
+            // Disable escalate checkboxes and department selects in readonly mode
+            document.querySelectorAll('.escalate-checkbox').forEach(checkbox => {
+                checkbox.disabled = true;
+            });
+            
+            document.querySelectorAll('.department-select').forEach(select => {
+                select.disabled = true;
+            });
+            
+            // Disable priority buttons
+            document.querySelectorAll('.priority-option').forEach(btn => {
+                btn.style.pointerEvents = 'none';
+            });
         }
 
         // Load audit data
         async function loadAuditData(auditId) {
             try {
-                const response = await fetch(`/api/audits/${auditId}`);
+                const response = await fetch(`/oe-inspection/api/audits/${auditId}`);
                 const result = await response.json();
 
                 if (!result.success) {
@@ -2042,7 +2056,7 @@
         async function updateCR(responseId, value) {
             try {
                 const item = findItem(responseId);
-                const response = await fetch(`/api/audits/response/${responseId}`, {
+                const response = await fetch(`/oe-inspection/api/audits/response/${responseId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
@@ -2068,7 +2082,7 @@
         // Select answer
         async function selectAnswer(responseId, choice, coeff) {
             try {
-                const response = await fetch(`/api/audits/response/${responseId}`, {
+                const response = await fetch(`/oe-inspection/api/audits/response/${responseId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ selectedChoice: choice, coeff })
@@ -2105,7 +2119,7 @@
                     [field]: value
                 };
 
-                const response = await fetch(`/api/audits/response/${responseId}`, {
+                const response = await fetch(`/oe-inspection/api/audits/response/${responseId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
@@ -2127,7 +2141,7 @@
         async function setPriority(responseId, priority) {
             try {
                 const item = findItem(responseId);
-                const response = await fetch(`/api/audits/response/${responseId}`, {
+                const response = await fetch(`/oe-inspection/api/audits/response/${responseId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
@@ -2154,7 +2168,7 @@
         async function toggleEscalate(responseId, checked) {
             try {
                 const item = findItem(responseId);
-                const response = await fetch(`/api/audits/response/${responseId}`, {
+                const response = await fetch(`/oe-inspection/api/audits/response/${responseId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
@@ -2192,12 +2206,13 @@
         async function setDepartment(responseId, department) {
             try {
                 const item = findItem(responseId);
-                const response = await fetch(`/api/audits/response/${responseId}`, {
+                const response = await fetch(`/oe-inspection/api/audits/response/${responseId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         selectedChoice: item.selectedChoice,
                         coeff: item.coeff,
+                        escalate: item.escalate,
                         department: department || null
                     })
                 });
@@ -2298,7 +2313,7 @@
                 reader.onload = async function(e) {
                     const base64 = e.target.result.split(',')[1];
                     
-                    const response = await fetch(`/api/audits/pictures`, {
+                    const response = await fetch(`/oe-inspection/api/audits/pictures`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -2361,7 +2376,7 @@
         // Load existing images for a response
         async function loadExistingImages(responseId) {
             try {
-                const response = await fetch(`/api/audits/pictures/${responseId}`);
+                const response = await fetch(`/oe-inspection/api/audits/pictures/${responseId}`);
                 const result = await response.json();
                 
                 const container = document.getElementById('existingImages');
@@ -2402,7 +2417,7 @@
             if (!confirm('Are you sure you want to delete this image?')) return;
             
             try {
-                const response = await fetch(`/api/audits/pictures/${pictureId}`, {
+                const response = await fetch(`/oe-inspection/api/audits/pictures/${pictureId}`, {
                     method: 'DELETE'
                 });
                 
@@ -2503,7 +2518,7 @@
             }
 
             try {
-                const response = await fetch(`/api/audits/${auditData.auditId}/complete`, {
+                const response = await fetch(`/oe-inspection/api/audits/${auditData.auditId}/complete`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -2881,7 +2896,7 @@
         async function saveFridgeReadingsToServer() {
             if (!auditData) return;
             
-            const response = await fetch(`/api/audits/${auditData.auditId}/fridge-readings`, {
+            const response = await fetch(`/oe-inspection/api/audits/${auditData.auditId}/fridge-readings`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -2905,7 +2920,7 @@
             if (!auditData) return;
             
             try {
-                const response = await fetch(`/api/audits/${auditData.auditId}/fridge-readings`);
+                const response = await fetch(`/oe-inspection/api/audits/${auditData.auditId}/fridge-readings`);
                 const result = await response.json();
                 
                 if (result.success) {

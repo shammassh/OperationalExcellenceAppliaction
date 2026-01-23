@@ -780,10 +780,11 @@
         let savedResponses = {};
 
         document.addEventListener('DOMContentLoaded', async () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const auditId = urlParams.get('id');
+            // Get audit ID from URL path (e.g., /oe-inspection/action-plan/16)
+            const pathParts = window.location.pathname.split('/');
+            const auditId = pathParts[pathParts.length - 1];
             
-            if (!auditId) {
+            if (!auditId || isNaN(auditId)) {
                 showError('No audit ID provided');
                 return;
             }
@@ -797,7 +798,7 @@
 
         async function loadAuditData(auditId) {
             try {
-                const response = await fetch(`/api/audits/${auditId}`);
+                const response = await fetch(`/oe-inspection/api/audits/${auditId}`);
                 const result = await response.json();
 
                 if (!result.success) {
@@ -823,7 +824,7 @@
 
         async function loadSavedResponses() {
             try {
-                const response = await fetch(`/api/action-plan/${auditData.documentNumber}`);
+                const response = await fetch(`/oe-inspection/api/action-plan/${auditData.documentNumber}`);
                 const result = await response.json();
                 
                 if (result.success && result.actions) {
@@ -1157,7 +1158,7 @@
                     pictures: item.pictures || []
                 }));
 
-                const response = await fetch('/api/action-plan/save', {
+                const response = await fetch('/oe-inspection/api/action-plan/save', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
