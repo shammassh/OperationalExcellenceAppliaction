@@ -11,6 +11,7 @@ const theftIncidentRoutes = require('./theft-incident/routes');
 const extraCleaningRoutes = require('./extra-cleaning/routes');
 const productionExtrasRoutes = require('./production-extras/routes');
 const weeklyFeedbackRoutes = require('./weekly-feedback/routes');
+const complaintRoutes = require('./complaint/routes');
 
 // Stores main page
 router.get('/', (req, res) => {
@@ -19,6 +20,7 @@ router.get('/', (req, res) => {
         { id: 'extra-cleaning', icon: '🧹', title: 'Extra Cleaning Agents Request', href: '/stores/extra-cleaning', desc: 'Request extra cleaning agents for your store', color: '#17a2b8' },
         { id: 'production-extras', icon: '👷', title: 'Production Extras Request', href: '/stores/production-extras', desc: 'Request extra production agents', color: '#667eea' },
         { id: 'weekly-feedback', icon: '📋', title: 'Weekly Third Party Feedback', href: '/stores/weekly-feedback', desc: 'Submit weekly feedback about third party services', color: '#6c5ce7' },
+        { id: 'complaint', icon: '📝', title: 'Complaint', href: '/stores/complaint', desc: 'Submit and track complaints', color: '#e17055' },
         // More forms will be added here
     ];
     
@@ -148,5 +150,6 @@ router.use('/theft-incident', theftIncidentRoutes);
 router.use('/extra-cleaning', extraCleaningRoutes);
 router.use('/production-extras', productionExtrasRoutes);
 router.use('/weekly-feedback', weeklyFeedbackRoutes);
+router.use('/complaint', complaintRoutes);
 
 module.exports = router;
