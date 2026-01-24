@@ -298,27 +298,6 @@ router.get('/', async (req, res) => {
                                 <div class="file-name" id="fileName"></div>
                             </div>
                             
-                            <div class="form-row-3">
-                                <div class="form-group">
-                                    <label>Transfer To <span class="required">*</span></label>
-                                    <select name="transferTo" id="transferTo" class="form-control" required>
-                                        <option value="">-- Select Department --</option>
-                                        ${categoryOptions}
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label>Due Date</label>
-                                    <input type="date" name="dueDate" class="form-control">
-                                </div>
-                                <div class="form-group">
-                                    <label>Escalate</label>
-                                    <div class="checkbox-group" style="height: 46px;">
-                                        <input type="checkbox" name="escalate" id="escalate" value="1">
-                                        <label for="escalate" style="margin: 0; font-weight: normal;">Mark as urgent/escalated</label>
-                                    </div>
-                                </div>
-                            </div>
-                            
                             <button type="submit" class="btn btn-primary">
                                 <span>📤</span> Submit Complaint
                             </button>
@@ -343,9 +322,6 @@ router.get('/', async (req, res) => {
                                 typeSelect.innerHTML += '<option value="' + type.id + '">' + type.name + '</option>';
                             });
                         }
-                        
-                        // Auto-select Transfer To based on category
-                        document.getElementById('transferTo').value = categoryId || '';
                     }
                     
                     function updateCases() {
@@ -387,7 +363,7 @@ router.get('/', async (req, res) => {
 // Submit complaint
 router.post('/submit', upload.single('attachment'), async (req, res) => {
     try {
-        const { storeId, categoryId, complaintTypeId, caseId, description, transferTo, dueDate, escalate } = req.body;
+        const { storeId, categoryId, complaintTypeId, caseId, description } = req.body;
         const userId = req.session?.user?.id || 1;
         
         const attachmentUrl = req.file ? '/uploads/complaints/' + req.file.filename : null;
@@ -411,11 +387,8 @@ router.post('/submit', upload.single('attachment'), async (req, res) => {
             .query('SELECT Name FROM ComplaintCases WHERE Id = @caseId');
         const caseName = caseResult.recordset[0]?.Name || '';
         
-        // Get transfer to name
-        const transferResult = await pool.request()
-            .input('transferId', sql.Int, transferTo)
-            .query('SELECT Name FROM ComplaintCategories WHERE Id = @transferId');
-        const transferName = transferResult.recordset[0]?.Name || '';
+        // TransferTo defaults to the category name (department handles based on category)
+        const transferName = categoryName;
         
         await pool.request()
             .input('storeId', sql.Int, storeId)
@@ -430,15 +403,13 @@ router.post('/submit', upload.single('attachment'), async (req, res) => {
             .input('attachmentUrl', sql.NVarChar, attachmentUrl)
             .input('attachmentName', sql.NVarChar, attachmentName)
             .input('transferTo', sql.NVarChar, transferName)
-            .input('dueDate', sql.Date, dueDate || null)
-            .input('escalate', sql.Bit, escalate ? 1 : 0)
             .input('status', sql.NVarChar, 'Open')
             .input('createdAt', sql.DateTime, new Date())
             .query(`
                 INSERT INTO Complaints (StoreId, CreatedBy, CategoryId, ComplaintTypeId, CaseId, Category, ComplaintType, CaseNumber, Description, 
-                    AttachmentUrl, AttachmentName, TransferTo, DueDate, Escalate, Status, CreatedAt)
+                    AttachmentUrl, AttachmentName, TransferTo, Status, CreatedAt)
                 VALUES (@storeId, @createdBy, @categoryId, @complaintTypeId, @caseId, @category, @complaintType, @caseNumber, @description,
-                    @attachmentUrl, @attachmentName, @transferTo, @dueDate, @escalate, @status, @createdAt)
+                    @attachmentUrl, @attachmentName, @transferTo, @status, @createdAt)
             `);
         
         await pool.close();
@@ -522,11 +493,10 @@ router.get('/history', async (req, res) => {
                 <td>${c.Id}</td>
                 <td>${new Date(c.CreatedAt).toLocaleDateString('en-GB')}</td>
                 <td>${c.StoreName || '-'}</td>
-                <td><span class="category-badge ${c.Category?.toLowerCase().replace(' ', '-')}">${c.Category}</span></td>
-                <td>${c.ComplaintType}</td>
-                <td>${c.TransferTo}</td>
+                <td><span class="category-badge ${c.Category?.toLowerCase().replace(' ', '-')}">${c.Category || '-'}</span></td>
+                <td>${c.ComplaintType || '-'}</td>
+                <td>${c.CaseNumber || '-'}</td>
                 <td><span class="status-badge ${c.Status?.toLowerCase().replace(' ', '-')}">${c.Status}</span></td>
-                <td>${c.Escalate ? '🔴' : ''}</td>
             </tr>
         `).join('');
         
@@ -561,11 +531,10 @@ router.get('/list', async (req, res) => {
                 <td>${new Date(c.CreatedAt).toLocaleDateString('en-GB')}</td>
                 <td>${c.StoreName || '-'}</td>
                 <td>${c.CreatedByName || '-'}</td>
-                <td><span class="category-badge ${c.Category?.toLowerCase().replace(' ', '-')}">${c.Category}</span></td>
-                <td>${c.ComplaintType}</td>
-                <td>${c.TransferTo}</td>
+                <td><span class="category-badge ${c.Category?.toLowerCase().replace(' ', '-')}">${c.Category || '-'}</span></td>
+                <td>${c.ComplaintType || '-'}</td>
+                <td>${c.CaseNumber || '-'}</td>
                 <td><span class="status-badge ${c.Status?.toLowerCase().replace(' ', '-')}">${c.Status}</span></td>
-                <td>${c.Escalate ? '🔴 Urgent' : ''}</td>
             </tr>
         `).join('');
         
@@ -914,6 +883,8 @@ function generateListPage(title, rows, isMyComplaints) {
                 .category-badge.third-party { background: #cce5ff; color: #004085; }
                 .category-badge.procurement { background: #e2d5f1; color: #6f42c1; }
                 .category-badge.maintenance { background: #fff3cd; color: #856404; }
+                .category-badge.helper { background: #ffeaa7; color: #856404; }
+                .category-badge.security { background: #74b9ff; color: #0056b3; }
             </style>
         </head>
         <body>
@@ -936,13 +907,12 @@ function generateListPage(title, rows, isMyComplaints) {
                                 ${isMyComplaints ? '' : '<th>Created By</th>'}
                                 <th>Category</th>
                                 <th>Type</th>
-                                <th>Transfer To</th>
+                                <th>Case</th>
                                 <th>Status</th>
-                                <th>Urgent</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${rows || '<tr><td colspan="9" style="text-align:center;color:#888;">No complaints found</td></tr>'}
+                            ${rows || '<tr><td colspan="8" style="text-align:center;color:#888;">No complaints found</td></tr>'}
                         </tbody>
                     </table>
                 </div>

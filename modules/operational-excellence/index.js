@@ -15,6 +15,7 @@ const feedbackDashboard = require('./feedback-dashboard');
 const securityDashboard = require('./security-dashboard');
 const thirdpartyDashboard = require('./thirdparty-dashboard');
 const attendanceDashboard = require('./attendance-dashboard');
+const complaintsDashboard = require('./complaints-dashboard');
 
 // Mount sub-routes
 router.use('/theft-dashboard', theftDashboard);
@@ -25,6 +26,7 @@ router.use('/feedback-dashboard', feedbackDashboard);
 router.use('/security-dashboard', securityDashboard);
 router.use('/thirdparty-dashboard', thirdpartyDashboard);
 router.use('/attendance-dashboard', attendanceDashboard);
+router.use('/complaints-dashboard', complaintsDashboard);
 
 // Landing page
 router.get('/', (req, res) => {
@@ -164,6 +166,8 @@ router.get('/', (req, res) => {
                 .badge-warning { background: #fff3cd; color: #856404; }
                 .badge-danger { background: #f8d7da; color: #721c24; }
                 .badge-success { background: #d4edda; color: #155724; }
+                
+                @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
             </style>
         </head>
         <body>
@@ -373,6 +377,34 @@ router.get('/', (req, res) => {
                         </div>
                     </a>
                     
+                    <!-- Store Complaints Dashboard -->
+                    <a href="/operational-excellence/complaints-dashboard" class="card" style="border-left: 4px solid #e17055;">
+                        <div class="card-icon">📝</div>
+                        <div class="card-title">Store Complaints</div>
+                        <div class="card-desc">
+                            View and manage complaints submitted by store managers. 
+                            Add updates, resolve issues, and track follow-ups.
+                        </div>
+                        <div class="card-stats">
+                            <div class="stat">
+                                <div class="stat-value" id="complaintsFollowUp" style="color: #dc3545;">-</div>
+                                <div class="stat-label">🔔 Follow-up</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" id="complaintsOpen" style="color: #e17055;">-</div>
+                                <div class="stat-label">Open</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" id="complaintsProgress" style="color: #ffc107;">-</div>
+                                <div class="stat-label">In Progress</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" id="complaintsToday" style="color: #17a2b8;">-</div>
+                                <div class="stat-label">Today</div>
+                            </div>
+                        </div>
+                    </a>
+                    
                     <!-- Future: Store Audits -->
                     <div class="card audit" style="opacity: 0.6; cursor: not-allowed;">
                         <div class="card-icon">📝</div>
@@ -490,6 +522,24 @@ router.get('/', (req, res) => {
                     })
                     .catch(err => {
                         console.error('Error loading attendance stats:', err);
+                    });
+                
+                // Load stats for complaints dashboard card
+                fetch('/operational-excellence/complaints-dashboard/api/stats')
+                    .then(r => r.json())
+                    .then(data => {
+                        document.getElementById('complaintsFollowUp').textContent = data.followUpDue || 0;
+                        document.getElementById('complaintsOpen').textContent = data.open || 0;
+                        document.getElementById('complaintsProgress').textContent = data.inProgress || 0;
+                        document.getElementById('complaintsToday').textContent = data.today || 0;
+                        
+                        // Highlight if there are follow-ups due
+                        if (data.followUpDue > 0) {
+                            document.getElementById('complaintsFollowUp').style.animation = 'blink 1s infinite';
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error loading complaints stats:', err);
                     });
             </script>
         </body>
