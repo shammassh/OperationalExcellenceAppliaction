@@ -12,7 +12,7 @@ const dbConfig = {
     server: process.env.SQL_SERVER || 'localhost',
     database: process.env.SQL_DATABASE || 'OEApp_UAT',
     user: process.env.SQL_USER || 'sa',
-    password: process.env.SQL_PASSWORD,
+    password: process.env.SQL_PASSWORD || 'Kokowawa123@@',
     options: {
         encrypt: process.env.SQL_ENCRYPT === 'true',
         trustServerCertificate: process.env.SQL_TRUST_CERT === 'true'
