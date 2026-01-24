@@ -16,6 +16,7 @@ const securityDashboard = require('./security-dashboard');
 const thirdpartyDashboard = require('./thirdparty-dashboard');
 const attendanceDashboard = require('./attendance-dashboard');
 const complaintsDashboard = require('./complaints-dashboard');
+const fiveDaysDashboard = require('./five-days-dashboard');
 
 // Mount sub-routes
 router.use('/theft-dashboard', theftDashboard);
@@ -27,6 +28,7 @@ router.use('/security-dashboard', securityDashboard);
 router.use('/thirdparty-dashboard', thirdpartyDashboard);
 router.use('/attendance-dashboard', attendanceDashboard);
 router.use('/complaints-dashboard', complaintsDashboard);
+router.use('/five-days-dashboard', fiveDaysDashboard);
 
 // Landing page
 router.get('/', (req, res) => {
@@ -405,6 +407,30 @@ router.get('/', (req, res) => {
                         </div>
                     </a>
                     
+                    <!-- 5 Days - Expired Items Dashboard -->
+                    <a href="/operational-excellence/five-days-dashboard" class="card" style="border-left: 4px solid #667eea;">
+                        <div class="card-icon">📅</div>
+                        <div class="card-title">5 Days - Expired Items</div>
+                        <div class="card-desc">
+                            View all store entries for expired items tracking. 
+                            Monitor 5-day cycle compliance across stores.
+                        </div>
+                        <div class="card-stats">
+                            <div class="stat">
+                                <div class="stat-value" id="fiveDaysTotal" style="color: #667eea;">-</div>
+                                <div class="stat-label">Total</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" id="fiveDaysStores" style="color: #28a745;">-</div>
+                                <div class="stat-label">Stores</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value" id="fiveDaysToday" style="color: #17a2b8;">-</div>
+                                <div class="stat-label">Today</div>
+                            </div>
+                        </div>
+                    </a>
+                    
                     <!-- Future: Store Audits -->
                     <div class="card audit" style="opacity: 0.6; cursor: not-allowed;">
                         <div class="card-icon">📝</div>
@@ -540,6 +566,18 @@ router.get('/', (req, res) => {
                     })
                     .catch(err => {
                         console.error('Error loading complaints stats:', err);
+                    });
+                
+                // Load stats for 5 days dashboard card
+                fetch('/operational-excellence/five-days-dashboard/api/stats')
+                    .then(r => r.json())
+                    .then(data => {
+                        document.getElementById('fiveDaysTotal').textContent = data.total || 0;
+                        document.getElementById('fiveDaysStores').textContent = data.stores || 0;
+                        document.getElementById('fiveDaysToday').textContent = data.today || 0;
+                    })
+                    .catch(err => {
+                        console.error('Error loading 5 days stats:', err);
                     });
             </script>
         </body>

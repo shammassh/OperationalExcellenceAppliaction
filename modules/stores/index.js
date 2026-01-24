@@ -12,6 +12,7 @@ const extraCleaningRoutes = require('./extra-cleaning/routes');
 const productionExtrasRoutes = require('./production-extras/routes');
 const weeklyFeedbackRoutes = require('./weekly-feedback/routes');
 const complaintRoutes = require('./complaint/routes');
+const fiveDaysRoutes = require('./five-days/routes');
 
 // Stores main page
 router.get('/', (req, res) => {
@@ -21,6 +22,7 @@ router.get('/', (req, res) => {
         { id: 'production-extras', icon: '👷', title: 'Production Extras Request', href: '/stores/production-extras', desc: 'Request extra production agents', color: '#667eea' },
         { id: 'weekly-feedback', icon: '📋', title: 'Weekly Third Party Feedback', href: '/stores/weekly-feedback', desc: 'Submit weekly feedback about third party services', color: '#6c5ce7' },
         { id: 'complaint', icon: '📝', title: 'Complaint', href: '/stores/complaint', desc: 'Submit and track complaints', color: '#e17055' },
+        { id: 'five-days', icon: '📅', title: '5 Days - Expired Items', href: '/stores/five-days', desc: 'Track expired items during 5-day cycles', color: '#667eea' },
         // More forms will be added here
     ];
     
@@ -151,5 +153,6 @@ router.use('/extra-cleaning', extraCleaningRoutes);
 router.use('/production-extras', productionExtrasRoutes);
 router.use('/weekly-feedback', weeklyFeedbackRoutes);
 router.use('/complaint', complaintRoutes);
+router.use('/five-days', fiveDaysRoutes);
 
 module.exports = router;
