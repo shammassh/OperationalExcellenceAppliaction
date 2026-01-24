@@ -365,6 +365,7 @@ router.get('/', (req, res) => {
                     <button class="tab" data-tab="shifts">⏰ Shifts</button>
                     <button class="tab" data-tab="unitcosts">💰 Unit Costs</button>
                     <button class="tab" data-tab="approvalrules">📋 Approval Rules</button>
+                    <button class="tab" data-tab="complaints">📝 Complaint Settings</button>
                 </div>
                 
                 <!-- Stores Tab -->
@@ -559,6 +560,46 @@ router.get('/', (req, res) => {
                     </div>
                 </div>
             </div>
+                
+                <!-- Complaint Settings Tab -->
+                <div id="complaints-tab" class="tab-content">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+                        <!-- Categories Column -->
+                        <div style="background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h3 style="color: #e17055; font-size: 16px;">📁 Categories</h3>
+                                <button class="btn btn-primary" onclick="openComplaintCategoryModal()" style="padding: 6px 12px; font-size: 13px;">+ Add</button>
+                            </div>
+                            <div id="complaint-categories-list">
+                                <div class="loading">Loading...</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Types Column -->
+                        <div style="background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h3 style="color: #e17055; font-size: 16px;">📋 Complaint Types</h3>
+                                <button class="btn btn-primary" id="addTypeBtn" onclick="openComplaintTypeModal()" style="padding: 6px 12px; font-size: 13px;" disabled>+ Add</button>
+                            </div>
+                            <p style="color: #888; font-size: 13px; margin-bottom: 10px;" id="selectedCategoryName">Select a category first</p>
+                            <div id="complaint-types-list">
+                                <div style="color: #ccc; text-align: center; padding: 30px;">👈 Select a category</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Cases Column -->
+                        <div style="background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h3 style="color: #e17055; font-size: 16px;">🏷️ Cases</h3>
+                                <button class="btn btn-primary" id="addCaseBtn" onclick="openComplaintCaseModal()" style="padding: 6px 12px; font-size: 13px;" disabled>+ Add</button>
+                            </div>
+                            <p style="color: #888; font-size: 13px; margin-bottom: 10px;" id="selectedTypeName">Select a type first</p>
+                            <div id="complaint-cases-list">
+                                <div style="color: #ccc; text-align: center; padding: 30px;">👈 Select a type</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             
             <!-- Store Modal -->
             <div id="storeModal" class="modal">
@@ -991,6 +1032,96 @@ router.get('/', (req, res) => {
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" onclick="closeModal('approvalrule')">Cancel</button>
                             <button type="submit" class="btn btn-success">Save Rule</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Complaint Category Modal -->
+            <div id="complaintCategoryModal" class="modal">
+                <div class="modal-content" style="max-width: 450px;">
+                    <div class="modal-header" style="background: linear-gradient(135deg, #e17055 0%, #d63031 100%); color: white;">
+                        <div class="modal-title" id="complaintCategoryModalTitle">Add Category</div>
+                        <button class="modal-close" onclick="closeComplaintModal('category')" style="color: white;">&times;</button>
+                    </div>
+                    <form id="complaintCategoryForm" onsubmit="saveComplaintCategory(event)">
+                        <input type="hidden" id="complaintCategoryId" value="">
+                        <div class="form-group">
+                            <label>Category Name *</label>
+                            <input type="text" id="complaintCategoryName" required placeholder="e.g., Helper, Security">
+                        </div>
+                        <div class="form-group">
+                            <label>Icon (emoji)</label>
+                            <input type="text" id="complaintCategoryIcon" placeholder="e.g., 👷" maxlength="4">
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="complaintCategoryStatus">
+                                <option value="1">Active</option>
+                                <option value="0">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="closeComplaintModal('category')">Cancel</button>
+                            <button type="submit" class="btn btn-success">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Complaint Type Modal -->
+            <div id="complaintTypeModal" class="modal">
+                <div class="modal-content" style="max-width: 450px;">
+                    <div class="modal-header" style="background: linear-gradient(135deg, #e17055 0%, #d63031 100%); color: white;">
+                        <div class="modal-title" id="complaintTypeModalTitle">Add Complaint Type</div>
+                        <button class="modal-close" onclick="closeComplaintModal('type')" style="color: white;">&times;</button>
+                    </div>
+                    <form id="complaintTypeForm" onsubmit="saveComplaintType(event)">
+                        <input type="hidden" id="complaintTypeId" value="">
+                        <input type="hidden" id="complaintTypeCategoryId" value="">
+                        <div class="form-group">
+                            <label>Complaint Type Name *</label>
+                            <input type="text" id="complaintTypeName" required placeholder="e.g., Staff Delays">
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="complaintTypeStatus">
+                                <option value="1">Active</option>
+                                <option value="0">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="closeComplaintModal('type')">Cancel</button>
+                            <button type="submit" class="btn btn-success">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Complaint Case Modal -->
+            <div id="complaintCaseModal" class="modal">
+                <div class="modal-content" style="max-width: 450px;">
+                    <div class="modal-header" style="background: linear-gradient(135deg, #e17055 0%, #d63031 100%); color: white;">
+                        <div class="modal-title" id="complaintCaseModalTitle">Add Case</div>
+                        <button class="modal-close" onclick="closeComplaintModal('case')" style="color: white;">&times;</button>
+                    </div>
+                    <form id="complaintCaseForm" onsubmit="saveComplaintCase(event)">
+                        <input type="hidden" id="complaintCaseId" value="">
+                        <input type="hidden" id="complaintCaseTypeId" value="">
+                        <div class="form-group">
+                            <label>Case Name *</label>
+                            <input type="text" id="complaintCaseName" required placeholder="e.g., Late, Long Break">
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="complaintCaseStatus">
+                                <option value="1">Active</option>
+                                <option value="0">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="closeComplaintModal('case')">Cancel</button>
+                            <button type="submit" class="btn btn-success">Save</button>
                         </div>
                     </form>
                 </div>
@@ -2295,6 +2426,297 @@ router.get('/', (req, res) => {
                         showToast('Error saving approval rule', 'error');
                     }
                 });
+                
+                // ========== COMPLAINT SETTINGS ==========
+                let complaintCategoriesData = [];
+                let complaintTypesData = [];
+                let complaintCasesData = [];
+                let selectedCategoryId = null;
+                let selectedTypeId = null;
+                
+                // Load complaint categories on page load
+                loadComplaintCategories();
+                
+                async function loadComplaintCategories() {
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/complaint-categories?t=' + Date.now());
+                        complaintCategoriesData = await res.json();
+                        renderComplaintCategories();
+                    } catch (err) {
+                        console.error('Error loading complaint categories:', err);
+                        document.getElementById('complaint-categories-list').innerHTML = '<div style="color:red;">Error loading</div>';
+                    }
+                }
+                
+                function renderComplaintCategories() {
+                    const container = document.getElementById('complaint-categories-list');
+                    if (!complaintCategoriesData.length) {
+                        container.innerHTML = '<div style="color:#888; text-align:center; padding:20px;">No categories yet</div>';
+                        return;
+                    }
+                    let html = '';
+                    complaintCategoriesData.forEach(c => {
+                        const isSelected = selectedCategoryId === c.Id;
+                        html += '<div class="complaint-item ' + (isSelected ? 'selected' : '') + '" onclick="selectCategory(' + c.Id + ', \\'' + escapeJS(c.Name) + '\\')" style="padding:10px 12px; margin-bottom:8px; background:' + (isSelected ? '#fff5f3' : '#f8f9fa') + '; border-radius:8px; cursor:pointer; border:2px solid ' + (isSelected ? '#e17055' : 'transparent') + '; display:flex; justify-content:space-between; align-items:center;">';
+                        html += '<span>' + (c.Icon || '📁') + ' ' + c.Name + '</span>';
+                        html += '<div style="display:flex; gap:5px;">';
+                        html += '<button class="btn-icon" onclick="event.stopPropagation(); editComplaintCategory(' + c.Id + ', \\'' + escapeJS(c.Name) + '\\', \\'' + escapeJS(c.Icon || '') + '\\', ' + c.IsActive + ')" style="background:none; border:none; cursor:pointer;">✏️</button>';
+                        html += '<button class="btn-icon" onclick="event.stopPropagation(); deleteComplaintItem(\\'category\\', ' + c.Id + ')" style="background:none; border:none; cursor:pointer;">🗑️</button>';
+                        html += '</div></div>';
+                    });
+                    container.innerHTML = html;
+                }
+                
+                function selectCategory(categoryId, categoryName) {
+                    selectedCategoryId = categoryId;
+                    selectedTypeId = null;
+                    document.getElementById('selectedCategoryName').textContent = 'Types for: ' + categoryName;
+                    document.getElementById('selectedTypeName').textContent = 'Select a type first';
+                    document.getElementById('addTypeBtn').disabled = false;
+                    document.getElementById('addCaseBtn').disabled = true;
+                    document.getElementById('complaint-cases-list').innerHTML = '<div style="color: #ccc; text-align: center; padding: 30px;">👈 Select a type</div>';
+                    renderComplaintCategories();
+                    loadComplaintTypes(categoryId);
+                }
+                
+                async function loadComplaintTypes(categoryId) {
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/complaint-types?categoryId=' + categoryId + '&t=' + Date.now());
+                        complaintTypesData = await res.json();
+                        renderComplaintTypes();
+                    } catch (err) {
+                        console.error('Error loading complaint types:', err);
+                        document.getElementById('complaint-types-list').innerHTML = '<div style="color:red;">Error loading</div>';
+                    }
+                }
+                
+                function renderComplaintTypes() {
+                    const container = document.getElementById('complaint-types-list');
+                    if (!complaintTypesData.length) {
+                        container.innerHTML = '<div style="color:#888; text-align:center; padding:20px;">No types yet</div>';
+                        return;
+                    }
+                    let html = '';
+                    complaintTypesData.forEach(t => {
+                        const isSelected = selectedTypeId === t.Id;
+                        html += '<div class="complaint-item ' + (isSelected ? 'selected' : '') + '" onclick="selectType(' + t.Id + ', \\'' + escapeJS(t.Name) + '\\')" style="padding:10px 12px; margin-bottom:8px; background:' + (isSelected ? '#fff5f3' : '#f8f9fa') + '; border-radius:8px; cursor:pointer; border:2px solid ' + (isSelected ? '#e17055' : 'transparent') + '; display:flex; justify-content:space-between; align-items:center;">';
+                        html += '<span>' + t.Name + '</span>';
+                        html += '<div style="display:flex; gap:5px;">';
+                        html += '<button class="btn-icon" onclick="event.stopPropagation(); editComplaintType(' + t.Id + ', \\'' + escapeJS(t.Name) + '\\', ' + t.IsActive + ')" style="background:none; border:none; cursor:pointer;">✏️</button>';
+                        html += '<button class="btn-icon" onclick="event.stopPropagation(); deleteComplaintItem(\\'type\\', ' + t.Id + ')" style="background:none; border:none; cursor:pointer;">🗑️</button>';
+                        html += '</div></div>';
+                    });
+                    container.innerHTML = html;
+                }
+                
+                function selectType(typeId, typeName) {
+                    selectedTypeId = typeId;
+                    document.getElementById('selectedTypeName').textContent = 'Cases for: ' + typeName;
+                    document.getElementById('addCaseBtn').disabled = false;
+                    renderComplaintTypes();
+                    loadComplaintCases(typeId);
+                }
+                
+                async function loadComplaintCases(typeId) {
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/complaint-cases?typeId=' + typeId + '&t=' + Date.now());
+                        complaintCasesData = await res.json();
+                        renderComplaintCases();
+                    } catch (err) {
+                        console.error('Error loading complaint cases:', err);
+                        document.getElementById('complaint-cases-list').innerHTML = '<div style="color:red;">Error loading</div>';
+                    }
+                }
+                
+                function renderComplaintCases() {
+                    const container = document.getElementById('complaint-cases-list');
+                    if (!complaintCasesData.length) {
+                        container.innerHTML = '<div style="color:#888; text-align:center; padding:20px;">No cases yet</div>';
+                        return;
+                    }
+                    let html = '';
+                    complaintCasesData.forEach(c => {
+                        html += '<div style="padding:10px 12px; margin-bottom:8px; background:#f8f9fa; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">';
+                        html += '<span>🏷️ ' + c.Name + '</span>';
+                        html += '<div style="display:flex; gap:5px;">';
+                        html += '<button class="btn-icon" onclick="editComplaintCase(' + c.Id + ', \\'' + escapeJS(c.Name) + '\\', ' + c.IsActive + ')" style="background:none; border:none; cursor:pointer;">✏️</button>';
+                        html += '<button class="btn-icon" onclick="deleteComplaintItem(\\'case\\', ' + c.Id + ')" style="background:none; border:none; cursor:pointer;">🗑️</button>';
+                        html += '</div></div>';
+                    });
+                    container.innerHTML = html;
+                }
+                
+                // Modal functions for complaints
+                function openComplaintCategoryModal() {
+                    document.getElementById('complaintCategoryId').value = '';
+                    document.getElementById('complaintCategoryForm').reset();
+                    document.getElementById('complaintCategoryModalTitle').textContent = 'Add Category';
+                    document.getElementById('complaintCategoryModal').classList.add('show');
+                }
+                
+                function openComplaintTypeModal() {
+                    if (!selectedCategoryId) { showToast('Select a category first', 'error'); return; }
+                    document.getElementById('complaintTypeId').value = '';
+                    document.getElementById('complaintTypeCategoryId').value = selectedCategoryId;
+                    document.getElementById('complaintTypeForm').reset();
+                    document.getElementById('complaintTypeModalTitle').textContent = 'Add Complaint Type';
+                    document.getElementById('complaintTypeModal').classList.add('show');
+                }
+                
+                function openComplaintCaseModal() {
+                    if (!selectedTypeId) { showToast('Select a type first', 'error'); return; }
+                    document.getElementById('complaintCaseId').value = '';
+                    document.getElementById('complaintCaseTypeId').value = selectedTypeId;
+                    document.getElementById('complaintCaseForm').reset();
+                    document.getElementById('complaintCaseModalTitle').textContent = 'Add Case';
+                    document.getElementById('complaintCaseModal').classList.add('show');
+                }
+                
+                function closeComplaintModal(type) {
+                    const modalId = type === 'category' ? 'complaintCategoryModal' : type === 'type' ? 'complaintTypeModal' : 'complaintCaseModal';
+                    document.getElementById(modalId).classList.remove('show');
+                }
+                
+                function editComplaintCategory(id, name, icon, isActive) {
+                    document.getElementById('complaintCategoryId').value = id;
+                    document.getElementById('complaintCategoryName').value = name;
+                    document.getElementById('complaintCategoryIcon').value = icon;
+                    document.getElementById('complaintCategoryStatus').value = isActive ? '1' : '0';
+                    document.getElementById('complaintCategoryModalTitle').textContent = 'Edit Category';
+                    document.getElementById('complaintCategoryModal').classList.add('show');
+                }
+                
+                function editComplaintType(id, name, isActive) {
+                    document.getElementById('complaintTypeId').value = id;
+                    document.getElementById('complaintTypeCategoryId').value = selectedCategoryId;
+                    document.getElementById('complaintTypeName').value = name;
+                    document.getElementById('complaintTypeStatus').value = isActive ? '1' : '0';
+                    document.getElementById('complaintTypeModalTitle').textContent = 'Edit Complaint Type';
+                    document.getElementById('complaintTypeModal').classList.add('show');
+                }
+                
+                function editComplaintCase(id, name, isActive) {
+                    document.getElementById('complaintCaseId').value = id;
+                    document.getElementById('complaintCaseTypeId').value = selectedTypeId;
+                    document.getElementById('complaintCaseName').value = name;
+                    document.getElementById('complaintCaseStatus').value = isActive ? '1' : '0';
+                    document.getElementById('complaintCaseModalTitle').textContent = 'Edit Case';
+                    document.getElementById('complaintCaseModal').classList.add('show');
+                }
+                
+                async function saveComplaintCategory(e) {
+                    e.preventDefault();
+                    const id = document.getElementById('complaintCategoryId').value;
+                    const data = {
+                        name: document.getElementById('complaintCategoryName').value,
+                        icon: document.getElementById('complaintCategoryIcon').value,
+                        isActive: document.getElementById('complaintCategoryStatus').value === '1'
+                    };
+                    try {
+                        const url = id ? '/operational-excellence/system-settings/api/complaint-categories/' + id : '/operational-excellence/system-settings/api/complaint-categories';
+                        const res = await fetch(url, {
+                            method: id ? 'PUT' : 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        });
+                        if (res.ok) {
+                            closeComplaintModal('category');
+                            showToast(id ? 'Category updated!' : 'Category added!');
+                            await loadComplaintCategories();
+                        } else {
+                            showToast('Error saving category', 'error');
+                        }
+                    } catch (err) {
+                        showToast('Error saving category', 'error');
+                    }
+                }
+                
+                async function saveComplaintType(e) {
+                    e.preventDefault();
+                    const id = document.getElementById('complaintTypeId').value;
+                    const data = {
+                        categoryId: document.getElementById('complaintTypeCategoryId').value,
+                        name: document.getElementById('complaintTypeName').value,
+                        isActive: document.getElementById('complaintTypeStatus').value === '1'
+                    };
+                    try {
+                        const url = id ? '/operational-excellence/system-settings/api/complaint-types/' + id : '/operational-excellence/system-settings/api/complaint-types';
+                        const res = await fetch(url, {
+                            method: id ? 'PUT' : 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        });
+                        if (res.ok) {
+                            closeComplaintModal('type');
+                            showToast(id ? 'Type updated!' : 'Type added!');
+                            await loadComplaintTypes(selectedCategoryId);
+                        } else {
+                            showToast('Error saving type', 'error');
+                        }
+                    } catch (err) {
+                        showToast('Error saving type', 'error');
+                    }
+                }
+                
+                async function saveComplaintCase(e) {
+                    e.preventDefault();
+                    const id = document.getElementById('complaintCaseId').value;
+                    const data = {
+                        typeId: document.getElementById('complaintCaseTypeId').value,
+                        name: document.getElementById('complaintCaseName').value,
+                        isActive: document.getElementById('complaintCaseStatus').value === '1'
+                    };
+                    try {
+                        const url = id ? '/operational-excellence/system-settings/api/complaint-cases/' + id : '/operational-excellence/system-settings/api/complaint-cases';
+                        const res = await fetch(url, {
+                            method: id ? 'PUT' : 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        });
+                        if (res.ok) {
+                            closeComplaintModal('case');
+                            showToast(id ? 'Case updated!' : 'Case added!');
+                            await loadComplaintCases(selectedTypeId);
+                        } else {
+                            showToast('Error saving case', 'error');
+                        }
+                    } catch (err) {
+                        showToast('Error saving case', 'error');
+                    }
+                }
+                
+                async function deleteComplaintItem(type, id) {
+                    if (!confirm('Are you sure you want to delete this ' + type + '?')) return;
+                    try {
+                        const endpoint = type === 'category' ? 'complaint-categories' : type === 'type' ? 'complaint-types' : 'complaint-cases';
+                        const res = await fetch('/operational-excellence/system-settings/api/' + endpoint + '/' + id, { method: 'DELETE' });
+                        if (res.ok) {
+                            showToast(type.charAt(0).toUpperCase() + type.slice(1) + ' deleted!');
+                            if (type === 'category') {
+                                selectedCategoryId = null;
+                                selectedTypeId = null;
+                                document.getElementById('complaint-types-list').innerHTML = '<div style="color: #ccc; text-align: center; padding: 30px;">👈 Select a category</div>';
+                                document.getElementById('complaint-cases-list').innerHTML = '<div style="color: #ccc; text-align: center; padding: 30px;">👈 Select a type</div>';
+                                document.getElementById('selectedCategoryName').textContent = 'Select a category first';
+                                document.getElementById('addTypeBtn').disabled = true;
+                                document.getElementById('addCaseBtn').disabled = true;
+                                await loadComplaintCategories();
+                            } else if (type === 'type') {
+                                selectedTypeId = null;
+                                document.getElementById('complaint-cases-list').innerHTML = '<div style="color: #ccc; text-align: center; padding: 30px;">👈 Select a type</div>';
+                                document.getElementById('selectedTypeName').textContent = 'Select a type first';
+                                document.getElementById('addCaseBtn').disabled = true;
+                                await loadComplaintTypes(selectedCategoryId);
+                            } else {
+                                await loadComplaintCases(selectedTypeId);
+                            }
+                        } else {
+                            showToast('Error deleting ' + type, 'error');
+                        }
+                    } catch (err) {
+                        showToast('Error deleting ' + type, 'error');
+                    }
+                }
             </script>
         </body>
         </html>
@@ -3179,6 +3601,219 @@ router.delete('/api/approval-rules/:id', async (req, res) => {
     } catch (err) {
         console.error('Error deleting approval rule:', err);
         res.status(500).json({ error: 'Failed to delete approval rule' });
+    }
+});
+
+// ========== COMPLAINT CATEGORIES API ==========
+router.get('/api/complaint-categories', async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request().query('SELECT * FROM ComplaintCategories WHERE IsActive = 1 ORDER BY SortOrder, Name');
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error fetching complaint categories:', err);
+        res.status(500).json({ error: 'Failed to fetch categories' });
+    }
+});
+
+router.post('/api/complaint-categories', async (req, res) => {
+    try {
+        const { name, icon, isActive } = req.body;
+        const pool = await getPool();
+        await pool.request()
+            .input('name', sql.NVarChar, name)
+            .input('icon', sql.NVarChar, icon || null)
+            .input('isActive', sql.Bit, isActive ? 1 : 0)
+            .query('INSERT INTO ComplaintCategories (Name, Icon, IsActive) VALUES (@name, @icon, @isActive)');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error creating complaint category:', err);
+        res.status(500).json({ error: 'Failed to create category' });
+    }
+});
+
+router.put('/api/complaint-categories/:id', async (req, res) => {
+    try {
+        const { name, icon, isActive } = req.body;
+        const pool = await getPool();
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .input('name', sql.NVarChar, name)
+            .input('icon', sql.NVarChar, icon || null)
+            .input('isActive', sql.Bit, isActive ? 1 : 0)
+            .query('UPDATE ComplaintCategories SET Name = @name, Icon = @icon, IsActive = @isActive WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating complaint category:', err);
+        res.status(500).json({ error: 'Failed to update category' });
+    }
+});
+
+router.delete('/api/complaint-categories/:id', async (req, res) => {
+    try {
+        const pool = await getPool();
+        // First delete all cases for types in this category, then types, then category
+        await pool.request().input('id', sql.Int, req.params.id).query(`
+            DELETE FROM ComplaintCases WHERE TypeId IN (SELECT Id FROM ComplaintTypes WHERE CategoryId = @id);
+            DELETE FROM ComplaintTypes WHERE CategoryId = @id;
+            DELETE FROM ComplaintCategories WHERE Id = @id;
+        `);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting complaint category:', err);
+        res.status(500).json({ error: 'Failed to delete category' });
+    }
+});
+
+// ========== COMPLAINT TYPES API ==========
+router.get('/api/complaint-types', async (req, res) => {
+    try {
+        const { categoryId } = req.query;
+        const pool = await getPool();
+        const result = await pool.request()
+            .input('categoryId', sql.Int, categoryId)
+            .query('SELECT * FROM ComplaintTypes WHERE CategoryId = @categoryId ORDER BY SortOrder, Name');
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error fetching complaint types:', err);
+        res.status(500).json({ error: 'Failed to fetch types' });
+    }
+});
+
+router.post('/api/complaint-types', async (req, res) => {
+    try {
+        const { categoryId, name, isActive } = req.body;
+        const pool = await getPool();
+        await pool.request()
+            .input('categoryId', sql.Int, categoryId)
+            .input('name', sql.NVarChar, name)
+            .input('isActive', sql.Bit, isActive ? 1 : 0)
+            .query('INSERT INTO ComplaintTypes (CategoryId, Name, IsActive) VALUES (@categoryId, @name, @isActive)');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error creating complaint type:', err);
+        res.status(500).json({ error: 'Failed to create type' });
+    }
+});
+
+router.put('/api/complaint-types/:id', async (req, res) => {
+    try {
+        const { name, isActive } = req.body;
+        const pool = await getPool();
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .input('name', sql.NVarChar, name)
+            .input('isActive', sql.Bit, isActive ? 1 : 0)
+            .query('UPDATE ComplaintTypes SET Name = @name, IsActive = @isActive WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating complaint type:', err);
+        res.status(500).json({ error: 'Failed to update type' });
+    }
+});
+
+router.delete('/api/complaint-types/:id', async (req, res) => {
+    try {
+        const pool = await getPool();
+        // First delete all cases for this type, then the type
+        await pool.request().input('id', sql.Int, req.params.id).query(`
+            DELETE FROM ComplaintCases WHERE TypeId = @id;
+            DELETE FROM ComplaintTypes WHERE Id = @id;
+        `);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting complaint type:', err);
+        res.status(500).json({ error: 'Failed to delete type' });
+    }
+});
+
+// ========== COMPLAINT CASES API ==========
+router.get('/api/complaint-cases', async (req, res) => {
+    try {
+        const { typeId } = req.query;
+        const pool = await getPool();
+        const result = await pool.request()
+            .input('typeId', sql.Int, typeId)
+            .query('SELECT * FROM ComplaintCases WHERE TypeId = @typeId ORDER BY SortOrder, Name');
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error fetching complaint cases:', err);
+        res.status(500).json({ error: 'Failed to fetch cases' });
+    }
+});
+
+router.post('/api/complaint-cases', async (req, res) => {
+    try {
+        const { typeId, name, isActive } = req.body;
+        const pool = await getPool();
+        await pool.request()
+            .input('typeId', sql.Int, typeId)
+            .input('name', sql.NVarChar, name)
+            .input('isActive', sql.Bit, isActive ? 1 : 0)
+            .query('INSERT INTO ComplaintCases (TypeId, Name, IsActive) VALUES (@typeId, @name, @isActive)');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error creating complaint case:', err);
+        res.status(500).json({ error: 'Failed to create case' });
+    }
+});
+
+router.put('/api/complaint-cases/:id', async (req, res) => {
+    try {
+        const { name, isActive } = req.body;
+        const pool = await getPool();
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .input('name', sql.NVarChar, name)
+            .input('isActive', sql.Bit, isActive ? 1 : 0)
+            .query('UPDATE ComplaintCases SET Name = @name, IsActive = @isActive WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating complaint case:', err);
+        res.status(500).json({ error: 'Failed to update case' });
+    }
+});
+
+router.delete('/api/complaint-cases/:id', async (req, res) => {
+    try {
+        const pool = await getPool();
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query('DELETE FROM ComplaintCases WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting complaint case:', err);
+        res.status(500).json({ error: 'Failed to delete case' });
+    }
+});
+
+// Public API for getting all complaint config (for complaint form)
+router.get('/api/complaint-config', async (req, res) => {
+    try {
+        const pool = await getPool();
+        const categories = await pool.request().query('SELECT * FROM ComplaintCategories WHERE IsActive = 1 ORDER BY SortOrder, Name');
+        const types = await pool.request().query('SELECT * FROM ComplaintTypes WHERE IsActive = 1 ORDER BY SortOrder, Name');
+        const cases = await pool.request().query('SELECT * FROM ComplaintCases WHERE IsActive = 1 ORDER BY SortOrder, Name');
+        
+        // Build hierarchical structure
+        const config = categories.recordset.map(cat => ({
+            id: cat.Id,
+            name: cat.Name,
+            icon: cat.Icon,
+            types: types.recordset.filter(t => t.CategoryId === cat.Id).map(type => ({
+                id: type.Id,
+                name: type.Name,
+                cases: cases.recordset.filter(c => c.TypeId === type.Id).map(cs => ({
+                    id: cs.Id,
+                    name: cs.Name
+                }))
+            }))
+        }));
+        
+        res.json(config);
+    } catch (err) {
+        console.error('Error fetching complaint config:', err);
+        res.status(500).json({ error: 'Failed to fetch config' });
     }
 });
 

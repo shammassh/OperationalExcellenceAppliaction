@@ -37,13 +37,8 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB limit
 
-// Category to Complaint Types mapping
-const complaintTypes = {
-    'Cleaning': ['Quality Issue', 'Staff Behavior', 'Missing Equipment', 'Schedule Issue', 'Other'],
-    'Third Party': ['Security Issue', 'Valet Issue', 'Helper Issue', 'Contractor Issue', 'Other'],
-    'Procurement': ['Delivery Delay', 'Wrong Items', 'Quality Issue', 'Stock Shortage', 'Other'],
-    'Maintenance': ['Equipment Breakdown', 'Facility Issue', 'Electrical Issue', 'Plumbing Issue', 'AC/HVAC Issue', 'Other']
-};
+// Category to Complaint Types mapping - now loaded from database
+// (keeping this for reference, actual data comes from ComplaintCategories, ComplaintTypes, ComplaintCases tables)
 
 // Main page - Complaint Form
 router.get('/', async (req, res) => {
@@ -55,10 +50,34 @@ router.get('/', async (req, res) => {
             SELECT Id, StoreName, StoreCode FROM Stores WHERE IsActive = 1 ORDER BY StoreName
         `);
         
+        // Get complaint config (hierarchical)
+        const categories = await pool.request().query('SELECT * FROM ComplaintCategories WHERE IsActive = 1 ORDER BY SortOrder, Name');
+        const types = await pool.request().query('SELECT * FROM ComplaintTypes WHERE IsActive = 1 ORDER BY SortOrder, Name');
+        const cases = await pool.request().query('SELECT * FROM ComplaintCases WHERE IsActive = 1 ORDER BY SortOrder, Name');
+        
         await pool.close();
+        
+        // Build hierarchical config for JavaScript
+        const complaintConfig = categories.recordset.map(cat => ({
+            id: cat.Id,
+            name: cat.Name,
+            icon: cat.Icon || '📁',
+            types: types.recordset.filter(t => t.CategoryId === cat.Id).map(type => ({
+                id: type.Id,
+                name: type.Name,
+                cases: cases.recordset.filter(c => c.TypeId === type.Id).map(cs => ({
+                    id: cs.Id,
+                    name: cs.Name
+                }))
+            }))
+        }));
         
         const storeOptions = stores.recordset.map(s => 
             `<option value="${s.Id}">${s.StoreName} (${s.StoreCode})</option>`
+        ).join('');
+        
+        const categoryOptions = categories.recordset.map(c =>
+            `<option value="${c.Id}">${c.Icon || '📁'} ${c.Name}</option>`
         ).join('');
         
         const userName = req.session?.user?.displayName || req.session?.user?.email || 'User';
@@ -244,23 +263,22 @@ router.get('/', async (req, res) => {
                             <div class="form-row-3">
                                 <div class="form-group">
                                     <label>Category <span class="required">*</span></label>
-                                    <select name="category" id="category" class="form-control" required onchange="updateComplaintTypes()">
+                                    <select name="categoryId" id="categoryId" class="form-control" required onchange="updateComplaintTypes()">
                                         <option value="">-- Select Category --</option>
-                                        <option value="Cleaning">🧹 Cleaning</option>
-                                        <option value="Third Party">👥 Third Party</option>
-                                        <option value="Procurement">📦 Procurement</option>
-                                        <option value="Maintenance">🔧 Maintenance</option>
+                                        ${categoryOptions}
                                     </select>
                                 </div>
                                 <div class="form-group">
                                     <label>Complaint Type <span class="required">*</span></label>
-                                    <select name="complaintType" id="complaintType" class="form-control" required>
+                                    <select name="complaintTypeId" id="complaintTypeId" class="form-control" required onchange="updateCases()">
                                         <option value="">-- Select Category First --</option>
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label>Case Reference</label>
-                                    <input type="text" name="caseNumber" class="form-control" placeholder="Optional case/ticket number">
+                                    <label>Case <span class="required">*</span></label>
+                                    <select name="caseId" id="caseId" class="form-control" required>
+                                        <option value="">-- Select Type First --</option>
+                                    </select>
                                 </div>
                             </div>
                             
@@ -283,12 +301,9 @@ router.get('/', async (req, res) => {
                             <div class="form-row-3">
                                 <div class="form-group">
                                     <label>Transfer To <span class="required">*</span></label>
-                                    <select name="transferTo" class="form-control" required>
+                                    <select name="transferTo" id="transferTo" class="form-control" required>
                                         <option value="">-- Select Department --</option>
-                                        <option value="Cleaning">🧹 Cleaning Department</option>
-                                        <option value="Third Party">👥 Third Party Department</option>
-                                        <option value="Procurement">📦 Procurement Department</option>
-                                        <option value="Maintenance">🔧 Maintenance Department</option>
+                                        ${categoryOptions}
                                     </select>
                                 </div>
                                 <div class="form-group">
@@ -312,17 +327,42 @@ router.get('/', async (req, res) => {
                 </div>
                 
                 <script>
-                    const complaintTypes = ${JSON.stringify(complaintTypes)};
+                    const complaintConfig = ${JSON.stringify(complaintConfig)};
                     
                     function updateComplaintTypes() {
-                        const category = document.getElementById('category').value;
-                        const typeSelect = document.getElementById('complaintType');
-                        typeSelect.innerHTML = '<option value="">-- Select Type --</option>';
+                        const categoryId = parseInt(document.getElementById('categoryId').value);
+                        const typeSelect = document.getElementById('complaintTypeId');
+                        const caseSelect = document.getElementById('caseId');
                         
-                        if (category && complaintTypes[category]) {
-                            complaintTypes[category].forEach(type => {
-                                typeSelect.innerHTML += '<option value="' + type + '">' + type + '</option>';
+                        typeSelect.innerHTML = '<option value="">-- Select Type --</option>';
+                        caseSelect.innerHTML = '<option value="">-- Select Type First --</option>';
+                        
+                        const category = complaintConfig.find(c => c.id === categoryId);
+                        if (category && category.types) {
+                            category.types.forEach(type => {
+                                typeSelect.innerHTML += '<option value="' + type.id + '">' + type.name + '</option>';
                             });
+                        }
+                        
+                        // Auto-select Transfer To based on category
+                        document.getElementById('transferTo').value = categoryId || '';
+                    }
+                    
+                    function updateCases() {
+                        const categoryId = parseInt(document.getElementById('categoryId').value);
+                        const typeId = parseInt(document.getElementById('complaintTypeId').value);
+                        const caseSelect = document.getElementById('caseId');
+                        
+                        caseSelect.innerHTML = '<option value="">-- Select Case --</option>';
+                        
+                        const category = complaintConfig.find(c => c.id === categoryId);
+                        if (category) {
+                            const type = category.types.find(t => t.id === typeId);
+                            if (type && type.cases) {
+                                type.cases.forEach(cs => {
+                                    caseSelect.innerHTML += '<option value="' + cs.id + '">' + cs.name + '</option>';
+                                });
+                            }
                         }
                     }
                     
@@ -347,7 +387,7 @@ router.get('/', async (req, res) => {
 // Submit complaint
 router.post('/submit', upload.single('attachment'), async (req, res) => {
     try {
-        const { storeId, category, complaintType, caseNumber, description, transferTo, dueDate, escalate } = req.body;
+        const { storeId, categoryId, complaintTypeId, caseId, description, transferTo, dueDate, escalate } = req.body;
         const userId = req.session?.user?.id || 1;
         
         const attachmentUrl = req.file ? '/uploads/complaints/' + req.file.filename : null;
@@ -355,24 +395,49 @@ router.post('/submit', upload.single('attachment'), async (req, res) => {
         
         const pool = await sql.connect(dbConfig);
         
+        // Get the text names for backward compatibility (Category, ComplaintType columns)
+        const categoryResult = await pool.request()
+            .input('catId', sql.Int, categoryId)
+            .query('SELECT Name FROM ComplaintCategories WHERE Id = @catId');
+        const categoryName = categoryResult.recordset[0]?.Name || '';
+        
+        const typeResult = await pool.request()
+            .input('typeId', sql.Int, complaintTypeId)
+            .query('SELECT Name FROM ComplaintTypes WHERE Id = @typeId');
+        const typeName = typeResult.recordset[0]?.Name || '';
+        
+        const caseResult = await pool.request()
+            .input('caseId', sql.Int, caseId)
+            .query('SELECT Name FROM ComplaintCases WHERE Id = @caseId');
+        const caseName = caseResult.recordset[0]?.Name || '';
+        
+        // Get transfer to name
+        const transferResult = await pool.request()
+            .input('transferId', sql.Int, transferTo)
+            .query('SELECT Name FROM ComplaintCategories WHERE Id = @transferId');
+        const transferName = transferResult.recordset[0]?.Name || '';
+        
         await pool.request()
             .input('storeId', sql.Int, storeId)
             .input('createdBy', sql.Int, userId)
-            .input('category', sql.NVarChar, category)
-            .input('complaintType', sql.NVarChar, complaintType)
-            .input('caseNumber', sql.NVarChar, caseNumber || null)
+            .input('categoryId', sql.Int, categoryId)
+            .input('complaintTypeId', sql.Int, complaintTypeId)
+            .input('caseId', sql.Int, caseId)
+            .input('category', sql.NVarChar, categoryName)
+            .input('complaintType', sql.NVarChar, typeName)
+            .input('caseNumber', sql.NVarChar, caseName)
             .input('description', sql.NVarChar, description)
             .input('attachmentUrl', sql.NVarChar, attachmentUrl)
             .input('attachmentName', sql.NVarChar, attachmentName)
-            .input('transferTo', sql.NVarChar, transferTo)
+            .input('transferTo', sql.NVarChar, transferName)
             .input('dueDate', sql.Date, dueDate || null)
             .input('escalate', sql.Bit, escalate ? 1 : 0)
             .input('status', sql.NVarChar, 'Open')
             .input('createdAt', sql.DateTime, new Date())
             .query(`
-                INSERT INTO Complaints (StoreId, CreatedBy, Category, ComplaintType, CaseNumber, Description, 
+                INSERT INTO Complaints (StoreId, CreatedBy, CategoryId, ComplaintTypeId, CaseId, Category, ComplaintType, CaseNumber, Description, 
                     AttachmentUrl, AttachmentName, TransferTo, DueDate, Escalate, Status, CreatedAt)
-                VALUES (@storeId, @createdBy, @category, @complaintType, @caseNumber, @description,
+                VALUES (@storeId, @createdBy, @categoryId, @complaintTypeId, @caseId, @category, @complaintType, @caseNumber, @description,
                     @attachmentUrl, @attachmentName, @transferTo, @dueDate, @escalate, @status, @createdAt)
             `);
         
