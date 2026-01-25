@@ -6,7 +6,9 @@
 const path = require('path');
 
 // Load the correct .env file based on NODE_ENV
-const envFile = process.env.NODE_ENV === 'live' ? '.env.live' : '.env.uat';
+// Support both 'live' and 'production' for .env.live
+const isProduction = process.env.NODE_ENV === 'live' || process.env.NODE_ENV === 'production';
+const envFile = isProduction ? '.env.live' : '.env.uat';
 require('dotenv').config({ path: path.join(__dirname, envFile) });
 
 const express = require('express');
@@ -402,12 +404,23 @@ if (USE_HTTPS) {
     }
     
     https.createServer(httpsOptions, app).listen(PORT, () => {
-        console.log(`🚀 ${process.env.APP_NAME} running on ${APP_URL}`);
+        console.log('='.repeat(60));
+        console.log(`🚀 ${process.env.APP_NAME} (HTTPS)`);
+        console.log('='.repeat(60));
+        console.log(`✅ Server running on ${APP_URL}`);
+        console.log(`🔒 SSL Certificate: ${SSL_CERT_PATH}`);
+        console.log('='.repeat(60));
     });
 } else {
     http.createServer(app).listen(PORT, () => {
-        console.log(`🚀 ${process.env.APP_NAME} running on ${APP_URL}`);
+        console.log('='.repeat(60));
+        console.log(`🚀 ${process.env.APP_NAME} (HTTP)`);
+        console.log('='.repeat(60));
+        console.log(`✅ Server running on ${APP_URL}`);
         console.log('⚠️  Running in HTTP mode (behind IIS reverse proxy)');
+        if (SSL_KEY_PATH) console.log(`   Key path: ${SSL_KEY_PATH} (exists: ${fs.existsSync(SSL_KEY_PATH)})`);
+        if (SSL_CERT_PATH) console.log(`   Cert path: ${SSL_CERT_PATH} (exists: ${fs.existsSync(SSL_CERT_PATH)})`);
+        console.log('='.repeat(60));
     });
 }
 
