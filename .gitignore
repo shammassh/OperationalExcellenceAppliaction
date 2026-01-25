@@ -4,6 +4,13 @@ node_modules
 .env.live
 .env.uat
 
+# Daemon configs with secrets (use .template files)
+daemon/OEApp-Live.xml
+daemon/OEApp-UAT.xml
+
+# SSL Certificates
+certs/
+
 # Logs
 logs/
 

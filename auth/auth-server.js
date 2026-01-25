@@ -15,6 +15,14 @@ const { checkUserNotifications } = require('../services/notification-scheduler')
 // Load configuration - dotenv already loaded by app.js with correct path
 // No need to reload here as it overwrites the correct env file with default .env
 
+// Debug: Log Azure AD config (mask secret)
+console.log('[AUTH] Azure AD Config:', {
+    clientId: process.env.AZURE_CLIENT_ID,
+    tenantId: process.env.AZURE_TENANT_ID,
+    redirectUri: process.env.REDIRECT_URI,
+    secretPrefix: process.env.AZURE_CLIENT_SECRET?.substring(0, 10) + '...'
+});
+
 // MSAL Configuration
 const msalConfig = {
     auth: {
