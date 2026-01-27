@@ -26,6 +26,7 @@ const operationalExcellenceModule = require('./modules/operational-excellence');
 const hrModule = require('./modules/hr');
 const personnelModule = require('./modules/personnel');
 const oeInspectionModule = require('./modules/oe-inspection');
+const ohsModule = require('./modules/ohs');
 
 const app = express();
 const PORT = process.env.PORT || 3010;
@@ -58,6 +59,7 @@ app.use('/operational-excellence', requireAuth, operationalExcellenceModule);
 app.use('/oe-inspection', requireAuth, oeInspectionModule);
 app.use('/hr', requireAuth, hrModule);
 app.use('/personnel', requireAuth, personnelModule);
+app.use('/ohs', requireAuth, ohsModule);
 
 // ==========================================
 // Routes
