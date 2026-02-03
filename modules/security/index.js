@@ -35,7 +35,9 @@ router.get('/', async (req, res) => {
                     (SELECT COUNT(*) FROM Security_DeliveryLogs WHERE Status = 'Active') as TotalDeliveryLogs,
                     (SELECT COUNT(*) FROM Security_DeliveryLogs WHERE LogDate = @today AND Status = 'Active') as TodayDeliveryLogs,
                     (SELECT COUNT(*) FROM Security_PatrolSheets WHERE Status = 'Active') as TotalPatrolSheets,
-                    (SELECT COUNT(*) FROM Security_PatrolSheets WHERE PatrolDate = @today AND Status = 'Active') as TodayPatrolSheets
+                    (SELECT COUNT(*) FROM Security_PatrolSheets WHERE PatrolDate = @today AND Status = 'Active') as TodayPatrolSheets,
+                    (SELECT COUNT(*) FROM Security_EntranceForms WHERE Status = 'Active') as TotalEntranceForms,
+                    (SELECT COUNT(*) FROM Security_EntranceForms WHERE FormDate = @today AND Status = 'Active') as TodayEntranceForms
             `);
         
         await pool.close();
@@ -136,6 +138,12 @@ router.get('/', async (req, res) => {
                     .dashboard-card.patrol:hover {
                         border-color: #2e7d32;
                     }
+                    .dashboard-card.entrance {
+                        border-bottom: 5px solid #f57c00;
+                    }
+                    .dashboard-card.entrance:hover {
+                        border-color: #f57c00;
+                    }
                     .card-icon {
                         font-size: 80px;
                         margin-bottom: 20px;
@@ -170,6 +178,7 @@ router.get('/', async (req, res) => {
                     }
                     .stat-number.delivery { color: #1976d2; }
                     .stat-number.patrol { color: #2e7d32; }
+                    .stat-number.entrance { color: #f57c00; }
                     .stat-label {
                         font-size: 12px;
                         color: #888;
@@ -192,6 +201,10 @@ router.get('/', async (req, res) => {
                     .view-btn.patrol {
                         background: #e8f5e9;
                         color: #2e7d32;
+                    }
+                    .view-btn.entrance {
+                        background: #fff3e0;
+                        color: #f57c00;
                     }
                 </style>
             </head>
@@ -243,6 +256,23 @@ router.get('/', async (req, res) => {
                                 </div>
                             </div>
                             <div class="view-btn patrol">View History →</div>
+                        </a>
+                        
+                        <a href="/security/entrance-forms" class="dashboard-card entrance">
+                            <div class="card-icon">🚪</div>
+                            <div class="card-title">Entrance Forms</div>
+                            <div class="card-desc">View all entrance form records for workers and contractors</div>
+                            <div class="card-stats">
+                                <div class="stat-item">
+                                    <div class="stat-number entrance">${stats.TodayEntranceForms || 0}</div>
+                                    <div class="stat-label">Today</div>
+                                </div>
+                                <div class="stat-item">
+                                    <div class="stat-number entrance">${stats.TotalEntranceForms || 0}</div>
+                                    <div class="stat-label">Total</div>
+                                </div>
+                            </div>
+                            <div class="view-btn entrance">View History →</div>
                         </a>
                     </div>
                 </div>
@@ -910,6 +940,342 @@ router.get('/api/patrol-sheets', async (req, res) => {
     } catch (err) {
         console.error('Error fetching patrol sheets:', err);
         res.json({ sheets: [], error: err.message });
+    }
+});
+
+// Entrance Forms History Page
+router.get('/entrance-forms', async (req, res) => {
+    const user = req.currentUser;
+    
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        const entranceResult = await pool.request()
+            .query(`
+                SELECT ef.*, 
+                       (SELECT COUNT(*) FROM Security_EntranceEntries WHERE EntranceFormId = ef.Id) as EntryCount
+                FROM Security_EntranceForms ef
+                WHERE ef.Status = 'Active'
+                ORDER BY ef.FormDate DESC, ef.CreatedAt DESC
+            `);
+        
+        await pool.close();
+        
+        const entranceForms = entranceResult.recordset;
+        
+        let entranceRows = entranceForms.map(form => {
+            const formDate = new Date(form.FormDate).toLocaleDateString('en-GB', { 
+                weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
+            });
+            return `
+                <tr onclick="viewEntrance(${form.Id})" style="cursor: pointer;">
+                    <td>${formDate}</td>
+                    <td><span class="entrance-badge">${form.Entrance}</span></td>
+                    <td>${form.Location}</td>
+                    <td>${form.CreatedBy}</td>
+                    <td><span class="entry-count">${form.EntryCount} entries</span></td>
+                    <td>
+                        <button class="btn-view" onclick="event.stopPropagation(); viewEntrance(${form.Id})">View</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Entrance Forms History - ${process.env.APP_NAME}</title>
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body { 
+                        font-family: 'Segoe UI', Arial, sans-serif; 
+                        background: #f0f2f5;
+                        min-height: 100vh;
+                    }
+                    .header {
+                        background: linear-gradient(135deg, #f57c00 0%, #ef6c00 100%);
+                        color: white;
+                        padding: 20px 40px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    }
+                    .header h1 { 
+                        font-size: 24px;
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                    }
+                    .header-nav a {
+                        color: white;
+                        text-decoration: none;
+                        margin-left: 20px;
+                        opacity: 0.9;
+                        transition: opacity 0.3s;
+                    }
+                    .header-nav a:hover { opacity: 1; }
+                    .container { 
+                        max-width: 1200px; 
+                        margin: 0 auto; 
+                        padding: 30px 20px; 
+                    }
+                    .card {
+                        background: white;
+                        border-radius: 15px;
+                        padding: 25px;
+                        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+                    }
+                    .card-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 20px;
+                        padding-bottom: 15px;
+                        border-bottom: 1px solid #eee;
+                    }
+                    .card-title {
+                        font-size: 18px;
+                        font-weight: 600;
+                        color: #333;
+                    }
+                    .filter-row {
+                        display: flex;
+                        gap: 15px;
+                        margin-bottom: 20px;
+                        flex-wrap: wrap;
+                    }
+                    .filter-row select,
+                    .filter-row input {
+                        padding: 10px 15px;
+                        border: 1px solid #ddd;
+                        border-radius: 8px;
+                        font-size: 14px;
+                        min-width: 150px;
+                    }
+                    .filter-row select:focus,
+                    .filter-row input:focus {
+                        outline: none;
+                        border-color: #f57c00;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                    }
+                    th {
+                        background: #f8f9fa;
+                        padding: 15px;
+                        text-align: left;
+                        font-size: 13px;
+                        font-weight: 600;
+                        color: #555;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                        border-bottom: 2px solid #dee2e6;
+                    }
+                    td {
+                        padding: 15px;
+                        border-bottom: 1px solid #eee;
+                        font-size: 14px;
+                    }
+                    tr:hover {
+                        background: #f8f9fa;
+                    }
+                    .entrance-badge {
+                        background: #fff3e0;
+                        color: #f57c00;
+                        padding: 5px 12px;
+                        border-radius: 20px;
+                        font-size: 12px;
+                        font-weight: 500;
+                    }
+                    .entry-count {
+                        background: #e0f2f1;
+                        color: #00796b;
+                        padding: 5px 12px;
+                        border-radius: 20px;
+                        font-size: 12px;
+                    }
+                    .btn-view {
+                        background: #f57c00;
+                        color: white;
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-size: 13px;
+                        transition: background 0.3s;
+                    }
+                    .btn-view:hover {
+                        background: #ef6c00;
+                    }
+                    .empty-state {
+                        text-align: center;
+                        padding: 60px;
+                        color: #666;
+                    }
+                    .empty-state-icon {
+                        font-size: 60px;
+                        margin-bottom: 15px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>🚪 Entrance Forms History</h1>
+                    <div class="header-nav">
+                        <a href="/security-services/entrance-form">+ New Entry</a>
+                        <a href="/security">← Back</a>
+                    </div>
+                </div>
+                
+                <div class="container">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">All Entrance Forms</div>
+                        </div>
+                        
+                        <div class="filter-row">
+                            <input type="date" id="filterFromDate" onchange="filterEntrance()" placeholder="From Date">
+                            <input type="date" id="filterToDate" onchange="filterEntrance()" placeholder="To Date">
+                            <select id="filterEntrance" onchange="filterEntrance()">
+                                <option value="">All Entrances</option>
+                                <option value="Lower Entrance">Lower Entrance</option>
+                                <option value="Upper Entrance">Upper Entrance</option>
+                            </select>
+                            <select id="filterLocation" onchange="filterEntrance()">
+                                <option value="">All Locations</option>
+                                <option value="HO Dbayeh">HO Dbayeh</option>
+                                <option value="HO Zouk">HO Zouk</option>
+                            </select>
+                        </div>
+                        
+                        <div id="entranceTableContainer">
+                            ${entranceForms.length > 0 ? `
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Entrance</th>
+                                            <th>Location</th>
+                                            <th>Created By</th>
+                                            <th>Entries</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${entranceRows}
+                                    </tbody>
+                                </table>
+                            ` : `
+                                <div class="empty-state">
+                                    <div class="empty-state-icon">🚪</div>
+                                    <p>No entrance forms found</p>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                </div>
+                
+                <script>
+                    function viewEntrance(id) {
+                        window.location.href = '/security-services/entrance-form/' + id;
+                    }
+                    
+                    async function filterEntrance() {
+                        const fromDate = document.getElementById('filterFromDate').value;
+                        const toDate = document.getElementById('filterToDate').value;
+                        const entrance = document.getElementById('filterEntrance').value;
+                        const location = document.getElementById('filterLocation').value;
+                        
+                        let url = '/security/api/entrance-forms?';
+                        if (fromDate) url += 'fromDate=' + fromDate + '&';
+                        if (toDate) url += 'toDate=' + toDate + '&';
+                        if (entrance) url += 'entrance=' + encodeURIComponent(entrance) + '&';
+                        if (location) url += 'location=' + encodeURIComponent(location);
+                        
+                        try {
+                            const res = await fetch(url);
+                            const data = await res.json();
+                            
+                            const container = document.getElementById('entranceTableContainer');
+                            
+                            if (!data.forms || data.forms.length === 0) {
+                                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🚪</div><p>No entrance forms found</p></div>';
+                                return;
+                            }
+                            
+                            let rows = data.forms.map(form => {
+                                const formDate = new Date(form.FormDate).toLocaleDateString('en-GB', { 
+                                    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
+                                });
+                                return '<tr onclick="viewEntrance(' + form.Id + ')" style="cursor: pointer;">' +
+                                    '<td>' + formDate + '</td>' +
+                                    '<td><span class="entrance-badge">' + form.Entrance + '</span></td>' +
+                                    '<td>' + form.Location + '</td>' +
+                                    '<td>' + form.CreatedBy + '</td>' +
+                                    '<td><span class="entry-count">' + form.EntryCount + ' entries</span></td>' +
+                                    '<td><button class="btn-view" onclick="event.stopPropagation(); viewEntrance(' + form.Id + ')">View</button></td>' +
+                                '</tr>';
+                            }).join('');
+                            
+                            container.innerHTML = '<table><thead><tr><th>Date</th><th>Entrance</th><th>Location</th><th>Created By</th><th>Entries</th><th>Action</th></tr></thead><tbody>' + rows + '</tbody></table>';
+                        } catch (err) {
+                            console.error('Error filtering entrance forms:', err);
+                        }
+                    }
+                </script>
+            </body>
+            </html>
+        `);
+    } catch (err) {
+        console.error('Error loading entrance forms:', err);
+        res.status(500).send('Error: ' + err.message);
+    }
+});
+
+// API: Get Entrance Forms
+router.get('/api/entrance-forms', async (req, res) => {
+    try {
+        const { fromDate, toDate, entrance, location } = req.query;
+        
+        const pool = await sql.connect(dbConfig);
+        
+        let query = `
+            SELECT ef.*, 
+                   (SELECT COUNT(*) FROM Security_EntranceEntries WHERE EntranceFormId = ef.Id) as EntryCount
+            FROM Security_EntranceForms ef
+            WHERE ef.Status = 'Active'
+        `;
+        
+        const request = pool.request();
+        
+        if (fromDate) {
+            query += ' AND ef.FormDate >= @fromDate';
+            request.input('fromDate', sql.Date, fromDate);
+        }
+        if (toDate) {
+            query += ' AND ef.FormDate <= @toDate';
+            request.input('toDate', sql.Date, toDate);
+        }
+        if (entrance) {
+            query += ' AND ef.Entrance = @entrance';
+            request.input('entrance', sql.NVarChar, entrance);
+        }
+        if (location) {
+            query += ' AND ef.Location = @location';
+            request.input('location', sql.NVarChar, location);
+        }
+        
+        query += ' ORDER BY ef.FormDate DESC, ef.CreatedAt DESC';
+        
+        const result = await request.query(query);
+        await pool.close();
+        
+        res.json({ forms: result.recordset });
+    } catch (err) {
+        console.error('Error fetching entrance forms:', err);
+        res.json({ forms: [], error: err.message });
     }
 });
 
