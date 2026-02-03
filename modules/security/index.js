@@ -39,7 +39,9 @@ router.get('/', async (req, res) => {
                     (SELECT COUNT(*) FROM Security_EntranceForms WHERE Status = 'Active') as TotalEntranceForms,
                     (SELECT COUNT(*) FROM Security_EntranceForms WHERE FormDate = @today AND Status = 'Active') as TodayEntranceForms,
                     (SELECT COUNT(*) FROM Security_AttendanceReports WHERE Status = 'Active') as TotalAttendanceReports,
-                    (SELECT COUNT(*) FROM Security_AttendanceReports WHERE ReportDate = @today AND Status = 'Active') as TodayAttendanceReports
+                    (SELECT COUNT(*) FROM Security_AttendanceReports WHERE ReportDate = @today AND Status = 'Active') as TodayAttendanceReports,
+                    (SELECT COUNT(*) FROM Security_VisitorCars WHERE Status = 'Active') as TotalVisitorCars,
+                    (SELECT COUNT(*) FROM Security_VisitorCars WHERE RecordDate = @today AND Status = 'Active') as TodayVisitorCars
             `);
         
         await pool.close();
@@ -152,6 +154,12 @@ router.get('/', async (req, res) => {
                     .dashboard-card.attendance:hover {
                         border-color: #7b1fa2;
                     }
+                    .dashboard-card.visitor {
+                        border-bottom: 5px solid #0d47a1;
+                    }
+                    .dashboard-card.visitor:hover {
+                        border-color: #0d47a1;
+                    }
                     .card-icon {
                         font-size: 80px;
                         margin-bottom: 20px;
@@ -188,6 +196,7 @@ router.get('/', async (req, res) => {
                     .stat-number.patrol { color: #2e7d32; }
                     .stat-number.entrance { color: #f57c00; }
                     .stat-number.attendance { color: #7b1fa2; }
+                    .stat-number.visitor { color: #0d47a1; }
                     .stat-label {
                         font-size: 12px;
                         color: #888;
@@ -218,6 +227,10 @@ router.get('/', async (req, res) => {
                     .view-btn.attendance {
                         background: #f3e5f5;
                         color: #7b1fa2;
+                    }
+                    .view-btn.visitor {
+                        background: #e3f2fd;
+                        color: #0d47a1;
                     }
                 </style>
             </head>
@@ -252,6 +265,23 @@ router.get('/', async (req, res) => {
                                 </div>
                             </div>
                             <div class="view-btn attendance">View History →</div>
+                        </a>
+                        
+                        <a href="/security/visitor-cars" class="dashboard-card visitor">
+                            <div class="card-icon">🚗</div>
+                            <div class="card-title">Visitors Cars</div>
+                            <div class="card-desc">Track visitor vehicles and plate numbers</div>
+                            <div class="card-stats">
+                                <div class="stat-item">
+                                    <div class="stat-number visitor">${stats.TodayVisitorCars || 0}</div>
+                                    <div class="stat-label">Today</div>
+                                </div>
+                                <div class="stat-item">
+                                    <div class="stat-number visitor">${stats.TotalVisitorCars || 0}</div>
+                                    <div class="stat-label">Total</div>
+                                </div>
+                            </div>
+                            <div class="view-btn visitor">View History →</div>
                         </a>
                         
                         <a href="/security/delivery-logs" class="dashboard-card delivery">
@@ -1628,6 +1658,328 @@ router.get('/api/attendance-reports', async (req, res) => {
     } catch (err) {
         console.error('Error fetching attendance reports:', err);
         res.json({ reports: [], error: err.message });
+    }
+});
+
+// Visitor Cars History Page
+router.get('/visitor-cars', async (req, res) => {
+    const user = req.currentUser;
+    
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        const carsResult = await pool.request()
+            .query(`
+                SELECT vc.*, 
+                       (SELECT COUNT(*) FROM Security_VisitorCarEntries WHERE VisitorCarId = vc.Id) as EntryCount
+                FROM Security_VisitorCars vc
+                WHERE vc.Status = 'Active'
+                ORDER BY vc.RecordDate DESC, vc.CreatedAt DESC
+            `);
+        
+        await pool.close();
+        
+        const visitorCars = carsResult.recordset;
+        
+        let carsRows = visitorCars.map(record => {
+            const recordDate = new Date(record.RecordDate).toLocaleDateString('en-GB', { 
+                weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
+            });
+            return `
+                <tr onclick="viewRecord(${record.Id})" style="cursor: pointer;">
+                    <td>${recordDate}</td>
+                    <td><span class="location-badge">${record.Location}</span></td>
+                    <td>${record.CreatedBy}</td>
+                    <td><span class="entry-count">${record.EntryCount} vehicles</span></td>
+                    <td>
+                        <button class="btn-view" onclick="event.stopPropagation(); viewRecord(${record.Id})">View</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Visitors Cars Records - ${process.env.APP_NAME}</title>
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body { 
+                        font-family: 'Segoe UI', Arial, sans-serif; 
+                        background: #f0f2f5;
+                        min-height: 100vh;
+                    }
+                    .header {
+                        background: linear-gradient(135deg, #0d47a1 0%, #1565c0 100%);
+                        color: white;
+                        padding: 20px 40px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    }
+                    .header h1 { 
+                        font-size: 24px;
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                    }
+                    .header-nav a {
+                        color: white;
+                        text-decoration: none;
+                        margin-left: 20px;
+                        opacity: 0.9;
+                        transition: opacity 0.3s;
+                    }
+                    .header-nav a:hover { opacity: 1; }
+                    .container { 
+                        max-width: 1200px; 
+                        margin: 0 auto; 
+                        padding: 30px 20px; 
+                    }
+                    .card {
+                        background: white;
+                        border-radius: 15px;
+                        padding: 25px;
+                        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+                    }
+                    .card-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 20px;
+                        padding-bottom: 15px;
+                        border-bottom: 1px solid #eee;
+                    }
+                    .card-title {
+                        font-size: 18px;
+                        font-weight: 600;
+                        color: #333;
+                    }
+                    .filter-row {
+                        display: flex;
+                        gap: 15px;
+                        margin-bottom: 20px;
+                        flex-wrap: wrap;
+                    }
+                    .filter-row select,
+                    .filter-row input {
+                        padding: 10px 15px;
+                        border: 1px solid #ddd;
+                        border-radius: 8px;
+                        font-size: 14px;
+                        min-width: 150px;
+                    }
+                    .filter-row select:focus,
+                    .filter-row input:focus {
+                        outline: none;
+                        border-color: #0d47a1;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                    }
+                    th {
+                        background: #f8f9fa;
+                        padding: 15px;
+                        text-align: left;
+                        font-size: 13px;
+                        font-weight: 600;
+                        color: #555;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                        border-bottom: 2px solid #dee2e6;
+                    }
+                    td {
+                        padding: 15px;
+                        border-bottom: 1px solid #eee;
+                        font-size: 14px;
+                    }
+                    tr:hover {
+                        background: #f8f9fa;
+                    }
+                    .location-badge {
+                        background: #e3f2fd;
+                        color: #0d47a1;
+                        padding: 5px 12px;
+                        border-radius: 20px;
+                        font-size: 12px;
+                        font-weight: 500;
+                    }
+                    .entry-count {
+                        background: #e0f2f1;
+                        color: #00796b;
+                        padding: 5px 12px;
+                        border-radius: 20px;
+                        font-size: 12px;
+                    }
+                    .btn-view {
+                        background: #0d47a1;
+                        color: white;
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-size: 13px;
+                        transition: background 0.3s;
+                    }
+                    .btn-view:hover {
+                        background: #0a3d91;
+                    }
+                    .empty-state {
+                        text-align: center;
+                        padding: 60px;
+                        color: #666;
+                    }
+                    .empty-state-icon {
+                        font-size: 60px;
+                        margin-bottom: 15px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>🚗 Visitors Cars Records</h1>
+                    <div class="header-nav">
+                        <a href="/security-services/visitor-cars">+ New Record</a>
+                        <a href="/security">← Back</a>
+                    </div>
+                </div>
+                
+                <div class="container">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">All Visitor Cars Records</div>
+                        </div>
+                        
+                        <div class="filter-row">
+                            <input type="date" id="filterFromDate" onchange="filterRecords()" placeholder="From Date">
+                            <input type="date" id="filterToDate" onchange="filterRecords()" placeholder="To Date">
+                            <select id="filterLocation" onchange="filterRecords()">
+                                <option value="">All Locations</option>
+                                <option value="HO Zouk">HO Zouk</option>
+                                <option value="HO Dbayeh">HO Dbayeh</option>
+                            </select>
+                        </div>
+                        
+                        <div id="recordsTableContainer">
+                            ${visitorCars.length > 0 ? `
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Location</th>
+                                            <th>Created By</th>
+                                            <th>Vehicles</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${carsRows}
+                                    </tbody>
+                                </table>
+                            ` : `
+                                <div class="empty-state">
+                                    <div class="empty-state-icon">🚗</div>
+                                    <p>No visitor cars records found</p>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                </div>
+                
+                <script>
+                    function viewRecord(id) {
+                        window.location.href = '/security-services/visitor-cars/' + id;
+                    }
+                    
+                    async function filterRecords() {
+                        const fromDate = document.getElementById('filterFromDate').value;
+                        const toDate = document.getElementById('filterToDate').value;
+                        const location = document.getElementById('filterLocation').value;
+                        
+                        let url = '/security/api/visitor-cars?';
+                        if (fromDate) url += 'fromDate=' + fromDate + '&';
+                        if (toDate) url += 'toDate=' + toDate + '&';
+                        if (location) url += 'location=' + encodeURIComponent(location);
+                        
+                        try {
+                            const res = await fetch(url);
+                            const data = await res.json();
+                            
+                            const container = document.getElementById('recordsTableContainer');
+                            
+                            if (!data.records || data.records.length === 0) {
+                                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🚗</div><p>No visitor cars records found</p></div>';
+                                return;
+                            }
+                            
+                            let rows = data.records.map(record => {
+                                const recordDate = new Date(record.RecordDate).toLocaleDateString('en-GB', { 
+                                    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
+                                });
+                                return '<tr onclick="viewRecord(' + record.Id + ')" style="cursor: pointer;">' +
+                                    '<td>' + recordDate + '</td>' +
+                                    '<td><span class="location-badge">' + record.Location + '</span></td>' +
+                                    '<td>' + record.CreatedBy + '</td>' +
+                                    '<td><span class="entry-count">' + record.EntryCount + ' vehicles</span></td>' +
+                                    '<td><button class="btn-view" onclick="event.stopPropagation(); viewRecord(' + record.Id + ')">View</button></td>' +
+                                '</tr>';
+                            }).join('');
+                            
+                            container.innerHTML = '<table><thead><tr><th>Date</th><th>Location</th><th>Created By</th><th>Vehicles</th><th>Action</th></tr></thead><tbody>' + rows + '</tbody></table>';
+                        } catch (err) {
+                            console.error('Error filtering records:', err);
+                        }
+                    }
+                </script>
+            </body>
+            </html>
+        `);
+    } catch (err) {
+        console.error('Error loading visitor cars records:', err);
+        res.status(500).send('Error: ' + err.message);
+    }
+});
+
+// API: Get Visitor Cars
+router.get('/api/visitor-cars', async (req, res) => {
+    try {
+        const { fromDate, toDate, location } = req.query;
+        
+        const pool = await sql.connect(dbConfig);
+        
+        let query = `
+            SELECT vc.*, 
+                   (SELECT COUNT(*) FROM Security_VisitorCarEntries WHERE VisitorCarId = vc.Id) as EntryCount
+            FROM Security_VisitorCars vc
+            WHERE vc.Status = 'Active'
+        `;
+        
+        const request = pool.request();
+        
+        if (fromDate) {
+            query += ' AND vc.RecordDate >= @fromDate';
+            request.input('fromDate', sql.Date, fromDate);
+        }
+        if (toDate) {
+            query += ' AND vc.RecordDate <= @toDate';
+            request.input('toDate', sql.Date, toDate);
+        }
+        if (location) {
+            query += ' AND vc.Location = @location';
+            request.input('location', sql.NVarChar, location);
+        }
+        
+        query += ' ORDER BY vc.RecordDate DESC, vc.CreatedAt DESC';
+        
+        const result = await request.query(query);
+        await pool.close();
+        
+        res.json({ records: result.recordset });
+    } catch (err) {
+        console.error('Error fetching visitor cars:', err);
+        res.json({ records: [], error: err.message });
     }
 });
 
