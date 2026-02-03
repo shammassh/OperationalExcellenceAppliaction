@@ -1263,8 +1263,8 @@
                 }
 
                 container.innerHTML = sections.map(section => `
-                    <div class="section-item" onclick="selectSection(${section.sectionId})" style="cursor: pointer; ${currentSectionId === section.sectionId ? 'border-color: #e17055; background: #fff5f3;' : ''}">
-                        <div class="section-info">
+                    <div class="section-item" style="cursor: pointer; ${currentSectionId === section.sectionId ? 'border-color: #e17055; background: #fff5f3;' : ''}">
+                        <div class="section-info" onclick="selectSection(${section.sectionId})">
                             <div class="section-number">${section.sectionNumber}</div>
                             <div class="section-icon">${section.sectionIcon || '📋'}</div>
                             <div>
@@ -1272,7 +1272,11 @@
                                 <div class="section-count">${section.itemCount || 0} items</div>
                             </div>
                         </div>
-                        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); selectSection(${section.sectionId})">📝 Manage Items</button>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-warning btn-sm" onclick="event.stopPropagation(); openEditSectionModal(${section.sectionId})" title="Edit Section">✏️</button>
+                            <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deleteSection(${section.sectionId})" title="Delete Section">🗑️</button>
+                            <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); selectSection(${section.sectionId})">📝 Items</button>
+                        </div>
                     </div>
                 `).join('');
             } catch (error) {
@@ -1304,7 +1308,61 @@
             const section = sections.find(s => s.sectionId === sectionId);
             document.getElementById('currentSectionName').textContent = section.sectionName;
             document.getElementById('itemsSection').style.display = 'block';
+            loadSections(); // Refresh to highlight selected
             loadItems();
+        }
+
+        function openEditSectionModal(sectionId) {
+            const section = sections.find(s => s.sectionId === sectionId);
+            if (!section) return;
+            document.getElementById('editSectionId').value = sectionId;
+            document.getElementById('editSectionNumber').value = section.sectionNumber || '';
+            document.getElementById('editSectionName').value = section.sectionName || '';
+            document.getElementById('editSectionIcon').value = section.sectionIcon || '📋';
+            document.getElementById('editSectionModal').classList.add('active');
+        }
+
+        function closeEditSectionModal() {
+            document.getElementById('editSectionModal').classList.remove('active');
+        }
+
+        async function saveSectionEdit(e) {
+            e.preventDefault();
+            const sectionId = document.getElementById('editSectionId').value;
+            const sectionNumber = parseInt(document.getElementById('editSectionNumber').value);
+            const sectionName = document.getElementById('editSectionName').value.trim();
+            const sectionIcon = document.getElementById('editSectionIcon').value;
+
+            try {
+                await apiCall(`/sections/${sectionId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ sectionNumber, sectionName, sectionIcon })
+                });
+                showToast('Section updated successfully!', 'success');
+                closeEditSectionModal();
+                loadSections();
+            } catch (error) {
+                showToast('Error updating section: ' + error.message, 'error');
+            }
+        }
+
+        async function deleteSection(sectionId) {
+            const section = sections.find(s => s.sectionId === sectionId);
+            if (!section) return;
+            
+            if (!confirm(`Delete section "${section.sectionName}"?\n\nThis will also delete all ${section.itemCount || 0} items in this section.`)) return;
+
+            try {
+                await apiCall(`/sections/${sectionId}`, { method: 'DELETE' });
+                showToast('Section deleted successfully!', 'success');
+                if (currentSectionId === sectionId) {
+                    currentSectionId = null;
+                    document.getElementById('itemsSection').style.display = 'none';
+                }
+                loadSections();
+            } catch (error) {
+                showToast('Error deleting section: ' + error.message, 'error');
+            }
         }
 
         // ==========================================
@@ -1581,6 +1639,52 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn" onclick="closeEditSchemaModal()" style="background: #6b7280;">Cancel</button>
+                    <button type="submit" class="btn btn-success">💾 Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Section Modal -->
+    <div id="editSectionModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>✏️ Edit Section</h3>
+                <button class="modal-close" onclick="closeEditSectionModal()">&times;</button>
+            </div>
+            <form id="editSectionForm" onsubmit="saveSectionEdit(event)">
+                <input type="hidden" id="editSectionId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Section Number <span class="required">*</span></label>
+                        <input type="number" id="editSectionNumber" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Icon</label>
+                        <select id="editSectionIcon">
+                            <option value="📋">📋 Default</option>
+                            <option value="🔥">🔥 Fire</option>
+                            <option value="⚡">⚡ Electrical</option>
+                            <option value="🦺">🦺 PPE</option>
+                            <option value="🚨">🚨 Emergency</option>
+                            <option value="🧯">🧯 Fire Extinguisher</option>
+                            <option value="🚪">🚪 Exit</option>
+                            <option value="⚠️">⚠️ Hazard</option>
+                            <option value="🛠️">🛠️ Equipment</option>
+                            <option value="🧹">🧹 Housekeeping</option>
+                            <option value="💊">💊 First Aid</option>
+                            <option value="🔒">🔒 Security</option>
+                            <option value="📝">📝 Documentation</option>
+                            <option value="✅">✅ Compliance</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Section Name <span class="required">*</span></label>
+                    <input type="text" id="editSectionName" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeEditSectionModal()" style="background: #6b7280;">Cancel</button>
                     <button type="submit" class="btn btn-success">💾 Save</button>
                 </div>
             </form>
