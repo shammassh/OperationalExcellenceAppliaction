@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OHS Inspection List</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            color: #d63031;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-actions { display: flex; gap: 12px; }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(225, 112, 85, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f8f9fa;
+            color: #495057;
+            border: 1px solid #dee2e6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .filters-bar {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .filter-group label {
+            font-size: 12px;
+            color: #6b7280;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .filter-group select,
+        .filter-group input {
+            padding: 10px 14px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            min-width: 150px;
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 24px;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .stat-card .number {
+            font-size: 36px;
+            font-weight: 700;
+            color: #d63031;
+        }
+
+        .stat-card .label {
+            font-size: 14px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+
+        .stat-card.completed .number { color: #10b981; }
+        .stat-card.in-progress .number { color: #f59e0b; }
+
+        .score-pass { color: #10b981 !important; }
+        .score-fail { color: #ef4444 !important; }
+        .score-na { color: #9ca3af !important; }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .audit-card {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .audit-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+        }
+
+        .card-header {
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .card-header.completed, .card-header.pass {
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+        }
+
+        .card-header.fail {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+        }
+
+        .card-header.in-progress, .card-header.draft {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        }
+
+        .doc-number {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1f2937;
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-draft { background: #fef3c7; color: #92400e; }
+        .status-completed { background: #d1fae5; color: #065f46; }
+
+        .card-body { padding: 20px; }
+
+        .card-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-label {
+            font-size: 11px;
+            color: #9ca3af;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+
+        .info-value {
+            font-size: 14px;
+            color: #1f2937;
+            font-weight: 500;
+        }
+
+        .score-display {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+            background: #f9fafb;
+            border-radius: 12px;
+            margin-bottom: 15px;
+        }
+
+        .score-value {
+            font-size: 32px;
+            font-weight: 700;
+        }
+
+        .score-label {
+            font-size: 12px;
+            color: #6b7280;
+            margin-left: 8px;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .card-actions .btn {
+            flex: 1;
+            justify-content: center;
+            padding: 10px;
+        }
+
+        .empty-state {
+            background: white;
+            border-radius: 16px;
+            padding: 60px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .empty-state h3 {
+            font-size: 24px;
+            color: #374151;
+            margin-bottom: 10px;
+        }
+
+        .empty-state p {
+            color: #6b7280;
+            margin-bottom: 20px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: white;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .stats-row { grid-template-columns: repeat(2, 1fr); }
+            .cards-grid { grid-template-columns: 1fr; }
+            .filters-bar { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🦺 OHS Inspection List</h1>
+        <div class="header-actions">
+            <a href="/ohs-inspection/start" class="btn btn-primary">➕ New Inspection</a>
+            <a href="/ohs-inspection" class="btn btn-secondary">← Back</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="stats-row" id="statsRow">
+            <div class="stat-card">
+                <div class="number" id="totalCount">-</div>
+                <div class="label">Total Inspections</div>
+            </div>
+            <div class="stat-card in-progress">
+                <div class="number" id="draftCount">-</div>
+                <div class="label">In Progress</div>
+            </div>
+            <div class="stat-card completed">
+                <div class="number" id="completedCount">-</div>
+                <div class="label">Completed</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="todayCount">-</div>
+                <div class="label">Today</div>
+            </div>
+        </div>
+
+        <div class="filters-bar">
+            <div class="filter-group">
+                <label>Status</label>
+                <select id="filterStatus">
+                    <option value="">All Status</option>
+                    <option value="Draft">Draft</option>
+                    <option value="Completed">Completed</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Store</label>
+                <select id="filterStore">
+                    <option value="">All Stores</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>From Date</label>
+                <input type="date" id="filterFromDate">
+            </div>
+            <div class="filter-group">
+                <label>To Date</label>
+                <input type="date" id="filterToDate">
+            </div>
+            <div class="filter-group" style="align-self: flex-end;">
+                <button class="btn btn-secondary" onclick="applyFilters()">🔍 Filter</button>
+            </div>
+            <div class="filter-group" style="align-self: flex-end;">
+                <button class="btn btn-secondary" onclick="clearFilters()">✕ Clear</button>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Loading inspections...</p>
+        </div>
+
+        <div class="cards-grid" id="cardsGrid"></div>
+
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <h3>No inspections found</h3>
+            <p>Start a new inspection or adjust your filters</p>
+            <a href="/ohs-inspection/start" class="btn btn-primary">🚀 Start New Inspection</a>
+        </div>
+    </div>
+
+    <script>
+        let allAudits = [];
+        let passingGrade = 80;
+
+        async function loadAudits() {
+            try {
+                const response = await fetch('/ohs-inspection/api/audits/list');
+                const data = await response.json();
+                
+                if (data.success) {
+                    allAudits = data.audits || [];
+                    if (data.audits.length > 0 && data.audits[0].PassingGrade) {
+                        passingGrade = parseInt(data.audits[0].PassingGrade) || 80;
+                    }
+                    
+                    // Populate store filter
+                    const stores = [...new Set(allAudits.map(a => a.StoreName).filter(Boolean))];
+                    const storeSelect = document.getElementById('filterStore');
+                    stores.forEach(store => {
+                        const option = document.createElement('option');
+                        option.value = store;
+                        option.textContent = store;
+                        storeSelect.appendChild(option);
+                    });
+                    
+                    updateStats();
+                    renderAudits(allAudits);
+                }
+            } catch (error) {
+                console.error('Error loading audits:', error);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function updateStats() {
+            const today = new Date().toDateString();
+            document.getElementById('totalCount').textContent = allAudits.length;
+            document.getElementById('draftCount').textContent = allAudits.filter(a => a.Status === 'Draft').length;
+            document.getElementById('completedCount').textContent = allAudits.filter(a => a.Status === 'Completed').length;
+            document.getElementById('todayCount').textContent = allAudits.filter(a => new Date(a.CreatedAt).toDateString() === today).length;
+        }
+
+        function renderAudits(audits) {
+            const grid = document.getElementById('cardsGrid');
+            const empty = document.getElementById('emptyState');
+            
+            if (audits.length === 0) {
+                grid.innerHTML = '';
+                empty.style.display = 'block';
+                return;
+            }
+            
+            empty.style.display = 'none';
+            
+            grid.innerHTML = audits.map(audit => {
+                const score = audit.TotalScore !== null ? Math.round(audit.TotalScore) : null;
+                const isPassed = score !== null && score >= passingGrade;
+                const statusClass = audit.Status === 'Completed' ? (isPassed ? 'pass' : 'fail') : 'draft';
+                const scoreClass = score !== null ? (isPassed ? 'score-pass' : 'score-fail') : 'score-na';
+                
+                return `
+                    <div class="audit-card" onclick="openAudit(${audit.AuditID})">
+                        <div class="card-header ${statusClass}">
+                            <div class="doc-number">${audit.DocumentNumber || 'N/A'}</div>
+                            <span class="status-badge status-${audit.Status?.toLowerCase()}">${audit.Status}</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="card-info">
+                                <div class="info-item">
+                                    <span class="info-label">Store</span>
+                                    <span class="info-value">${audit.StoreName || 'N/A'}</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Date</span>
+                                    <span class="info-value">${audit.AuditDate ? new Date(audit.AuditDate).toLocaleDateString() : 'N/A'}</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Inspector</span>
+                                    <span class="info-value">${audit.Auditors || 'N/A'}</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Created</span>
+                                    <span class="info-value">${new Date(audit.CreatedAt).toLocaleDateString()}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="score-display">
+                                <span class="score-value ${scoreClass}">${score !== null ? score + '%' : '-'}</span>
+                                <span class="score-label">${score !== null ? (isPassed ? 'PASS' : 'FAIL') : 'Not scored'}</span>
+                            </div>
+                            
+                            <div class="card-actions">
+                                <button class="btn btn-primary" onclick="event.stopPropagation(); openAudit(${audit.AuditID})">
+                                    ${audit.Status === 'Completed' ? '👁 View' : '✏️ Continue'}
+                                </button>
+                                <button class="btn btn-secondary" onclick="event.stopPropagation(); deleteAudit(${audit.AuditID})">
+                                    🗑️
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function applyFilters() {
+            const status = document.getElementById('filterStatus').value;
+            const store = document.getElementById('filterStore').value;
+            const fromDate = document.getElementById('filterFromDate').value;
+            const toDate = document.getElementById('filterToDate').value;
+            
+            let filtered = [...allAudits];
+            
+            if (status) {
+                filtered = filtered.filter(a => a.Status === status);
+            }
+            if (store) {
+                filtered = filtered.filter(a => a.StoreName === store);
+            }
+            if (fromDate) {
+                filtered = filtered.filter(a => new Date(a.AuditDate) >= new Date(fromDate));
+            }
+            if (toDate) {
+                filtered = filtered.filter(a => new Date(a.AuditDate) <= new Date(toDate));
+            }
+            
+            renderAudits(filtered);
+        }
+
+        function clearFilters() {
+            document.getElementById('filterStatus').value = '';
+            document.getElementById('filterStore').value = '';
+            document.getElementById('filterFromDate').value = '';
+            document.getElementById('filterToDate').value = '';
+            renderAudits(allAudits);
+        }
+
+        function openAudit(id) {
+            window.location.href = `/ohs-inspection/fill/${id}`;
+        }
+
+        async function deleteAudit(id) {
+            if (!confirm('Are you sure you want to delete this inspection?')) return;
+            
+            try {
+                const response = await fetch(`/ohs-inspection/api/audits/${id}`, { method: 'DELETE' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    allAudits = allAudits.filter(a => a.AuditID !== id);
+                    updateStats();
+                    applyFilters();
+                } else {
+                    alert('Failed to delete: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error deleting inspection');
+            }
+        }
+
+        // Load on page load
+        loadAudits();
+    </script>
+</body>
+</html>

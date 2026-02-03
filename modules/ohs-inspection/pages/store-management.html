@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OHS Inspection - Store Management</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            min-height: 100vh;
+            color: #1e293b;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            border-bottom: 1px solid rgba(225, 112, 85, 0.3);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-left { display: flex; align-items: center; gap: 1rem; }
+
+        .back-btn {
+            background: linear-gradient(135deg, #475569 0%, #334155 100%);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .header-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #e17055, #d63031);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .main-container { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .search-box {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: white;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            width: 300px;
+        }
+
+        .search-input {
+            border: none;
+            outline: none;
+            flex: 1;
+            font-size: 0.95rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(225, 112, 85, 0.4);
+        }
+
+        .btn-secondary { background: #f1f5f9; color: #475569; }
+        .btn-danger { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; }
+        .btn-sm { padding: 0.5rem 0.75rem; font-size: 0.85rem; }
+
+        .stores-table {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(225, 112, 85, 0.2);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        th {
+            background: rgba(225, 112, 85, 0.1);
+            font-weight: 600;
+            color: #475569;
+            font-size: 0.9rem;
+        }
+
+        tr:hover { background: rgba(225, 112, 85, 0.05); }
+
+        .status-active {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .status-inactive {
+            background: #94a3b8;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .action-btns { display: flex; gap: 0.5rem; }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.show { display: flex; }
+
+        .modal {
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            width: 500px;
+            max-width: 90%;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: #1e293b;
+        }
+
+        .form-group { margin-bottom: 1rem; }
+        .form-label { display: block; font-size: 0.9rem; color: #64748b; margin-bottom: 0.5rem; }
+
+        .form-input, .form-select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 0.95rem;
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: #e17055;
+        }
+
+        .modal-actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem; }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem;
+            color: #64748b;
+        }
+
+        .empty-icon { font-size: 4rem; margin-bottom: 1rem; }
+
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: #10b981;
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+        }
+
+        .toast.show { transform: translateY(0); opacity: 1; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <a href="/ohs-inspection" class="back-btn">← Back</a>
+            <span class="header-title">🏪 Store Management</span>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="toolbar">
+            <div class="search-box">
+                <span>🔍</span>
+                <input type="text" class="search-input" id="searchInput" placeholder="Search stores..." oninput="filterStores()">
+            </div>
+            <button class="btn btn-primary" onclick="openAddModal()">+ Add Store</button>
+        </div>
+
+        <div class="stores-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Store Name</th>
+                        <th>Code</th>
+                        <th>Location</th>
+                        <th>Manager</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="storesTableBody">
+                    <tr>
+                        <td colspan="6" class="empty-state">
+                            <div class="empty-icon">🏪</div>
+                            <p>Loading stores...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="storeModal">
+        <div class="modal">
+            <h3 class="modal-title" id="modalTitle">Add Store</h3>
+            <input type="hidden" id="storeId">
+
+            <div class="form-group">
+                <label class="form-label">Store Name *</label>
+                <input type="text" class="form-input" id="storeName" placeholder="Enter store name">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Store Code</label>
+                <input type="text" class="form-input" id="storeCode" placeholder="e.g., STR-001">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Location</label>
+                <input type="text" class="form-input" id="storeLocation" placeholder="Address or location">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Manager</label>
+                <input type="text" class="form-input" id="storeManager" placeholder="Manager name">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Status</label>
+                <select class="form-select" id="storeStatus">
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                </select>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveStore()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        let stores = [];
+        let filteredStores = [];
+
+        async function loadStores() {
+            try {
+                const response = await fetch('/ohs-inspection/api/stores');
+                const result = await response.json();
+                if (result.success) {
+                    stores = result.data || [];
+                    filteredStores = [...stores];
+                    renderStores();
+                }
+            } catch (error) {
+                console.error('Error loading stores:', error);
+                document.getElementById('storesTableBody').innerHTML = `
+                    <tr>
+                        <td colspan="6" class="empty-state">
+                            <div class="empty-icon">❌</div>
+                            <p>Error loading stores</p>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        function renderStores() {
+            const tbody = document.getElementById('storesTableBody');
+
+            if (filteredStores.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="empty-state">
+                            <div class="empty-icon">🏪</div>
+                            <p>No stores found. Add your first store!</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = filteredStores.map(store => `
+                <tr>
+                    <td><strong>${store.name}</strong></td>
+                    <td>${store.code || '-'}</td>
+                    <td>${store.location || '-'}</td>
+                    <td>${store.manager || '-'}</td>
+                    <td>
+                        <span class="${store.status === 'Active' ? 'status-active' : 'status-inactive'}">
+                            ${store.status || 'Active'}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="action-btns">
+                            <button class="btn btn-secondary btn-sm" onclick="editStore(${store.id})">✏️ Edit</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteStore(${store.id})">🗑️</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function filterStores() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            filteredStores = stores.filter(s => 
+                s.name.toLowerCase().includes(query) ||
+                (s.code && s.code.toLowerCase().includes(query)) ||
+                (s.location && s.location.toLowerCase().includes(query))
+            );
+            renderStores();
+        }
+
+        function openAddModal() {
+            document.getElementById('modalTitle').textContent = 'Add Store';
+            document.getElementById('storeId').value = '';
+            document.getElementById('storeName').value = '';
+            document.getElementById('storeCode').value = '';
+            document.getElementById('storeLocation').value = '';
+            document.getElementById('storeManager').value = '';
+            document.getElementById('storeStatus').value = 'Active';
+            document.getElementById('storeModal').classList.add('show');
+        }
+
+        function editStore(id) {
+            const store = stores.find(s => s.id === id);
+            if (!store) return;
+
+            document.getElementById('modalTitle').textContent = 'Edit Store';
+            document.getElementById('storeId').value = store.id;
+            document.getElementById('storeName').value = store.name;
+            document.getElementById('storeCode').value = store.code || '';
+            document.getElementById('storeLocation').value = store.location || '';
+            document.getElementById('storeManager').value = store.manager || '';
+            document.getElementById('storeStatus').value = store.status || 'Active';
+            document.getElementById('storeModal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('storeModal').classList.remove('show');
+        }
+
+        async function saveStore() {
+            const id = document.getElementById('storeId').value;
+            const name = document.getElementById('storeName').value.trim();
+
+            if (!name) {
+                alert('Please enter a store name');
+                return;
+            }
+
+            const storeData = {
+                name,
+                code: document.getElementById('storeCode').value.trim(),
+                location: document.getElementById('storeLocation').value.trim(),
+                manager: document.getElementById('storeManager').value.trim(),
+                status: document.getElementById('storeStatus').value
+            };
+
+            try {
+                const url = id ? `/ohs-inspection/api/stores/${id}` : '/ohs-inspection/api/stores';
+                const method = id ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(storeData)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    closeModal();
+                    showToast(id ? 'Store updated!' : 'Store added!');
+                    loadStores();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error saving store:', error);
+                alert('Error saving store');
+            }
+        }
+
+        async function deleteStore(id) {
+            if (!confirm('Are you sure you want to delete this store?')) return;
+
+            try {
+                const response = await fetch(`/ohs-inspection/api/stores/${id}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    showToast('Store deleted');
+                    loadStores();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error deleting store:', error);
+            }
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        loadStores();
+    </script>
+</body>
+</html>

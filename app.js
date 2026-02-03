@@ -27,6 +27,7 @@ const hrModule = require('./modules/hr');
 const personnelModule = require('./modules/personnel');
 const oeInspectionModule = require('./modules/oe-inspection');
 const ohsModule = require('./modules/ohs');
+const ohsInspectionModule = require('./modules/ohs-inspection');
 
 const app = express();
 const PORT = process.env.PORT || 3010;
@@ -60,6 +61,7 @@ app.use('/oe-inspection', requireAuth, oeInspectionModule);
 app.use('/hr', requireAuth, hrModule);
 app.use('/personnel', requireAuth, personnelModule);
 app.use('/ohs', requireAuth, ohsModule);
+app.use('/ohs-inspection', requireAuth, ohsInspectionModule);
 
 // ==========================================
 // Routes
@@ -121,18 +123,18 @@ app.get('/dashboard', requireAuth, (req, res) => {
     // Define which roles can see which departments
     const rolePermissions = {
         // System Admin and OE Department can see all
-        'System Administrator': ['stores', 'ohs', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Senior Inspector': ['stores', 'ohs', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Inspector': ['stores', 'ohs', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Implementation Inspector': ['stores', 'ohs', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Head of Operational Excellence': ['stores', 'ohs', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
+        'System Administrator': ['stores', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
+        'Senior Inspector': ['stores', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
+        'Inspector': ['stores', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
+        'Implementation Inspector': ['stores', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
+        'Head of Operational Excellence': ['stores', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
         
         // Executives can see all
-        'Chief People & Support Officer': ['stores', 'ohs', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Head of Talent Management': ['stores', 'ohs', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Head of Operational Assurance and Support': ['stores', 'ohs', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Lead Support and Execution Coordinator': ['stores', 'ohs', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Head of Operations': ['stores', 'ohs', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
+        'Chief People & Support Officer': ['stores', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
+        'Head of Talent Management': ['stores', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
+        'Head of Operational Assurance and Support': ['stores', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
+        'Lead Support and Execution Coordinator': ['stores', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
+        'Head of Operations': ['stores', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
         
         // Store-Level Users
         'Area Manager': ['stores', 'personnel'],
@@ -141,8 +143,8 @@ app.get('/dashboard', requireAuth, (req, res) => {
         'Personnel Supervisor': ['stores', 'personnel'],
         
         // OHS Department
-        'OHS Manager': ['ohs'],
-        'OHS Officer': ['ohs'],
+        'OHS Manager': ['ohs', 'ohs-inspection'],
+        'OHS Officer': ['ohs', 'ohs-inspection'],
         
         // Third-Party Services
         'Senior Coordinator': ['thirdparty'],
@@ -177,6 +179,7 @@ app.get('/dashboard', requireAuth, (req, res) => {
         { id: 'stores', icon: '🏪', title: 'Stores', href: '/stores', desc: 'Store operations & management' },
         { id: 'personnel', icon: '👤', title: 'Personnel', href: '/personnel', desc: 'Personnel forms & requests' },
         { id: 'ohs', icon: '🦺', title: 'Occupational Health & Safety', href: '/ohs', desc: 'OHS incidents & inspections' },
+        { id: 'ohs-inspection', icon: '🛡️', title: 'OHS Inspection', href: '/ohs-inspection', desc: 'OHS safety inspections & audits' },
         { id: 'oe', icon: '📋', title: 'Operational Excellence', href: '/operational-excellence', desc: 'Audits, action plans & reports' },
         { id: 'oe-inspection', icon: '🔍', title: 'OE Inspection', href: '/oe-inspection', desc: 'OE inspections, reports & action plans' },
         { id: 'thirdparty', icon: '🤝', title: 'Third-Party Services', href: '/third-party', desc: 'Service providers & compliance' },

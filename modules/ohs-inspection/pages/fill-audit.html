@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fill OHS Inspection</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            min-height: 100vh;
+            color: #1e293b;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            border-bottom: 1px solid rgba(225, 112, 85, 0.3);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-left { display: flex; align-items: center; gap: 1rem; }
+
+        .back-btn {
+            background: linear-gradient(135deg, #475569 0%, #334155 100%);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .back-btn:hover { background: linear-gradient(135deg, #64748b 0%, #475569 100%); }
+
+        .header-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #e17055, #d63031);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+
+        .audit-info { display: flex; gap: 1.5rem; font-size: 0.9rem; }
+
+        .audit-info-item { display: flex; align-items: center; gap: 0.5rem; }
+        .audit-info-label { color: #64748b; }
+        .audit-info-value { color: #1e293b; font-weight: 600; }
+
+        .status-badge {
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .status-in-progress { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; }
+        .status-completed { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; }
+
+        .main-container { display: flex; height: calc(100vh - 70px); }
+
+        .sections-sidebar {
+            width: 280px;
+            background: rgba(255, 255, 255, 0.95);
+            border-right: 1px solid rgba(225, 112, 85, 0.2);
+            overflow-y: auto;
+            padding: 1rem;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .sidebar-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(225, 112, 85, 0.2);
+        }
+
+        .section-nav-item {
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
+        }
+
+        .section-nav-item:hover {
+            background: rgba(225, 112, 85, 0.1);
+            border-color: rgba(225, 112, 85, 0.3);
+        }
+
+        .section-nav-item.active {
+            background: rgba(225, 112, 85, 0.2);
+            border-color: rgba(225, 112, 85, 0.5);
+        }
+
+        .section-nav-icon { font-size: 1.25rem; }
+        .section-nav-info { flex: 1; }
+        .section-nav-name { font-size: 0.9rem; font-weight: 500; color: #1e293b; }
+        .section-nav-progress { font-size: 0.75rem; color: #64748b; }
+        .section-nav-score { font-size: 0.85rem; font-weight: 600; }
+
+        .score-pass { color: #10b981; }
+        .score-fail { color: #ef4444; }
+        .score-na { color: #94a3b8; }
+
+        .content-area { flex: 1; overflow-y: auto; padding: 2rem; }
+
+        .section-header {
+            background: linear-gradient(135deg, rgba(225, 112, 85, 0.1) 0%, rgba(214, 48, 49, 0.05) 100%);
+            border: 1px solid rgba(225, 112, 85, 0.3);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-title { display: flex; align-items: center; gap: 1rem; }
+        .section-icon { font-size: 2rem; }
+        .section-name { font-size: 1.5rem; font-weight: 600; color: #1e293b; }
+        .section-stats { display: flex; gap: 2rem; align-items: center; }
+        .section-stat { text-align: center; }
+        .section-stat-value { font-size: 1.5rem; font-weight: 700; }
+        .section-stat-label { font-size: 0.8rem; color: #64748b; }
+
+        .question-card {
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(225, 112, 85, 0.2);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .question-card:hover {
+            border-color: rgba(225, 112, 85, 0.4);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .question-card.answered { border-left: 4px solid #10b981; }
+        .question-card.answered-partial { border-left: 4px solid #f59e0b; }
+        .question-card.answered-no { border-left: 4px solid #ef4444; }
+        .question-card.answered-na { border-left: 4px solid #64748b; }
+
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .question-ref {
+            background: #e17055;
+            color: #ffffff;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .question-coeff {
+            background: #f97316;
+            color: #ffffff;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+
+        .question-title {
+            font-size: 1rem;
+            color: #1e293b;
+            line-height: 1.5;
+            margin-bottom: 1rem;
+        }
+
+        .answer-options { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+
+        .answer-btn {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 2px solid rgba(225, 112, 85, 0.3);
+            border-radius: 8px;
+            background: transparent;
+            color: #64748b;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .answer-btn:hover {
+            border-color: rgba(225, 112, 85, 0.5);
+            background: rgba(225, 112, 85, 0.1);
+        }
+
+        .answer-btn.selected-yes {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border-color: #10b981;
+            color: white;
+        }
+
+        .answer-btn.selected-partial {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            border-color: #f59e0b;
+            color: white;
+        }
+
+        .answer-btn.selected-no {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            border-color: #ef4444;
+            color: white;
+        }
+
+        .answer-btn.selected-na {
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+            border-color: #64748b;
+            color: white;
+        }
+
+        .finding-section {
+            display: none;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .finding-section.visible { display: block; }
+
+        .finding-group { margin-bottom: 1rem; }
+        .finding-label { font-size: 0.85rem; color: #64748b; margin-bottom: 0.5rem; }
+
+        .finding-input {
+            width: 100%;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(225, 112, 85, 0.3);
+            border-radius: 6px;
+            color: #1e293b;
+            font-size: 0.9rem;
+            resize: vertical;
+        }
+
+        .finding-input:focus {
+            outline: none;
+            border-color: rgba(225, 112, 85, 0.6);
+        }
+
+        .priority-options { display: flex; gap: 0.5rem; }
+
+        .priority-btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid rgba(225, 112, 85, 0.3);
+            border-radius: 6px;
+            background: transparent;
+            color: #64748b;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .priority-btn.selected-high { background: #ef4444; border-color: #ef4444; color: white; }
+        .priority-btn.selected-medium { background: #f59e0b; border-color: #f59e0b; color: white; }
+        .priority-btn.selected-low { background: #3b82f6; border-color: #3b82f6; color: white; }
+
+        .action-bar {
+            position: fixed;
+            bottom: 0;
+            left: 280px;
+            right: 0;
+            background: white;
+            padding: 1rem 2rem;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 50;
+        }
+
+        .progress-info { display: flex; align-items: center; gap: 1rem; }
+
+        .progress-bar {
+            width: 200px;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+            transition: width 0.3s;
+        }
+
+        .progress-text { font-size: 0.9rem; color: #64748b; }
+
+        .action-buttons { display: flex; gap: 1rem; }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+            color: white;
+        }
+
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(225, 112, 85, 0.4); }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .btn-secondary { background: #f1f5f9; color: #475569; }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .loading-overlay.show { display: flex; }
+
+        .loading-box {
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            text-align: center;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #e17055;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 768px) {
+            .sections-sidebar { display: none; }
+            .action-bar { left: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <a href="/ohs-inspection/list" class="back-btn">← Back</a>
+            <span class="header-title">🦺 OHS Inspection</span>
+        </div>
+        <div class="header-right">
+            <div class="audit-info">
+                <div class="audit-info-item">
+                    <span class="audit-info-label">Doc:</span>
+                    <span class="audit-info-value" id="docNumber">-</span>
+                </div>
+                <div class="audit-info-item">
+                    <span class="audit-info-label">Store:</span>
+                    <span class="audit-info-value" id="storeName">-</span>
+                </div>
+            </div>
+            <span class="status-badge status-in-progress" id="statusBadge">Draft</span>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="sections-sidebar">
+            <div class="sidebar-title">📋 Sections</div>
+            <div id="sectionsList"></div>
+        </div>
+
+        <div class="content-area" id="contentArea">
+            <div class="loading-box">
+                <div class="spinner"></div>
+                <p>Loading inspection...</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="action-bar">
+        <div class="progress-info">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+            <span class="progress-text" id="progressText">0 / 0 answered</span>
+        </div>
+        <div class="action-buttons">
+            <button class="btn btn-secondary" onclick="saveProgress()">💾 Save Progress</button>
+            <button class="btn btn-primary" onclick="generateReport()">📄 Generate Report</button>
+            <button class="btn btn-success" onclick="completeAudit()">✅ Complete</button>
+        </div>
+    </div>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-box">
+            <div class="spinner"></div>
+            <p id="loadingText">Processing...</p>
+        </div>
+    </div>
+
+    <script>
+        let auditData = null;
+        let currentSectionIndex = 0;
+
+        // Get audit ID from URL
+        const pathParts = window.location.pathname.split('/');
+        const auditId = pathParts[pathParts.length - 1];
+
+        async function loadAudit() {
+            try {
+                const response = await fetch(`/ohs-inspection/api/audits/${auditId}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    auditData = result.data;
+                    renderAudit();
+                } else {
+                    alert('Error loading audit: ' + result.error);
+                    window.location.href = '/ohs-inspection/list';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to load audit');
+            }
+        }
+
+        function renderAudit() {
+            document.getElementById('docNumber').textContent = auditData.documentNumber;
+            document.getElementById('storeName').textContent = auditData.storeName;
+            document.getElementById('statusBadge').textContent = auditData.status;
+            document.getElementById('statusBadge').className = `status-badge status-${auditData.status === 'Completed' ? 'completed' : 'in-progress'}`;
+
+            renderSectionsSidebar();
+            renderCurrentSection();
+            updateProgress();
+        }
+
+        function renderSectionsSidebar() {
+            const container = document.getElementById('sectionsList');
+            
+            if (!auditData.sections || auditData.sections.length === 0) {
+                container.innerHTML = '<p style="color: #64748b; padding: 1rem;">No sections found. Please configure a template first.</p>';
+                return;
+            }
+
+            container.innerHTML = auditData.sections.map((section, index) => {
+                const answered = section.items ? section.items.filter(i => i.selectedChoice).length : 0;
+                const total = section.items ? section.items.length : 0;
+                const score = calculateSectionScore(section);
+
+                return `
+                    <div class="section-nav-item ${index === currentSectionIndex ? 'active' : ''}" onclick="selectSection(${index})">
+                        <div class="section-nav-icon">${section.sectionIcon || '📋'}</div>
+                        <div class="section-nav-info">
+                            <div class="section-nav-name">${section.sectionName}</div>
+                            <div class="section-nav-progress">${answered} / ${total} answered</div>
+                        </div>
+                        <div class="section-nav-score ${score >= 80 ? 'score-pass' : score > 0 ? 'score-fail' : 'score-na'}">
+                            ${score > 0 ? score + '%' : '-'}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectSection(index) {
+            currentSectionIndex = index;
+            renderSectionsSidebar();
+            renderCurrentSection();
+        }
+
+        function renderCurrentSection() {
+            const container = document.getElementById('contentArea');
+            
+            if (!auditData.sections || auditData.sections.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 4rem;">
+                        <h2>No sections configured</h2>
+                        <p style="color: #64748b; margin: 1rem 0;">Please create a template with sections and questions first.</p>
+                        <a href="/ohs-inspection/template-builder" class="btn btn-primary">🔧 Open Template Builder</a>
+                    </div>
+                `;
+                return;
+            }
+
+            const section = auditData.sections[currentSectionIndex];
+            const score = calculateSectionScore(section);
+            const answered = section.items ? section.items.filter(i => i.selectedChoice).length : 0;
+            const total = section.items ? section.items.length : 0;
+
+            container.innerHTML = `
+                <div class="section-header">
+                    <div class="section-title">
+                        <div class="section-icon">${section.sectionIcon || '📋'}</div>
+                        <div class="section-name">${section.sectionName}</div>
+                    </div>
+                    <div class="section-stats">
+                        <div class="section-stat">
+                            <div class="section-stat-value">${answered}/${total}</div>
+                            <div class="section-stat-label">Answered</div>
+                        </div>
+                        <div class="section-stat">
+                            <div class="section-stat-value ${score >= 80 ? 'score-pass' : score > 0 ? 'score-fail' : ''}">${score > 0 ? score + '%' : '-'}</div>
+                            <div class="section-stat-label">Score</div>
+                        </div>
+                    </div>
+                </div>
+
+                ${(section.items || []).map(item => renderQuestionCard(item)).join('')}
+
+                <div style="height: 100px;"></div>
+            `;
+        }
+
+        function renderQuestionCard(item) {
+            const answerClass = item.selectedChoice === 'Yes' ? 'answered' :
+                               item.selectedChoice === 'Partially' ? 'answered-partial' :
+                               item.selectedChoice === 'No' ? 'answered-no' :
+                               item.selectedChoice === 'NA' ? 'answered-na' : '';
+
+            const showFinding = item.selectedChoice === 'No' || item.selectedChoice === 'Partially';
+
+            return `
+                <div class="question-card ${answerClass}" id="question-${item.responseId}">
+                    <div class="question-header">
+                        <span class="question-ref">${item.referenceValue || '#'}</span>
+                        <span class="question-coeff">×${item.coeff || 1}</span>
+                    </div>
+                    <div class="question-title">${item.title || 'No question text'}</div>
+
+                    <div class="answer-options">
+                        <button class="answer-btn ${item.selectedChoice === 'Yes' ? 'selected-yes' : ''}" 
+                                onclick="selectAnswer(${item.responseId}, 'Yes', ${item.coeff || 1})">✓ Yes</button>
+                        <button class="answer-btn ${item.selectedChoice === 'Partially' ? 'selected-partial' : ''}" 
+                                onclick="selectAnswer(${item.responseId}, 'Partially', ${item.coeff || 1})">◐ Partial</button>
+                        <button class="answer-btn ${item.selectedChoice === 'No' ? 'selected-no' : ''}" 
+                                onclick="selectAnswer(${item.responseId}, 'No', ${item.coeff || 1})">✗ No</button>
+                        <button class="answer-btn ${item.selectedChoice === 'NA' ? 'selected-na' : ''}" 
+                                onclick="selectAnswer(${item.responseId}, 'NA', ${item.coeff || 1})">N/A</button>
+                    </div>
+
+                    <div class="finding-section ${showFinding ? 'visible' : ''}" id="finding-${item.responseId}">
+                        <div class="finding-group">
+                            <div class="finding-label">Finding / Issue</div>
+                            <textarea class="finding-input" placeholder="Describe the finding..." 
+                                      onchange="updateFinding(${item.responseId}, 'finding', this.value)">${item.finding || ''}</textarea>
+                        </div>
+                        <div class="finding-group">
+                            <div class="finding-label">Corrective Action</div>
+                            <textarea class="finding-input" placeholder="Suggested corrective action..." 
+                                      onchange="updateFinding(${item.responseId}, 'cr', this.value)">${item.cr || ''}</textarea>
+                        </div>
+                        <div class="finding-group">
+                            <div class="finding-label">Priority</div>
+                            <div class="priority-options">
+                                <button class="priority-btn ${item.priority === 'High' ? 'selected-high' : ''}" 
+                                        onclick="updateFinding(${item.responseId}, 'priority', 'High')">🔴 High</button>
+                                <button class="priority-btn ${item.priority === 'Medium' ? 'selected-medium' : ''}" 
+                                        onclick="updateFinding(${item.responseId}, 'priority', 'Medium')">🟡 Medium</button>
+                                <button class="priority-btn ${item.priority === 'Low' ? 'selected-low' : ''}" 
+                                        onclick="updateFinding(${item.responseId}, 'priority', 'Low')">🔵 Low</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function selectAnswer(responseId, choice, coeff) {
+            try {
+                const response = await fetch(`/ohs-inspection/api/audits/response/${responseId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ selectedChoice: choice, coeff })
+                });
+
+                if (response.ok) {
+                    // Update local data
+                    for (const section of auditData.sections) {
+                        const item = section.items?.find(i => i.responseId === responseId);
+                        if (item) {
+                            item.selectedChoice = choice;
+                            break;
+                        }
+                    }
+                    renderSectionsSidebar();
+                    renderCurrentSection();
+                    updateProgress();
+                }
+            } catch (error) {
+                console.error('Error updating answer:', error);
+            }
+        }
+
+        async function updateFinding(responseId, field, value) {
+            try {
+                const body = {};
+                body[field] = value;
+
+                await fetch(`/ohs-inspection/api/audits/response/${responseId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                // Update local data
+                for (const section of auditData.sections) {
+                    const item = section.items?.find(i => i.responseId === responseId);
+                    if (item) {
+                        item[field] = value;
+                        break;
+                    }
+                }
+
+                if (field === 'priority') {
+                    renderCurrentSection();
+                }
+            } catch (error) {
+                console.error('Error updating finding:', error);
+            }
+        }
+
+        function calculateSectionScore(section) {
+            if (!section.items || section.items.length === 0) return 0;
+
+            let earned = 0, max = 0;
+            for (const item of section.items) {
+                if (item.selectedChoice && item.selectedChoice !== 'NA') {
+                    const coeff = parseFloat(item.coeff) || 1;
+                    max += coeff;
+                    if (item.selectedChoice === 'Yes') earned += coeff;
+                    else if (item.selectedChoice === 'Partially') earned += coeff * 0.5;
+                }
+            }
+            return max > 0 ? Math.round((earned / max) * 100) : 0;
+        }
+
+        function updateProgress() {
+            let answered = 0, total = 0;
+            for (const section of auditData.sections || []) {
+                for (const item of section.items || []) {
+                    total++;
+                    if (item.selectedChoice) answered++;
+                }
+            }
+
+            const percent = total > 0 ? Math.round((answered / total) * 100) : 0;
+            document.getElementById('progressFill').style.width = percent + '%';
+            document.getElementById('progressText').textContent = `${answered} / ${total} answered (${percent}%)`;
+        }
+
+        async function saveProgress() {
+            showLoading('Saving progress...');
+            // Already auto-saved on each answer
+            setTimeout(() => {
+                hideLoading();
+                alert('Progress saved successfully!');
+            }, 500);
+        }
+
+        async function generateReport() {
+            showLoading('Generating report...');
+            try {
+                const response = await fetch(`/ohs-inspection/api/audits/${auditId}/generate-report`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                hideLoading();
+                if (result.success) {
+                    alert(`Report generated!\nScore: ${result.overallScore}%\nFile: ${result.fileName}`);
+                    window.open(`/ohs-inspection/api/audits/reports/${result.fileName}`, '_blank');
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                hideLoading();
+                alert('Error generating report');
+            }
+        }
+
+        async function completeAudit() {
+            if (!confirm('Are you sure you want to complete this inspection?')) return;
+
+            showLoading('Completing inspection...');
+            try {
+                const response = await fetch(`/ohs-inspection/api/audits/${auditId}/complete`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                hideLoading();
+                if (result.success) {
+                    alert(`Inspection completed!\nFinal Score: ${Math.round(result.data.totalScore)}%`);
+                    loadAudit();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                hideLoading();
+                alert('Error completing inspection');
+            }
+        }
+
+        function showLoading(text) {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingOverlay').classList.add('show');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('show');
+        }
+
+        // Load on page load
+        loadAudit();
+    </script>
+</body>
+</html>
