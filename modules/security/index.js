@@ -1,6 +1,6 @@
 /**
  * Security Department Module
- * Dashboard for Security Managers to view delivery logs and reports
+ * Dashboard for Security Managers to view delivery logs and patrol sheets
  */
 
 const express = require('express');
@@ -19,36 +19,252 @@ const dbConfig = {
     }
 };
 
-// Security Department Dashboard
+// Security Department Dashboard - Main Page with 2 Cards
 router.get('/', async (req, res) => {
     const user = req.currentUser;
     
     try {
         const pool = await sql.connect(dbConfig);
         
-        // Get summary stats
         const today = new Date().toISOString().split('T')[0];
-        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         
         const statsResult = await pool.request()
             .input('today', sql.Date, today)
-            .input('weekAgo', sql.Date, weekAgo)
             .query(`
                 SELECT 
-                    (SELECT COUNT(*) FROM Security_DeliveryLogs WHERE LogDate = @today AND Status = 'Active') as TodayLogs,
-                    (SELECT COUNT(*) FROM Security_DeliveryLogs WHERE LogDate >= @weekAgo AND Status = 'Active') as WeekLogs,
-                    (SELECT COUNT(*) FROM Security_DeliveryLogs WHERE Status = 'Active') as TotalLogs,
-                    (SELECT COUNT(*) FROM Security_DeliveryLogItems dli 
-                     INNER JOIN Security_DeliveryLogs dl ON dli.DeliveryLogId = dl.Id 
-                     WHERE dl.LogDate = @today AND dl.Status = 'Active') as TodayItems
+                    (SELECT COUNT(*) FROM Security_DeliveryLogs WHERE Status = 'Active') as TotalDeliveryLogs,
+                    (SELECT COUNT(*) FROM Security_DeliveryLogs WHERE LogDate = @today AND Status = 'Active') as TodayDeliveryLogs,
+                    (SELECT COUNT(*) FROM Security_PatrolSheets WHERE Status = 'Active') as TotalPatrolSheets,
+                    (SELECT COUNT(*) FROM Security_PatrolSheets WHERE PatrolDate = @today AND Status = 'Active') as TodayPatrolSheets
             `);
+        
+        await pool.close();
         
         const stats = statsResult.recordset[0];
         
-        // Get recent delivery logs
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Security Department - ${process.env.APP_NAME}</title>
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body { 
+                        font-family: 'Segoe UI', Arial, sans-serif; 
+                        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+                        min-height: 100vh;
+                    }
+                    .header {
+                        background: rgba(0,0,0,0.3);
+                        backdrop-filter: blur(10px);
+                        color: white;
+                        padding: 20px 40px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        border-bottom: 1px solid rgba(255,255,255,0.1);
+                    }
+                    .header h1 { 
+                        font-size: 24px;
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                    }
+                    .header-nav a {
+                        color: white;
+                        text-decoration: none;
+                        margin-left: 20px;
+                        opacity: 0.8;
+                        transition: opacity 0.3s;
+                    }
+                    .header-nav a:hover { opacity: 1; }
+                    .container { 
+                        max-width: 1000px; 
+                        margin: 0 auto; 
+                        padding: 50px 20px; 
+                    }
+                    .welcome-card {
+                        background: rgba(255,255,255,0.1);
+                        backdrop-filter: blur(10px);
+                        border-radius: 15px;
+                        padding: 30px;
+                        color: white;
+                        margin-bottom: 40px;
+                        border: 1px solid rgba(255,255,255,0.1);
+                        text-align: center;
+                    }
+                    .welcome-card h2 {
+                        margin-bottom: 10px;
+                        font-size: 28px;
+                    }
+                    .welcome-card p {
+                        opacity: 0.8;
+                        font-size: 16px;
+                    }
+                    .cards-grid {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+                        gap: 30px;
+                    }
+                    .dashboard-card {
+                        background: white;
+                        border-radius: 20px;
+                        padding: 40px;
+                        text-decoration: none;
+                        color: #333;
+                        transition: all 0.3s ease;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        text-align: center;
+                        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                        border: 3px solid transparent;
+                    }
+                    .dashboard-card:hover {
+                        transform: translateY(-10px);
+                        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                    }
+                    .dashboard-card.delivery {
+                        border-bottom: 5px solid #1976d2;
+                    }
+                    .dashboard-card.delivery:hover {
+                        border-color: #1976d2;
+                    }
+                    .dashboard-card.patrol {
+                        border-bottom: 5px solid #2e7d32;
+                    }
+                    .dashboard-card.patrol:hover {
+                        border-color: #2e7d32;
+                    }
+                    .card-icon {
+                        font-size: 80px;
+                        margin-bottom: 20px;
+                    }
+                    .card-title {
+                        font-size: 24px;
+                        font-weight: 600;
+                        margin-bottom: 10px;
+                    }
+                    .card-desc {
+                        color: #666;
+                        font-size: 15px;
+                        line-height: 1.6;
+                        margin-bottom: 20px;
+                    }
+                    .card-stats {
+                        display: flex;
+                        gap: 30px;
+                        margin-top: 15px;
+                        padding-top: 20px;
+                        border-top: 1px solid #eee;
+                        width: 100%;
+                        justify-content: center;
+                    }
+                    .stat-item {
+                        text-align: center;
+                    }
+                    .stat-number {
+                        font-size: 28px;
+                        font-weight: 700;
+                        color: #333;
+                    }
+                    .stat-number.delivery { color: #1976d2; }
+                    .stat-number.patrol { color: #2e7d32; }
+                    .stat-label {
+                        font-size: 12px;
+                        color: #888;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                    }
+                    .view-btn {
+                        margin-top: 20px;
+                        padding: 12px 30px;
+                        border-radius: 25px;
+                        font-size: 14px;
+                        font-weight: 500;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                    }
+                    .view-btn.delivery {
+                        background: #e3f2fd;
+                        color: #1976d2;
+                    }
+                    .view-btn.patrol {
+                        background: #e8f5e9;
+                        color: #2e7d32;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>🔒 Security Department</h1>
+                    <div class="header-nav">
+                        <a href="/security-services">Security Services</a>
+                        <a href="/dashboard">← Dashboard</a>
+                    </div>
+                </div>
+                
+                <div class="container">
+                    <div class="welcome-card">
+                        <h2>Welcome, ${user.displayName}</h2>
+                        <p>Security Department Dashboard - View and manage security logs</p>
+                    </div>
+                    
+                    <div class="cards-grid">
+                        <a href="/security/delivery-logs" class="dashboard-card delivery">
+                            <div class="card-icon">📦</div>
+                            <div class="card-title">Delivery Logs</div>
+                            <div class="card-desc">View all delivery log records submitted by security personnel</div>
+                            <div class="card-stats">
+                                <div class="stat-item">
+                                    <div class="stat-number delivery">${stats.TodayDeliveryLogs || 0}</div>
+                                    <div class="stat-label">Today</div>
+                                </div>
+                                <div class="stat-item">
+                                    <div class="stat-number delivery">${stats.TotalDeliveryLogs || 0}</div>
+                                    <div class="stat-label">Total</div>
+                                </div>
+                            </div>
+                            <div class="view-btn delivery">View History →</div>
+                        </a>
+                        
+                        <a href="/security/patrol-sheets" class="dashboard-card patrol">
+                            <div class="card-icon">🚶</div>
+                            <div class="card-title">Patrol Sheets</div>
+                            <div class="card-desc">View all patrol sheet records submitted by security guards</div>
+                            <div class="card-stats">
+                                <div class="stat-item">
+                                    <div class="stat-number patrol">${stats.TodayPatrolSheets || 0}</div>
+                                    <div class="stat-label">Today</div>
+                                </div>
+                                <div class="stat-item">
+                                    <div class="stat-number patrol">${stats.TotalPatrolSheets || 0}</div>
+                                    <div class="stat-label">Total</div>
+                                </div>
+                            </div>
+                            <div class="view-btn patrol">View History →</div>
+                        </a>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `);
+    } catch (err) {
+        console.error('Error loading security dashboard:', err);
+        res.status(500).send('Error: ' + err.message);
+    }
+});
+
+// Delivery Logs History Page
+router.get('/delivery-logs', async (req, res) => {
+    const user = req.currentUser;
+    
+    try {
+        const pool = await sql.connect(dbConfig);
+        
         const logsResult = await pool.request()
             .query(`
-                SELECT TOP 20 dl.*, 
+                SELECT dl.*, 
                        (SELECT COUNT(*) FROM Security_DeliveryLogItems WHERE DeliveryLogId = dl.Id) as ItemCount
                 FROM Security_DeliveryLogs dl
                 WHERE dl.Status = 'Active'
@@ -80,7 +296,7 @@ router.get('/', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Security Department Dashboard - ${process.env.APP_NAME}</title>
+                <title>Delivery Logs History - ${process.env.APP_NAME}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
                     body { 
@@ -89,7 +305,7 @@ router.get('/', async (req, res) => {
                         min-height: 100vh;
                     }
                     .header {
-                        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+                        background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
                         color: white;
                         padding: 20px 40px;
                         display: flex;
@@ -106,66 +322,20 @@ router.get('/', async (req, res) => {
                         color: white;
                         text-decoration: none;
                         margin-left: 20px;
-                        opacity: 0.8;
+                        opacity: 0.9;
                         transition: opacity 0.3s;
                     }
                     .header-nav a:hover { opacity: 1; }
                     .container { 
-                        max-width: 1400px; 
+                        max-width: 1200px; 
                         margin: 0 auto; 
                         padding: 30px 20px; 
-                    }
-                    .welcome-banner {
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        border-radius: 15px;
-                        padding: 30px;
-                        color: white;
-                        margin-bottom: 30px;
-                    }
-                    .welcome-banner h2 {
-                        font-size: 26px;
-                        margin-bottom: 8px;
-                    }
-                    .welcome-banner p {
-                        opacity: 0.9;
-                        font-size: 15px;
-                    }
-                    .stats-grid {
-                        display: grid;
-                        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                        gap: 20px;
-                        margin-bottom: 30px;
-                    }
-                    .stat-card {
-                        background: white;
-                        border-radius: 12px;
-                        padding: 25px;
-                        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-                        text-align: center;
-                        border-top: 4px solid #667eea;
-                    }
-                    .stat-card.today { border-top-color: #2ecc71; }
-                    .stat-card.week { border-top-color: #3498db; }
-                    .stat-card.total { border-top-color: #9b59b6; }
-                    .stat-card.items { border-top-color: #e67e22; }
-                    .stat-number {
-                        font-size: 36px;
-                        font-weight: 700;
-                        color: #333;
-                        margin-bottom: 5px;
-                    }
-                    .stat-label {
-                        color: #666;
-                        font-size: 13px;
-                        text-transform: uppercase;
-                        letter-spacing: 0.5px;
                     }
                     .card {
                         background: white;
                         border-radius: 15px;
                         padding: 25px;
                         box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-                        margin-bottom: 25px;
                     }
                     .card-header {
                         display: flex;
@@ -179,9 +349,6 @@ router.get('/', async (req, res) => {
                         font-size: 18px;
                         font-weight: 600;
                         color: #333;
-                        display: flex;
-                        align-items: center;
-                        gap: 10px;
                     }
                     .filter-row {
                         display: flex;
@@ -200,7 +367,7 @@ router.get('/', async (req, res) => {
                     .filter-row select:focus,
                     .filter-row input:focus {
                         outline: none;
-                        border-color: #667eea;
+                        border-color: #1976d2;
                     }
                     table {
                         width: 100%;
@@ -241,7 +408,7 @@ router.get('/', async (req, res) => {
                         font-size: 12px;
                     }
                     .btn-view {
-                        background: #667eea;
+                        background: #1976d2;
                         color: white;
                         border: none;
                         padding: 8px 16px;
@@ -251,10 +418,10 @@ router.get('/', async (req, res) => {
                         transition: background 0.3s;
                     }
                     .btn-view:hover {
-                        background: #5a6fd6;
+                        background: #1565c0;
                     }
                     .btn-primary {
-                        background: #667eea;
+                        background: #1976d2;
                         color: white;
                         border: none;
                         padding: 10px 20px;
@@ -264,7 +431,7 @@ router.get('/', async (req, res) => {
                         text-decoration: none;
                     }
                     .btn-primary:hover {
-                        background: #5a6fd6;
+                        background: #1565c0;
                     }
                     .empty-state {
                         text-align: center;
@@ -275,96 +442,21 @@ router.get('/', async (req, res) => {
                         font-size: 60px;
                         margin-bottom: 15px;
                     }
-                    .quick-links {
-                        display: grid;
-                        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-                        gap: 20px;
-                        margin-bottom: 30px;
-                    }
-                    .quick-link {
-                        background: white;
-                        border-radius: 12px;
-                        padding: 25px;
-                        text-decoration: none;
-                        color: #333;
-                        display: flex;
-                        align-items: center;
-                        gap: 15px;
-                        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-                        transition: all 0.3s;
-                        border-left: 4px solid #667eea;
-                    }
-                    .quick-link:hover {
-                        transform: translateY(-3px);
-                        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-                    }
-                    .quick-link-icon {
-                        font-size: 32px;
-                    }
-                    .quick-link-text h4 {
-                        margin-bottom: 5px;
-                        font-size: 16px;
-                    }
-                    .quick-link-text p {
-                        color: #666;
-                        font-size: 13px;
-                    }
                 </style>
             </head>
             <body>
                 <div class="header">
-                    <h1>🔒 Security Department</h1>
+                    <h1>📦 Delivery Logs History</h1>
                     <div class="header-nav">
-                        <a href="/dashboard">← Dashboard</a>
+                        <a href="/security-services/delivery-log">+ New Entry</a>
+                        <a href="/security">← Back</a>
                     </div>
                 </div>
                 
                 <div class="container">
-                    <div class="welcome-banner">
-                        <h2>Welcome, ${user.displayName}</h2>
-                        <p>Security Department Dashboard - Monitor delivery logs and security activities</p>
-                    </div>
-                    
-                    <div class="stats-grid">
-                        <div class="stat-card today">
-                            <div class="stat-number">${stats.TodayLogs || 0}</div>
-                            <div class="stat-label">Today's Logs</div>
-                        </div>
-                        <div class="stat-card items">
-                            <div class="stat-number">${stats.TodayItems || 0}</div>
-                            <div class="stat-label">Today's Deliveries</div>
-                        </div>
-                        <div class="stat-card week">
-                            <div class="stat-number">${stats.WeekLogs || 0}</div>
-                            <div class="stat-label">This Week</div>
-                        </div>
-                        <div class="stat-card total">
-                            <div class="stat-number">${stats.TotalLogs || 0}</div>
-                            <div class="stat-label">Total Logs</div>
-                        </div>
-                    </div>
-                    
-                    <div class="quick-links">
-                        <a href="/security-services/delivery-log" class="quick-link">
-                            <div class="quick-link-icon">📦</div>
-                            <div class="quick-link-text">
-                                <h4>New Delivery Log</h4>
-                                <p>Create a new delivery log entry</p>
-                            </div>
-                        </a>
-                        <a href="/security-services" class="quick-link">
-                            <div class="quick-link-icon">🛡️</div>
-                            <div class="quick-link-text">
-                                <h4>Security Services</h4>
-                                <p>Access all security forms and services</p>
-                            </div>
-                        </a>
-                    </div>
-                    
                     <div class="card">
                         <div class="card-header">
-                            <div class="card-title">📋 Recent Delivery Logs</div>
-                            <a href="/security-services/delivery-log" class="btn-primary">+ New Entry</a>
+                            <div class="card-title">All Delivery Logs</div>
                         </div>
                         
                         <div class="filter-row">
@@ -390,13 +482,13 @@ router.get('/', async (req, res) => {
                                             <th>Action</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="logsBody">
+                                    <tbody>
                                         ${logRows}
                                     </tbody>
                                 </table>
                             ` : `
                                 <div class="empty-state">
-                                    <div class="empty-state-icon">📋</div>
+                                    <div class="empty-state-icon">📦</div>
                                     <p>No delivery logs found</p>
                                 </div>
                             `}
@@ -426,7 +518,7 @@ router.get('/', async (req, res) => {
                             const container = document.getElementById('logsTableContainer');
                             
                             if (!data.logs || data.logs.length === 0) {
-                                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><p>No delivery logs found</p></div>';
+                                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📦</div><p>No delivery logs found</p></div>';
                                 return;
                             }
                             
@@ -453,12 +545,293 @@ router.get('/', async (req, res) => {
             </html>
         `);
     } catch (err) {
-        console.error('Error loading security dashboard:', err);
+        console.error('Error loading delivery logs:', err);
         res.status(500).send('Error: ' + err.message);
     }
 });
 
-// API: Get Delivery Logs for Dashboard
+// Patrol Sheets History Page
+router.get('/patrol-sheets', async (req, res) => {
+    const user = req.currentUser;
+    
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        const patrolsResult = await pool.request()
+            .query(`
+                SELECT ps.*, 
+                       (SELECT COUNT(*) FROM Security_PatrolEntries WHERE PatrolSheetId = ps.Id) as EntryCount
+                FROM Security_PatrolSheets ps
+                WHERE ps.Status = 'Active'
+                ORDER BY ps.PatrolDate DESC, ps.CreatedAt DESC
+            `);
+        
+        await pool.close();
+        
+        const patrols = patrolsResult.recordset;
+        
+        let patrolRows = patrols.map(patrol => {
+            const patrolDate = new Date(patrol.PatrolDate).toLocaleDateString('en-GB', { 
+                weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
+            });
+            return `
+                <tr onclick="viewPatrol(${patrol.Id})" style="cursor: pointer;">
+                    <td>${patrolDate}</td>
+                    <td><span class="location-badge">${patrol.Location}</span></td>
+                    <td>${patrol.CreatedBy}</td>
+                    <td><span class="entry-count">${patrol.EntryCount} patrols</span></td>
+                    <td>
+                        <button class="btn-view" onclick="event.stopPropagation(); viewPatrol(${patrol.Id})">View</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Patrol Sheets History - ${process.env.APP_NAME}</title>
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body { 
+                        font-family: 'Segoe UI', Arial, sans-serif; 
+                        background: #f0f2f5;
+                        min-height: 100vh;
+                    }
+                    .header {
+                        background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+                        color: white;
+                        padding: 20px 40px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    }
+                    .header h1 { 
+                        font-size: 24px;
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                    }
+                    .header-nav a {
+                        color: white;
+                        text-decoration: none;
+                        margin-left: 20px;
+                        opacity: 0.9;
+                        transition: opacity 0.3s;
+                    }
+                    .header-nav a:hover { opacity: 1; }
+                    .container { 
+                        max-width: 1200px; 
+                        margin: 0 auto; 
+                        padding: 30px 20px; 
+                    }
+                    .card {
+                        background: white;
+                        border-radius: 15px;
+                        padding: 25px;
+                        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+                    }
+                    .card-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 20px;
+                        padding-bottom: 15px;
+                        border-bottom: 1px solid #eee;
+                    }
+                    .card-title {
+                        font-size: 18px;
+                        font-weight: 600;
+                        color: #333;
+                    }
+                    .filter-row {
+                        display: flex;
+                        gap: 15px;
+                        margin-bottom: 20px;
+                        flex-wrap: wrap;
+                    }
+                    .filter-row select,
+                    .filter-row input {
+                        padding: 10px 15px;
+                        border: 1px solid #ddd;
+                        border-radius: 8px;
+                        font-size: 14px;
+                        min-width: 150px;
+                    }
+                    .filter-row select:focus,
+                    .filter-row input:focus {
+                        outline: none;
+                        border-color: #2e7d32;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                    }
+                    th {
+                        background: #f8f9fa;
+                        padding: 15px;
+                        text-align: left;
+                        font-size: 13px;
+                        font-weight: 600;
+                        color: #555;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                        border-bottom: 2px solid #dee2e6;
+                    }
+                    td {
+                        padding: 15px;
+                        border-bottom: 1px solid #eee;
+                        font-size: 14px;
+                    }
+                    tr:hover {
+                        background: #f8f9fa;
+                    }
+                    .location-badge {
+                        background: #e8f5e9;
+                        color: #2e7d32;
+                        padding: 5px 12px;
+                        border-radius: 20px;
+                        font-size: 12px;
+                        font-weight: 500;
+                    }
+                    .entry-count {
+                        background: #e0f2f1;
+                        color: #00796b;
+                        padding: 5px 12px;
+                        border-radius: 20px;
+                        font-size: 12px;
+                    }
+                    .btn-view {
+                        background: #2e7d32;
+                        color: white;
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-size: 13px;
+                        transition: background 0.3s;
+                    }
+                    .btn-view:hover {
+                        background: #1b5e20;
+                    }
+                    .empty-state {
+                        text-align: center;
+                        padding: 60px;
+                        color: #666;
+                    }
+                    .empty-state-icon {
+                        font-size: 60px;
+                        margin-bottom: 15px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>🚶 Patrol Sheets History</h1>
+                    <div class="header-nav">
+                        <a href="/security-services/patrol-sheet">+ New Entry</a>
+                        <a href="/security">← Back</a>
+                    </div>
+                </div>
+                
+                <div class="container">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">All Patrol Sheets</div>
+                        </div>
+                        
+                        <div class="filter-row">
+                            <input type="date" id="filterFromDate" onchange="filterPatrols()" placeholder="From Date">
+                            <input type="date" id="filterToDate" onchange="filterPatrols()" placeholder="To Date">
+                            <select id="filterLocation" onchange="filterPatrols()">
+                                <option value="">All Locations</option>
+                                <option value="HO Dbayeh">HO Dbayeh</option>
+                                <option value="HO Zouk">HO Zouk</option>
+                            </select>
+                        </div>
+                        
+                        <div id="patrolsTableContainer">
+                            ${patrols.length > 0 ? `
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Location</th>
+                                            <th>Created By</th>
+                                            <th>Entries</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${patrolRows}
+                                    </tbody>
+                                </table>
+                            ` : `
+                                <div class="empty-state">
+                                    <div class="empty-state-icon">🚶</div>
+                                    <p>No patrol sheets found</p>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                </div>
+                
+                <script>
+                    function viewPatrol(id) {
+                        window.location.href = '/security-services/patrol-sheet/' + id;
+                    }
+                    
+                    async function filterPatrols() {
+                        const fromDate = document.getElementById('filterFromDate').value;
+                        const toDate = document.getElementById('filterToDate').value;
+                        const location = document.getElementById('filterLocation').value;
+                        
+                        let url = '/security/api/patrol-sheets?';
+                        if (fromDate) url += 'fromDate=' + fromDate + '&';
+                        if (toDate) url += 'toDate=' + toDate + '&';
+                        if (location) url += 'location=' + encodeURIComponent(location);
+                        
+                        try {
+                            const res = await fetch(url);
+                            const data = await res.json();
+                            
+                            const container = document.getElementById('patrolsTableContainer');
+                            
+                            if (!data.sheets || data.sheets.length === 0) {
+                                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🚶</div><p>No patrol sheets found</p></div>';
+                                return;
+                            }
+                            
+                            let rows = data.sheets.map(patrol => {
+                                const patrolDate = new Date(patrol.PatrolDate).toLocaleDateString('en-GB', { 
+                                    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
+                                });
+                                return '<tr onclick="viewPatrol(' + patrol.Id + ')" style="cursor: pointer;">' +
+                                    '<td>' + patrolDate + '</td>' +
+                                    '<td><span class="location-badge">' + patrol.Location + '</span></td>' +
+                                    '<td>' + patrol.CreatedBy + '</td>' +
+                                    '<td><span class="entry-count">' + patrol.EntryCount + ' patrols</span></td>' +
+                                    '<td><button class="btn-view" onclick="event.stopPropagation(); viewPatrol(' + patrol.Id + ')">View</button></td>' +
+                                '</tr>';
+                            }).join('');
+                            
+                            container.innerHTML = '<table><thead><tr><th>Date</th><th>Location</th><th>Created By</th><th>Entries</th><th>Action</th></tr></thead><tbody>' + rows + '</tbody></table>';
+                        } catch (err) {
+                            console.error('Error filtering patrols:', err);
+                        }
+                    }
+                </script>
+            </body>
+            </html>
+        `);
+    } catch (err) {
+        console.error('Error loading patrol sheets:', err);
+        res.status(500).send('Error: ' + err.message);
+    }
+});
+
+// API: Get Delivery Logs
 router.get('/api/delivery-logs', async (req, res) => {
     try {
         const { fromDate, toDate, premises } = req.query;
@@ -496,6 +869,47 @@ router.get('/api/delivery-logs', async (req, res) => {
     } catch (err) {
         console.error('Error fetching delivery logs:', err);
         res.json({ logs: [], error: err.message });
+    }
+});
+
+// API: Get Patrol Sheets
+router.get('/api/patrol-sheets', async (req, res) => {
+    try {
+        const { fromDate, toDate, location } = req.query;
+        
+        const pool = await sql.connect(dbConfig);
+        
+        let query = `
+            SELECT ps.*, 
+                   (SELECT COUNT(*) FROM Security_PatrolEntries WHERE PatrolSheetId = ps.Id) as EntryCount
+            FROM Security_PatrolSheets ps
+            WHERE ps.Status = 'Active'
+        `;
+        
+        const request = pool.request();
+        
+        if (fromDate) {
+            query += ' AND ps.PatrolDate >= @fromDate';
+            request.input('fromDate', sql.Date, fromDate);
+        }
+        if (toDate) {
+            query += ' AND ps.PatrolDate <= @toDate';
+            request.input('toDate', sql.Date, toDate);
+        }
+        if (location) {
+            query += ' AND ps.Location = @location';
+            request.input('location', sql.NVarChar, location);
+        }
+        
+        query += ' ORDER BY ps.PatrolDate DESC, ps.CreatedAt DESC';
+        
+        const result = await request.query(query);
+        await pool.close();
+        
+        res.json({ sheets: result.recordset });
+    } catch (err) {
+        console.error('Error fetching patrol sheets:', err);
+        res.json({ sheets: [], error: err.message });
     }
 });
 

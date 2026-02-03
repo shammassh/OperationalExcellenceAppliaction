@@ -8,9 +8,11 @@ const router = express.Router();
 
 // Import form handlers
 const deliveryLogRoutes = require('./delivery-log/routes');
+const patrolSheetRoutes = require('./patrol-sheet/routes');
 
 // Mount sub-routes
 router.use('/delivery-log', deliveryLogRoutes);
+router.use('/patrol-sheet', patrolSheetRoutes);
 
 // Landing Page
 router.get('/', async (req, res) => {
@@ -164,6 +166,12 @@ router.get('/', async (req, res) => {
                         <div class="card-icon">📦</div>
                         <div class="card-title">Delivery Log Sheet</div>
                         <div class="card-desc">Record and track all deliveries received at security checkpoints</div>
+                        <span class="card-badge internal">Internal</span>
+                    </a>
+                    <a href="/security-services/patrol-sheet" class="menu-card internal">
+                        <div class="card-icon">🚶</div>
+                        <div class="card-title">Patrol Sheet</div>
+                        <div class="card-desc">Record guard patrol entries with time in and time out</div>
                         <span class="card-badge internal">Internal</span>
                     </a>
                     <a href="/security-services/internal/schedule" class="menu-card internal">
