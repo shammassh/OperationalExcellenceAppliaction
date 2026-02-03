@@ -10,11 +10,13 @@ const router = express.Router();
 const deliveryLogRoutes = require('./delivery-log/routes');
 const patrolSheetRoutes = require('./patrol-sheet/routes');
 const entranceFormRoutes = require('./entrance-form/routes');
+const attendanceReportRoutes = require('./attendance-report/routes');
 
 // Mount sub-routes
 router.use('/delivery-log', deliveryLogRoutes);
 router.use('/patrol-sheet', patrolSheetRoutes);
 router.use('/entrance-form', entranceFormRoutes);
+router.use('/attendance-report', attendanceReportRoutes); // Form accessible via direct URL only
 
 // Landing Page
 router.get('/', async (req, res) => {
