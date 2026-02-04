@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Security Department Module
  * Dashboard for Security Managers to view delivery logs and patrol sheets
  */
@@ -41,7 +41,9 @@ router.get('/', async (req, res) => {
                     (SELECT COUNT(*) FROM Security_AttendanceReports WHERE Status = 'Active') as TotalAttendanceReports,
                     (SELECT COUNT(*) FROM Security_AttendanceReports WHERE ReportDate = @today AND Status = 'Active') as TodayAttendanceReports,
                     (SELECT COUNT(*) FROM Security_VisitorCars WHERE Status = 'Active') as TotalVisitorCars,
-                    (SELECT COUNT(*) FROM Security_VisitorCars WHERE RecordDate = @today AND Status = 'Active') as TodayVisitorCars
+                    (SELECT COUNT(*) FROM Security_VisitorCars WHERE RecordDate = @today AND Status = 'Active') as TodayVisitorCars,
+                    (SELECT COUNT(*) FROM Security_ParkingViolations WHERE Status = 'Active') as TotalParkingViolations,
+                    (SELECT COUNT(*) FROM Security_ParkingViolations WHERE ViolationDate = @today AND Status = 'Active') as TodayParkingViolations
             `);
         
         await pool.close();
@@ -52,6 +54,7 @@ router.get('/', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
+                <meta charset="UTF-8">
                 <title>Security Department - ${process.env.APP_NAME}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -160,6 +163,12 @@ router.get('/', async (req, res) => {
                     .dashboard-card.visitor:hover {
                         border-color: #0d47a1;
                     }
+                    .dashboard-card.violation {
+                        border-bottom: 5px solid #c62828;
+                    }
+                    .dashboard-card.violation:hover {
+                        border-color: #c62828;
+                    }
                     .card-icon {
                         font-size: 80px;
                         margin-bottom: 20px;
@@ -197,6 +206,7 @@ router.get('/', async (req, res) => {
                     .stat-number.entrance { color: #f57c00; }
                     .stat-number.attendance { color: #7b1fa2; }
                     .stat-number.visitor { color: #0d47a1; }
+                    .stat-number.violation { color: #c62828; }
                     .stat-label {
                         font-size: 12px;
                         color: #888;
@@ -232,14 +242,18 @@ router.get('/', async (req, res) => {
                         background: #e3f2fd;
                         color: #0d47a1;
                     }
+                    .view-btn.violation {
+                        background: #ffebee;
+                        color: #c62828;
+                    }
                 </style>
             </head>
             <body>
                 <div class="header">
-                    <h1>🔒 Security Department</h1>
+                    <h1>&#128274; Security Department</h1>
                     <div class="header-nav">
                         <a href="/security-services">Security Services</a>
-                        <a href="/dashboard">← Dashboard</a>
+                        <a href="/dashboard">&#8592; Dashboard</a>
                     </div>
                 </div>
                 
@@ -251,7 +265,7 @@ router.get('/', async (req, res) => {
                     
                     <div class="cards-grid">
                         <a href="/security/attendance-reports" class="dashboard-card attendance">
-                            <div class="card-icon">📋</div>
+                            <div class="card-icon">&#128203;</div>
                             <div class="card-title">Employee Attendance</div>
                             <div class="card-desc">Track employees who come after working hours</div>
                             <div class="card-stats">
@@ -264,11 +278,11 @@ router.get('/', async (req, res) => {
                                     <div class="stat-label">Total</div>
                                 </div>
                             </div>
-                            <div class="view-btn attendance">View History →</div>
+                            <div class="view-btn attendance">View History &#8592;’</div>
                         </a>
                         
                         <a href="/security/visitor-cars" class="dashboard-card visitor">
-                            <div class="card-icon">🚗</div>
+                            <div class="card-icon">&#128663;</div>
                             <div class="card-title">Visitors Cars</div>
                             <div class="card-desc">Track visitor vehicles and plate numbers</div>
                             <div class="card-stats">
@@ -281,11 +295,28 @@ router.get('/', async (req, res) => {
                                     <div class="stat-label">Total</div>
                                 </div>
                             </div>
-                            <div class="view-btn visitor">View History →</div>
+                            <div class="view-btn visitor">View History &#8592;’</div>
+                        </a>
+                        
+                        <a href="/security/parking-violations" class="dashboard-card violation">
+                            <div class="card-icon">&#127359;</div>
+                            <div class="card-title">Parking Violations</div>
+                            <div class="card-desc">Record and track parking violations with photo evidence</div>
+                            <div class="card-stats">
+                                <div class="stat-item">
+                                    <div class="stat-number violation">${stats.TodayParkingViolations || 0}</div>
+                                    <div class="stat-label">Today</div>
+                                </div>
+                                <div class="stat-item">
+                                    <div class="stat-number violation">${stats.TotalParkingViolations || 0}</div>
+                                    <div class="stat-label">Total</div>
+                                </div>
+                            </div>
+                            <div class="view-btn violation">View History &#8592;’</div>
                         </a>
                         
                         <a href="/security/delivery-logs" class="dashboard-card delivery">
-                            <div class="card-icon">📦</div>
+                            <div class="card-icon">&#128230;</div>
                             <div class="card-title">Delivery Logs</div>
                             <div class="card-desc">View all delivery log records submitted by security personnel</div>
                             <div class="card-stats">
@@ -298,11 +329,11 @@ router.get('/', async (req, res) => {
                                     <div class="stat-label">Total</div>
                                 </div>
                             </div>
-                            <div class="view-btn delivery">View History →</div>
+                            <div class="view-btn delivery">View History &#8592;’</div>
                         </a>
                         
                         <a href="/security/patrol-sheets" class="dashboard-card patrol">
-                            <div class="card-icon">🚶</div>
+                            <div class="card-icon">&#128694;</div>
                             <div class="card-title">Patrol Sheets</div>
                             <div class="card-desc">View all patrol sheet records submitted by security guards</div>
                             <div class="card-stats">
@@ -315,11 +346,11 @@ router.get('/', async (req, res) => {
                                     <div class="stat-label">Total</div>
                                 </div>
                             </div>
-                            <div class="view-btn patrol">View History →</div>
+                            <div class="view-btn patrol">View History &#8592;’</div>
                         </a>
                         
                         <a href="/security/entrance-forms" class="dashboard-card entrance">
-                            <div class="card-icon">🚪</div>
+                            <div class="card-icon">&#128682;</div>
                             <div class="card-title">Entrance Forms</div>
                             <div class="card-desc">View all entrance form records for workers and contractors</div>
                             <div class="card-stats">
@@ -332,7 +363,7 @@ router.get('/', async (req, res) => {
                                     <div class="stat-label">Total</div>
                                 </div>
                             </div>
-                            <div class="view-btn entrance">View History →</div>
+                            <div class="view-btn entrance">View History &#8592;’</div>
                         </a>
                     </div>
                 </div>
@@ -386,6 +417,7 @@ router.get('/delivery-logs', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
+                <meta charset="UTF-8">
                 <title>Delivery Logs History - ${process.env.APP_NAME}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -536,10 +568,10 @@ router.get('/delivery-logs', async (req, res) => {
             </head>
             <body>
                 <div class="header">
-                    <h1>📦 Delivery Logs History</h1>
+                    <h1>&#128230; Delivery Logs History</h1>
                     <div class="header-nav">
                         <a href="/security-services/delivery-log">+ New Entry</a>
-                        <a href="/security">← Back</a>
+                        <a href="/security">&#8592; Back</a>
                     </div>
                 </div>
                 
@@ -578,7 +610,7 @@ router.get('/delivery-logs', async (req, res) => {
                                 </table>
                             ` : `
                                 <div class="empty-state">
-                                    <div class="empty-state-icon">📦</div>
+                                    <div class="empty-state-icon">&#128230;</div>
                                     <p>No delivery logs found</p>
                                 </div>
                             `}
@@ -608,7 +640,7 @@ router.get('/delivery-logs', async (req, res) => {
                             const container = document.getElementById('logsTableContainer');
                             
                             if (!data.logs || data.logs.length === 0) {
-                                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📦</div><p>No delivery logs found</p></div>';
+                                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128230;</div><p>No delivery logs found</p></div>';
                                 return;
                             }
                             
@@ -681,6 +713,7 @@ router.get('/patrol-sheets', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
+                <meta charset="UTF-8">
                 <title>Patrol Sheets History - ${process.env.APP_NAME}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -818,10 +851,10 @@ router.get('/patrol-sheets', async (req, res) => {
             </head>
             <body>
                 <div class="header">
-                    <h1>🚶 Patrol Sheets History</h1>
+                    <h1>&#128694; Patrol Sheets History</h1>
                     <div class="header-nav">
                         <a href="/security-services/patrol-sheet">+ New Entry</a>
-                        <a href="/security">← Back</a>
+                        <a href="/security">&#8592; Back</a>
                     </div>
                 </div>
                 
@@ -859,7 +892,7 @@ router.get('/patrol-sheets', async (req, res) => {
                                 </table>
                             ` : `
                                 <div class="empty-state">
-                                    <div class="empty-state-icon">🚶</div>
+                                    <div class="empty-state-icon">&#128694;</div>
                                     <p>No patrol sheets found</p>
                                 </div>
                             `}
@@ -889,7 +922,7 @@ router.get('/patrol-sheets', async (req, res) => {
                             const container = document.getElementById('patrolsTableContainer');
                             
                             if (!data.sheets || data.sheets.length === 0) {
-                                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🚶</div><p>No patrol sheets found</p></div>';
+                                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128694;</div><p>No patrol sheets found</p></div>';
                                 return;
                             }
                             
@@ -1045,6 +1078,7 @@ router.get('/entrance-forms', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
+                <meta charset="UTF-8">
                 <title>Entrance Forms History - ${process.env.APP_NAME}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1182,10 +1216,10 @@ router.get('/entrance-forms', async (req, res) => {
             </head>
             <body>
                 <div class="header">
-                    <h1>🚪 Entrance Forms History</h1>
+                    <h1>&#128682; Entrance Forms History</h1>
                     <div class="header-nav">
                         <a href="/security-services/entrance-form">+ New Entry</a>
-                        <a href="/security">← Back</a>
+                        <a href="/security">&#8592; Back</a>
                     </div>
                 </div>
                 
@@ -1229,7 +1263,7 @@ router.get('/entrance-forms', async (req, res) => {
                                 </table>
                             ` : `
                                 <div class="empty-state">
-                                    <div class="empty-state-icon">🚪</div>
+                                    <div class="empty-state-icon">&#128682;</div>
                                     <p>No entrance forms found</p>
                                 </div>
                             `}
@@ -1261,7 +1295,7 @@ router.get('/entrance-forms', async (req, res) => {
                             const container = document.getElementById('entranceTableContainer');
                             
                             if (!data.forms || data.forms.length === 0) {
-                                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🚪</div><p>No entrance forms found</p></div>';
+                                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128682;</div><p>No entrance forms found</p></div>';
                                 return;
                             }
                             
@@ -1380,6 +1414,7 @@ router.get('/attendance-reports', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
+                <meta charset="UTF-8">
                 <title>Employee Attendance Reports - ${process.env.APP_NAME}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1517,10 +1552,10 @@ router.get('/attendance-reports', async (req, res) => {
             </head>
             <body>
                 <div class="header">
-                    <h1>📋 Employee Attendance Reports</h1>
+                    <h1>&#128203; Employee Attendance Reports</h1>
                     <div class="header-nav">
                         <a href="/security-services/attendance-report">+ New Report</a>
-                        <a href="/security">← Back</a>
+                        <a href="/security">&#8592; Back</a>
                     </div>
                 </div>
                 
@@ -1558,7 +1593,7 @@ router.get('/attendance-reports', async (req, res) => {
                                 </table>
                             ` : `
                                 <div class="empty-state">
-                                    <div class="empty-state-icon">📋</div>
+                                    <div class="empty-state-icon">&#128203;</div>
                                     <p>No attendance reports found</p>
                                 </div>
                             `}
@@ -1588,7 +1623,7 @@ router.get('/attendance-reports', async (req, res) => {
                             const container = document.getElementById('reportsTableContainer');
                             
                             if (!data.reports || data.reports.length === 0) {
-                                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><p>No attendance reports found</p></div>';
+                                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128203;</div><p>No attendance reports found</p></div>';
                                 return;
                             }
                             
@@ -1702,6 +1737,7 @@ router.get('/visitor-cars', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
+                <meta charset="UTF-8">
                 <title>Visitors Cars Records - ${process.env.APP_NAME}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1839,10 +1875,10 @@ router.get('/visitor-cars', async (req, res) => {
             </head>
             <body>
                 <div class="header">
-                    <h1>🚗 Visitors Cars Records</h1>
+                    <h1>&#128663; Visitors Cars Records</h1>
                     <div class="header-nav">
                         <a href="/security-services/visitor-cars">+ New Record</a>
-                        <a href="/security">← Back</a>
+                        <a href="/security">&#8592; Back</a>
                     </div>
                 </div>
                 
@@ -1880,7 +1916,7 @@ router.get('/visitor-cars', async (req, res) => {
                                 </table>
                             ` : `
                                 <div class="empty-state">
-                                    <div class="empty-state-icon">🚗</div>
+                                    <div class="empty-state-icon">&#128663;</div>
                                     <p>No visitor cars records found</p>
                                 </div>
                             `}
@@ -1910,7 +1946,7 @@ router.get('/visitor-cars', async (req, res) => {
                             const container = document.getElementById('recordsTableContainer');
                             
                             if (!data.records || data.records.length === 0) {
-                                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🚗</div><p>No visitor cars records found</p></div>';
+                                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128663;</div><p>No visitor cars records found</p></div>';
                                 return;
                             }
                             
@@ -1983,4 +2019,333 @@ router.get('/api/visitor-cars', async (req, res) => {
     }
 });
 
+// Parking Violations History Page
+router.get('/parking-violations', async (req, res) => {
+    const user = req.currentUser;
+    
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        const violationsResult = await pool.request()
+            .query(`
+                SELECT * FROM Security_ParkingViolations
+                WHERE Status = 'Active'
+                ORDER BY ViolationDate DESC, CreatedAt DESC
+            `);
+        
+        await pool.close();
+        
+        const violations = violationsResult.recordset;
+        
+        let violationRows = violations.map(v => {
+            const violationDate = new Date(v.ViolationDate).toLocaleDateString('en-GB', { 
+                weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
+            });
+            const hasImage = v.ImagePath ? '<span class="has-photo">&#128247; Photo</span>' : '<span class="no-photo">No photo</span>';
+            return `
+                <tr onclick="viewViolation(${v.Id})" style="cursor: pointer;">
+                    <td>${violationDate}</td>
+                    <td><span class="location-badge">${v.Location}</span></td>
+                    <td>${v.CreatedBy}</td>
+                    <td>${hasImage}</td>
+                    <td>
+                        <button class="btn-view" onclick="event.stopPropagation(); viewViolation(${v.Id})">View</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Parking Violations History - ${process.env.APP_NAME}</title>
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body { 
+                        font-family: 'Segoe UI', Arial, sans-serif; 
+                        background: #f0f2f5;
+                        min-height: 100vh;
+                    }
+                    .header {
+                        background: linear-gradient(135deg, #c62828 0%, #b71c1c 100%);
+                        color: white;
+                        padding: 20px 40px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    }
+                    .header h1 { 
+                        font-size: 24px;
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                    }
+                    .header-nav a {
+                        color: white;
+                        text-decoration: none;
+                        margin-left: 20px;
+                        opacity: 0.9;
+                        transition: opacity 0.3s;
+                    }
+                    .header-nav a:hover { opacity: 1; }
+                    .container { 
+                        max-width: 1200px; 
+                        margin: 0 auto; 
+                        padding: 30px 20px; 
+                    }
+                    .card {
+                        background: white;
+                        border-radius: 15px;
+                        padding: 25px;
+                        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+                    }
+                    .card-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 20px;
+                        padding-bottom: 15px;
+                        border-bottom: 1px solid #eee;
+                    }
+                    .card-title {
+                        font-size: 18px;
+                        font-weight: 600;
+                        color: #333;
+                    }
+                    .filter-row {
+                        display: flex;
+                        gap: 15px;
+                        margin-bottom: 20px;
+                        flex-wrap: wrap;
+                    }
+                    .filter-row select,
+                    .filter-row input {
+                        padding: 10px 15px;
+                        border: 1px solid #ddd;
+                        border-radius: 8px;
+                        font-size: 14px;
+                        min-width: 150px;
+                    }
+                    .filter-row select:focus,
+                    .filter-row input:focus {
+                        outline: none;
+                        border-color: #c62828;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                    }
+                    th {
+                        background: #f8f9fa;
+                        padding: 15px;
+                        text-align: left;
+                        font-size: 13px;
+                        font-weight: 600;
+                        color: #555;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                        border-bottom: 2px solid #dee2e6;
+                    }
+                    td {
+                        padding: 15px;
+                        border-bottom: 1px solid #eee;
+                        font-size: 14px;
+                    }
+                    tr:hover {
+                        background: #f8f9fa;
+                    }
+                    .location-badge {
+                        background: #ffebee;
+                        color: #c62828;
+                        padding: 5px 12px;
+                        border-radius: 20px;
+                        font-size: 12px;
+                        font-weight: 500;
+                    }
+                    .has-photo {
+                        background: #e8f5e9;
+                        color: #2e7d32;
+                        padding: 5px 12px;
+                        border-radius: 20px;
+                        font-size: 12px;
+                    }
+                    .no-photo {
+                        background: #f5f5f5;
+                        color: #888;
+                        padding: 5px 12px;
+                        border-radius: 20px;
+                        font-size: 12px;
+                    }
+                    .btn-view {
+                        background: #c62828;
+                        color: white;
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-size: 13px;
+                        transition: background 0.3s;
+                    }
+                    .btn-view:hover {
+                        background: #b71c1c;
+                    }
+                    .empty-state {
+                        text-align: center;
+                        padding: 60px;
+                        color: #666;
+                    }
+                    .empty-state-icon {
+                        font-size: 60px;
+                        margin-bottom: 15px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>&#127359; Parking Violations History</h1>
+                    <div class="header-nav">
+                        <a href="/security-services/parking-violation">+ New Violation</a>
+                        <a href="/security">&#8592; Back</a>
+                    </div>
+                </div>
+                
+                <div class="container">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">All Parking Violations</div>
+                        </div>
+                        
+                        <div class="filter-row">
+                            <input type="date" id="filterFromDate" onchange="filterViolations()" placeholder="From Date">
+                            <input type="date" id="filterToDate" onchange="filterViolations()" placeholder="To Date">
+                            <select id="filterLocation" onchange="filterViolations()">
+                                <option value="">All Locations</option>
+                                <option value="HO Zouk">HO Zouk</option>
+                                <option value="HO Dbayeh">HO Dbayeh</option>
+                            </select>
+                        </div>
+                        
+                        <div id="violationsTableContainer">
+                            ${violations.length > 0 ? `
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Location</th>
+                                            <th>Reported By</th>
+                                            <th>Photo</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${violationRows}
+                                    </tbody>
+                                </table>
+                            ` : `
+                                <div class="empty-state">
+                                    <div class="empty-state-icon">&#127359;</div>
+                                    <div>No parking violations recorded yet</div>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                </div>
+                
+                <script>
+                    function viewViolation(id) {
+                        window.location.href = '/security-services/parking-violation/' + id;
+                    }
+                    
+                    async function filterViolations() {
+                        const fromDate = document.getElementById('filterFromDate').value;
+                        const toDate = document.getElementById('filterToDate').value;
+                        const location = document.getElementById('filterLocation').value;
+                        
+                        try {
+                            const params = new URLSearchParams();
+                            if (fromDate) params.append('fromDate', fromDate);
+                            if (toDate) params.append('toDate', toDate);
+                            if (location) params.append('location', location);
+                            
+                            const response = await fetch('/security/api/parking-violations?' + params);
+                            const data = await response.json();
+                            
+                            const container = document.getElementById('violationsTableContainer');
+                            
+                            if (data.violations.length === 0) {
+                                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#127359;</div><div>No violations match your filters</div></div>';
+                                return;
+                            }
+                            
+                            const rows = data.violations.map(function(v) {
+                                const violationDate = new Date(v.ViolationDate).toLocaleDateString('en-GB', { 
+                                    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
+                                });
+                                const hasImage = v.ImagePath ? '<span class="has-photo">&#128247; Photo</span>' : '<span class="no-photo">No photo</span>';
+                                return '<tr onclick="viewViolation(' + v.Id + ')" style="cursor: pointer;">' +
+                                    '<td>' + violationDate + '</td>' +
+                                    '<td><span class="location-badge">' + v.Location + '</span></td>' +
+                                    '<td>' + v.CreatedBy + '</td>' +
+                                    '<td>' + hasImage + '</td>' +
+                                    '<td><button class="btn-view" onclick="event.stopPropagation(); viewViolation(' + v.Id + ')">View</button></td>' +
+                                '</tr>';
+                            }).join('');
+                            
+                            container.innerHTML = '<table><thead><tr><th>Date</th><th>Location</th><th>Reported By</th><th>Photo</th><th>Action</th></tr></thead><tbody>' + rows + '</tbody></table>';
+                        } catch (err) {
+                            console.error('Error filtering violations:', err);
+                        }
+                    }
+                </script>
+            </body>
+            </html>
+        `);
+    } catch (err) {
+        console.error('Error loading parking violations:', err);
+        res.status(500).send('Error: ' + err.message);
+    }
+});
+
+// API: Get Parking Violations
+router.get('/api/parking-violations', async (req, res) => {
+    try {
+        const { fromDate, toDate, location } = req.query;
+        
+        const pool = await sql.connect(dbConfig);
+        
+        let query = `
+            SELECT * FROM Security_ParkingViolations
+            WHERE Status = 'Active'
+        `;
+        
+        const request = pool.request();
+        
+        if (fromDate) {
+            query += ' AND ViolationDate >= @fromDate';
+            request.input('fromDate', sql.Date, fromDate);
+        }
+        if (toDate) {
+            query += ' AND ViolationDate <= @toDate';
+            request.input('toDate', sql.Date, toDate);
+        }
+        if (location) {
+            query += ' AND Location = @location';
+            request.input('location', sql.NVarChar, location);
+        }
+        
+        query += ' ORDER BY ViolationDate DESC, CreatedAt DESC';
+        
+        const result = await request.query(query);
+        await pool.close();
+        
+        res.json({ violations: result.recordset });
+    } catch (err) {
+        console.error('Error fetching parking violations:', err);
+        res.json({ violations: [], error: err.message });
+    }
+});
+
 module.exports = router;
+
