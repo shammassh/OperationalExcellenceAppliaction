@@ -4,28 +4,41 @@
  */
 
 const sql = require('mssql');
-const config = require('../../config/default');
+const config = require('../../../config/default');
 
 class RoleAssignmentService {
     static async getAllUsers() {
         const pool = await sql.connect(config.database);
         const result = await pool.request().query(`
             SELECT 
-                id, 
-                azure_user_id, 
-                email, 
-                display_name, 
-                role, 
-                assigned_stores,
-                assigned_department,
-                is_active, 
-                is_approved,
-                created_at, 
-                last_login
+                Id as id, 
+                AzureId as azure_user_id, 
+                Email as email, 
+                DisplayName as display_name, 
+                CASE 
+                    WHEN RoleId = 1 THEN 'Admin'
+                    WHEN RoleId = 2 THEN 'SuperAuditor'
+                    WHEN RoleId = 3 THEN 'Auditor'
+                    ELSE 'Pending'
+                END as role,
+                IsActive as is_active, 
+                IsApproved as is_approved,
+                CreatedAt as created_at, 
+                LastLoginAt as last_login
             FROM Users
-            ORDER BY created_at DESC
+            ORDER BY CreatedAt DESC
         `);
         return result.recordset;
+    }
+
+    static getRoleId(roleName) {
+        const roleMap = {
+            'Admin': 1,
+            'SuperAuditor': 2,
+            'Auditor': 3,
+            'Pending': null
+        };
+        return roleMap[roleName] || null;
     }
 
     static async updateUser(userId, updateData) {
@@ -35,28 +48,26 @@ class RoleAssignmentService {
         const request = pool.request().input('userId', sql.Int, userId);
         
         if (updateData.role !== undefined) {
-            updates.push('role = @role');
-            request.input('role', sql.NVarChar, updateData.role);
+            const roleId = this.getRoleId(updateData.role);
+            updates.push('RoleId = @roleId');
+            request.input('roleId', sql.Int, roleId);
+            
+            // When assigning a role, also approve the user
+            if (roleId !== null) {
+                updates.push('IsApproved = 1');
+            }
         }
         if (updateData.display_name !== undefined) {
-            updates.push('display_name = @display_name');
-            request.input('display_name', sql.NVarChar, updateData.display_name);
+            updates.push('DisplayName = @displayName');
+            request.input('displayName', sql.NVarChar, updateData.display_name);
         }
         if (updateData.is_approved !== undefined) {
-            updates.push('is_approved = @is_approved');
-            request.input('is_approved', sql.Bit, updateData.is_approved ? 1 : 0);
+            updates.push('IsApproved = @isApproved');
+            request.input('isApproved', sql.Bit, updateData.is_approved ? 1 : 0);
         }
         if (updateData.is_active !== undefined) {
-            updates.push('is_active = @is_active');
-            request.input('is_active', sql.Bit, updateData.is_active ? 1 : 0);
-        }
-        if (updateData.assigned_stores !== undefined) {
-            updates.push('assigned_stores = @assigned_stores');
-            request.input('assigned_stores', sql.NVarChar, JSON.stringify(updateData.assigned_stores));
-        }
-        if (updateData.assigned_department !== undefined) {
-            updates.push('assigned_department = @assigned_department');
-            request.input('assigned_department', sql.NVarChar, updateData.assigned_department);
+            updates.push('IsActive = @isActive');
+            request.input('isActive', sql.Bit, updateData.is_active ? 1 : 0);
         }
         
         if (updates.length === 0) {
@@ -65,8 +76,8 @@ class RoleAssignmentService {
         
         await request.query(`
             UPDATE Users 
-            SET ${updates.join(', ')}, updated_at = GETDATE()
-            WHERE id = @userId
+            SET ${updates.join(', ')}, UpdatedAt = GETDATE()
+            WHERE Id = @userId
         `);
         
         return await this.getUserById(userId);
@@ -76,7 +87,24 @@ class RoleAssignmentService {
         const pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('userId', sql.Int, userId)
-            .query('SELECT * FROM Users WHERE id = @userId');
+            .query(`
+                SELECT 
+                    Id as id, 
+                    AzureId as azure_user_id, 
+                    Email as email, 
+                    DisplayName as display_name, 
+                    CASE 
+                        WHEN RoleId = 1 THEN 'Admin'
+                        WHEN RoleId = 2 THEN 'SuperAuditor'
+                        WHEN RoleId = 3 THEN 'Auditor'
+                        ELSE 'Pending'
+                    END as role,
+                    IsActive as is_active, 
+                    IsApproved as is_approved,
+                    CreatedAt as created_at, 
+                    LastLoginAt as last_login
+                FROM Users WHERE Id = @userId
+            `);
         return result.recordset[0];
     }
 
@@ -84,18 +112,19 @@ class RoleAssignmentService {
         const pool = await sql.connect(config.database);
         
         // If assigning a real role (not Pending), approve and activate the user
+        const roleId = this.getRoleId(newRole);
         const isApproved = newRole !== 'Pending' ? 1 : 0;
         const isActive = newRole !== 'Pending' ? 1 : 0;
         
         await pool.request()
             .input('userId', sql.Int, userId)
-            .input('role', sql.NVarChar, newRole)
+            .input('roleId', sql.Int, roleId)
             .input('isApproved', sql.Bit, isApproved)
             .input('isActive', sql.Bit, isActive)
             .query(`
                 UPDATE Users 
-                SET role = @role, is_approved = @isApproved, is_active = @isActive, updated_at = GETDATE()
-                WHERE id = @userId
+                SET RoleId = @roleId, IsApproved = @isApproved, IsActive = @isActive, UpdatedAt = GETDATE()
+                WHERE Id = @userId
             `);
         
         return await this.getUserById(userId);
@@ -109,8 +138,8 @@ class RoleAssignmentService {
             .input('isActive', sql.Bit, isActive ? 1 : 0)
             .query(`
                 UPDATE Users 
-                SET is_active = @isActive, updated_at = GETDATE()
-                WHERE id = @userId
+                SET IsActive = @isActive, UpdatedAt = GETDATE()
+                WHERE Id = @userId
             `);
         
         return await this.getUserById(userId);
@@ -118,13 +147,14 @@ class RoleAssignmentService {
 
     static async approveUser(userId, role = 'Auditor') {
         const pool = await sql.connect(config.database);
+        const roleId = this.getRoleId(role);
         
         await pool.request()
             .input('userId', sql.Int, userId)
-            .input('role', sql.NVarChar, role)
+            .input('roleId', sql.Int, roleId)
             .query(`
                 UPDATE Users 
-                SET role = @role, is_approved = 1, is_active = 1, updated_at = GETDATE()
+                SET RoleId = @roleId, IsApproved = 1, IsActive = 1, UpdatedAt = GETDATE()
                 WHERE id = @userId
             `);
         
@@ -138,8 +168,8 @@ class RoleAssignmentService {
             .input('userId', sql.Int, userId)
             .query(`
                 UPDATE Users 
-                SET is_approved = 0, is_active = 0, updated_at = GETDATE()
-                WHERE id = @userId
+                SET IsApproved = 0, IsActive = 0, UpdatedAt = GETDATE()
+                WHERE Id = @userId
             `);
         
         return { success: true };

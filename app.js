@@ -122,61 +122,87 @@ app.get('/', (req, res) => {
 
 // Protected dashboard
 app.get('/dashboard', requireAuth, (req, res) => {
-    const role = req.currentUser.role;
+    const permissions = req.currentUser.permissions || {};
+    const roleNames = req.currentUser.roleNames || [];
+    const primaryRole = req.currentUser.role;
     
-    // Define which roles can see which departments
-    const rolePermissions = {
-        // System Admin and OE Department can see all
+    // Map form codes to menu sections
+    const formToMenu = {
+        // Stores module
+        'THEFT_INCIDENT': 'stores', 'COMPLAINT': 'stores', 'EXTRA_CLEANING': 'stores',
+        'WEEKLY_FEEDBACK': 'stores', 'PRODUCTION_EXTRAS': 'stores', 'FIVE_DAYS_ENTRY': 'stores',
+        
+        // Security Services module
+        'SECURITY_SCHEDULE': 'security-services',
+        
+        // Personnel module  
+        'THIRDPARTY_SCHEDULE': 'personnel', 'THIRDPARTY_ATTENDANCE': 'personnel',
+        
+        // OHS module
+        'OHS_INSPECTION_START': 'ohs', 'OHS_INSPECTION_LIST': 'ohs',
+        
+        // OHS Inspection module
+        'OHS_INSPECTION_TEMPLATES': 'ohs-inspection', 'OHS_INSPECTION_STORES': 'ohs-inspection',
+        'OHS_INSPECTION_ACTION_PLANS': 'ohs-inspection', 'OHS_INSPECTION_DEPT_REPORTS': 'ohs-inspection',
+        'OHS_INSPECTION_SETTINGS': 'ohs-inspection',
+        
+        // OE module (dashboards)
+        'THEFT_DASHBOARD': 'oe', 'COMPLAINTS_DASHBOARD': 'oe', 'EXTRA_CLEANING_REVIEW': 'oe',
+        'FEEDBACK_DASHBOARD': 'oe', 'PRODUCTION_DASHBOARD': 'oe', 'FIVE_DAYS_DASHBOARD': 'oe',
+        'ATTENDANCE_DASHBOARD': 'oe', 'THIRDPARTY_DASHBOARD': 'oe', 'SECURITY_DASHBOARD': 'oe',
+        
+        // OE Inspection module
+        'OE_INSPECTION_START': 'oe-inspection', 'OE_INSPECTION_LIST': 'oe-inspection',
+        'OE_INSPECTION_ACTION_PLANS': 'oe-inspection', 'OE_INSPECTION_DEPT_REPORTS': 'oe-inspection',
+        
+        // Third-Party module
+        'THIRDPARTY_SCHEDULE': 'thirdparty', 'THIRDPARTY_ATTENDANCE': 'thirdparty',
+        'THIRDPARTY_DASHBOARD': 'thirdparty',
+        
+        // Security module
+        'THEFT_DASHBOARD': 'security', 'SECURITY_DASHBOARD': 'security',
+        
+        // HR module
+        'COMPLAINT': 'hr'
+    };
+    
+    // Calculate which menus user can access based on their form permissions
+    const accessibleMenus = new Set();
+    
+    // If user has permissions from database, use those
+    if (Object.keys(permissions).length > 0) {
+        Object.keys(permissions).forEach(formCode => {
+            const perm = permissions[formCode];
+            if (perm.canView) {
+                const menu = formToMenu[formCode];
+                if (menu) accessibleMenus.add(menu);
+            }
+        });
+    }
+    
+    // Also check role-based access (for backward compatibility and System Admin)
+    const roleBasedAccess = {
         'System Administrator': ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
         'Senior Inspector': ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
         'Inspector': ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
         'Implementation Inspector': ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
         'Head of Operational Excellence': ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
-        
-        // Executives can see all
         'Chief People & Support Officer': ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
         'Head of Talent Management': ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Head of Operational Assurance and Support': ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Lead Support and Execution Coordinator': ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
         'Head of Operations': ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
-        
-        // Store-Level Users
-        'Area Manager': ['stores', 'personnel'],
-        'Store Manager': ['stores', 'personnel'],
-        'Duty Manager': ['stores', 'personnel'],
-        'Personnel Supervisor': ['stores', 'personnel'],
-        
-        // OHS Department
-        'OHS Manager': ['ohs', 'ohs-inspection'],
-        'OHS Officer': ['ohs', 'ohs-inspection'],
-        
-        // Third-Party Services
-        'Senior Coordinator': ['thirdparty'],
-        'Compliance Inspector': ['thirdparty'],
-        'Payroll Officer': ['thirdparty'],
-        
-        // Security Department
-        'Program Lead': ['security', 'security-services'],
-        'Regional Security Manager': ['security', 'security-services'],
-        'Security Compliance Inspector': ['security', 'security-services'],
-        
-        // HR & Talent
-        'HR Officer': ['hr'],
-        'Employee Relations Officer': ['hr'],
-        
-        // Facilities & Maintenance
-        'Facility Services Supervisor': ['stores'],
-        'Head of Maintenance': ['stores'],
-        'Assistant Head of Maintenance': ['stores'],
-        
-        // External Providers
-        'Cleaning Service Provider': ['thirdparty'],
-        'Security Service Provider': ['security'],
-        'Valet Service Provider': ['thirdparty'],
-        'Other Service Provider': ['thirdparty']
     };
     
-    const userPermissions = rolePermissions[role] || [];
+    // Add role-based access for each role the user has
+    roleNames.forEach(roleName => {
+        if (roleBasedAccess[roleName]) {
+            roleBasedAccess[roleName].forEach(m => accessibleMenus.add(m));
+        }
+    });
+    
+    // Also check primary role
+    if (roleBasedAccess[primaryRole]) {
+        roleBasedAccess[primaryRole].forEach(m => accessibleMenus.add(m));
+    }
     
     // Build menu items based on permissions
     const allMenuItems = [
@@ -192,7 +218,7 @@ app.get('/dashboard', requireAuth, (req, res) => {
         { id: 'hr', icon: '👥', title: 'HR & Talent', href: '/hr', desc: 'Employee relations & cases' }
     ];
     
-    const visibleMenuItems = allMenuItems.filter(item => userPermissions.includes(item.id));
+    const visibleMenuItems = allMenuItems.filter(item => accessibleMenus.has(item.id));
     
     const menuHtml = visibleMenuItems.map(item => `
         <a href="${item.href}" class="menu-item">

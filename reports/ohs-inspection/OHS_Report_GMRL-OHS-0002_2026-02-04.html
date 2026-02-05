@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OHS Inspection Report - GMRL-OHS-0002</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f5f5f5; color: #333; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #e17055 0%, #d63031 100%); color: white; padding: 30px; border-radius: 12px; margin-bottom: 20px; }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .header-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
+        .header-item { background: rgba(255,255,255,0.1); padding: 10px 15px; border-radius: 8px; }
+        .header-item label { font-size: 12px; opacity: 0.8; display: block; }
+        .header-item span { font-size: 16px; font-weight: 600; }
+        .score-card { background: white; border-radius: 12px; padding: 30px; margin-bottom: 20px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .score-value { font-size: 72px; font-weight: bold; }
+        .score-value.pass { color: #10b981; }
+        .score-value.fail { color: #ef4444; }
+        .score-label { font-size: 24px; margin-top: 10px; }
+        .score-label.pass { color: #10b981; }
+        .score-label.fail { color: #ef4444; }
+        .section-card { background: white; border-radius: 12px; margin-bottom: 20px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .section-header { background: #fff5f5; padding: 20px; border-bottom: 1px solid #fecaca; display: flex; justify-content: space-between; align-items: center; }
+        .section-title { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .section-score { font-size: 24px; font-weight: bold; }
+        .section-score.pass { color: #10b981; }
+        .section-score.fail { color: #ef4444; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background: #f8fafc; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748b; }
+        tr:hover { background: #f8fafc; }
+        .choice-yes { color: #10b981; font-weight: 600; }
+        .choice-no { color: #ef4444; font-weight: 600; }
+        .choice-partial { color: #f59e0b; font-weight: 600; }
+        .choice-na { color: #94a3b8; }
+        .findings-card { background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .findings-title { color: #dc2626; font-size: 20px; font-weight: 600; margin-bottom: 15px; }
+        .finding-item { background: white; border-radius: 8px; padding: 15px; margin-bottom: 10px; border-left: 4px solid #ef4444; }
+        .finding-ref { font-weight: 600; color: #e17055; }
+        .finding-question { margin: 5px 0; }
+        .finding-detail { color: #64748b; font-size: 14px; }
+        .footer { text-align: center; padding: 20px; color: #64748b; font-size: 14px; }
+        @media print { body { background: white; } .container { max-width: 100%; padding: 0; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🦺 OHS Inspection Report</h1>
+            <div class="header-info">
+                <div class="header-item"><label>Document Number</label><span>GMRL-OHS-0002</span></div>
+                <div class="header-item"><label>Store</label><span>Test Storeww</span></div>
+                <div class="header-item"><label>Inspection Date</label><span>2/3/2026</span></div>
+                <div class="header-item"><label>Inspectors</label><span>sss</span></div>
+                <div class="header-item"><label>Accompanied By</label><span>N/A</span></div>
+                <div class="header-item"><label>Status</label><span>Completed</span></div>
+            </div>
+        </div>
+        
+        <div class="score-card">
+            <div class="score-value pass">100%</div>
+            <div class="score-label pass">PASS ✅</div>
+            <div style="color: #64748b; margin-top: 10px;">Threshold: 80%</div>
+        </div>
+        
+        
+        <div class="section-card">
+            <div class="section-header">
+                <div class="section-title">📋 General Housekeeping & Workplace Conditions</div>
+                <div class="section-score fail">0%</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Question</th>
+                        <th>Answer</th>
+                        <th>Score</th>
+                        <th>Finding</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    <tr>
+                        <td>1.1</td>
+                        <td>Floors are clean, dry, and free from spills, residues, or debris</td>
+                        <td class="choice-na">NA</td>
+                        <td>0 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>1.2</td>
+                        <td>Housekeeping standards are maintained throughout operating hours</td>
+                        <td class="choice-na">NA</td>
+                        <td>0 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header">
+                <div class="section-title">📋 Slips, Trips & Falls</div>
+                <div class="section-score pass">100%</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Question</th>
+                        <th>Answer</th>
+                        <th>Score</th>
+                        <th>Finding</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    <tr>
+                        <td>2.1</td>
+                        <td>Floor surfaces are intact, level, and free from cracks or loose tiles.</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2.2</td>
+                        <td>Anti-slip mats are installed where required and are in good condition.</td>
+                        <td class="choice-na">-</td>
+                        <td>- / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header">
+                <div class="section-title">📋 Fire Safety & Emergency Exits</div>
+                <div class="section-score fail">0%</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Question</th>
+                        <th>Answer</th>
+                        <th>Score</th>
+                        <th>Finding</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    <tr>
+                        <td>3.1</td>
+                        <td>Fire extinguishers are installed at the correct mounting height.</td>
+                        <td class="choice-na">-</td>
+                        <td>- / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>3.2</td>
+                        <td>Fire extinguishers are appropriate for the fire risk in the area.</td>
+                        <td class="choice-na">NA</td>
+                        <td>0 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header">
+                <div class="section-title">📋 •	Emergency evacuation plans are displayed and legible</div>
+                <div class="section-score fail">0%</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Question</th>
+                        <th>Answer</th>
+                        <th>Score</th>
+                        <th>Finding</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    <tr>
+                        <td>4.1</td>
+                        <td>Emergency evacuation plans are displayed and legible</td>
+                        <td class="choice-na">-</td>
+                        <td>- / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+        
+        
+        
+        
+        <div class="footer">
+            Report generated on 2/4/2026, 12:24:19 PM | OHS Inspection System
+        </div>
+    </div>
+</body>
+</html>

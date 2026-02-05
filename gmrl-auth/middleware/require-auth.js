@@ -47,10 +47,34 @@ async function requireAuth(req, res, next) {
             azureUserId: session.azure_user_id,
             email: session.email,
             displayName: session.display_name,
-            role: session.role,
+            role: session.role,  // Primary role (for backward compatibility)
+            roles: session.roles || [],  // All assigned roles
+            roleNames: session.roleNames || [],  // Role names as array
+            permissions: session.permissions || {},  // Form permissions
             isActive: session.is_active,
             isApproved: session.is_approved,
             accessToken: session.azure_access_token
+        };
+        
+        // Add helper functions
+        req.currentUser.hasRole = function(roleName) {
+            return this.roleNames.includes(roleName);
+        };
+        
+        req.currentUser.hasAnyRole = function(...roleNames) {
+            return roleNames.some(r => this.roleNames.includes(r));
+        };
+        
+        req.currentUser.canAccess = function(formCode, action = 'view') {
+            const perm = this.permissions[formCode];
+            if (!perm) return false;
+            switch(action.toLowerCase()) {
+                case 'view': return perm.canView;
+                case 'create': return perm.canCreate;
+                case 'edit': return perm.canEdit;
+                case 'delete': return perm.canDelete;
+                default: return false;
+            }
         };
         
         req.sessionToken = sessionToken;

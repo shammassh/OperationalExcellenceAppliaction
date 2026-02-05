@@ -44,6 +44,7 @@ class SessionManager {
     static async getSession(sessionToken) {
         const pool = await sql.connect(config.database);
         
+        // Get main session and user info
         const result = await pool.request()
             .input('sessionToken', sql.NVarChar, sessionToken)
             .query(`
@@ -71,7 +72,47 @@ class SessionManager {
                 AND u.IsActive = 1
             `);
         
-        return result.recordset[0] || null;
+        if (!result.recordset[0]) {
+            return null;
+        }
+        
+        const session = result.recordset[0];
+        
+        // Get all user roles (multi-role support)
+        const rolesResult = await pool.request()
+            .input('userId', sql.Int, session.user_db_id)
+            .query(`
+                SELECT r.Id, r.RoleName, c.CategoryName
+                FROM UserRoleAssignments ura
+                JOIN UserRoles r ON ura.RoleId = r.Id
+                JOIN RoleCategories c ON r.CategoryId = c.Id
+                WHERE ura.UserId = @userId
+                ORDER BY c.Id, r.Id
+            `);
+        
+        session.roles = rolesResult.recordset;
+        session.roleNames = rolesResult.recordset.map(r => r.RoleName);
+        
+        // Get user's form permissions from UserFormAccess
+        const permissionsResult = await pool.request()
+            .input('userId', sql.Int, session.user_db_id)
+            .query(`
+                SELECT FormCode, CanView, CanCreate, CanEdit, CanDelete
+                FROM UserFormAccess
+                WHERE UserId = @userId
+            `);
+        
+        session.permissions = {};
+        permissionsResult.recordset.forEach(p => {
+            session.permissions[p.FormCode] = {
+                canView: p.CanView,
+                canCreate: p.CanCreate,
+                canEdit: p.CanEdit,
+                canDelete: p.CanDelete
+            };
+        });
+        
+        return session;
     }
     
     /**

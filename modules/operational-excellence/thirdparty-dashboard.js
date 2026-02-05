@@ -162,6 +162,13 @@ router.get('/', async (req, res) => {
                     .stat-card.week .stat-value { color: #17a2b8; }
                     .stat-card.month .stat-value { color: #667eea; }
                     
+                    .stat-card { cursor: pointer; transition: all 0.2s; border: 2px solid transparent; }
+                    .stat-card:hover { transform: translateY(-3px); box-shadow: 0 4px 15px rgba(0,0,0,0.15); }
+                    .stat-card.selected { border-color: #8e44ad; background: #f8f0fc; }
+                    .stat-card.active.selected { border-color: #28a745; background: #f0fff4; }
+                    .stat-card.week.selected { border-color: #17a2b8; background: #f0fafc; }
+                    .stat-card.month.selected { border-color: #667eea; background: #f0f4ff; }
+                    
                     .card {
                         background: white;
                         border-radius: 10px;
@@ -236,19 +243,19 @@ router.get('/', async (req, res) => {
                 <div class="container">
                     <!-- Stats Cards -->
                     <div class="stats-grid">
-                        <div class="stat-card">
+                        <div class="stat-card ${filterPeriod === 'all' ? 'selected' : ''}" onclick="filterByCard('all')" title="Click to show all schedules">
                             <div class="stat-value">${statsData.Total}</div>
                             <div class="stat-label">Total Schedules</div>
                         </div>
-                        <div class="stat-card active">
+                        <div class="stat-card active ${filterPeriod === 'today' ? 'selected' : ''}" onclick="filterByCard('today')" title="Click to show active schedules">
                             <div class="stat-value">${statsData.Active}</div>
                             <div class="stat-label">Active Now</div>
                         </div>
-                        <div class="stat-card week">
+                        <div class="stat-card week ${filterPeriod === 'this-week' ? 'selected' : ''}" onclick="filterByCard('this-week')" title="Click to show this week's schedules">
                             <div class="stat-value">${statsData.ThisWeek}</div>
                             <div class="stat-label">This Week</div>
                         </div>
-                        <div class="stat-card month">
+                        <div class="stat-card month ${filterPeriod === 'this-month' ? 'selected' : ''}" onclick="filterByCard('this-month')" title="Click to show this month's schedules">
                             <div class="stat-value">${statsData.ThisMonth}</div>
                             <div class="stat-label">This Month</div>
                         </div>
@@ -320,6 +327,13 @@ router.get('/', async (req, res) => {
                 <script>
                     function viewSchedule(id) {
                         window.location.href = '/operational-excellence/thirdparty-dashboard/view/' + id;
+                    }
+                    
+                    function filterByCard(period) {
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('period', period);
+                        // Keep store filter if already set
+                        window.location.href = url.toString();
                     }
                     
                     function toggleCustomDates() {
