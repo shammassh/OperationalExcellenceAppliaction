@@ -117,7 +117,7 @@ router.get('/users', async (req, res) => {
         
         // Get users with their assigned roles (supports multiple roles)
         const users = await pool.request().query(`
-            SELECT u.Id, u.Email, u.DisplayName, u.IsActive, u.CreatedAt,
+            SELECT u.Id, u.Email, u.DisplayName, u.IsActive, u.IsApproved, u.CreatedAt,
                    (SELECT COUNT(*) FROM UserFormAccess WHERE UserId = u.Id) as FormCount,
                    (SELECT STRING_AGG(r.RoleName, ', ') FROM UserRoleAssignments ura 
                     JOIN UserRoles r ON ura.RoleId = r.Id WHERE ura.UserId = u.Id) as RoleNames,
@@ -146,14 +146,23 @@ router.get('/users', async (req, res) => {
                 `<span class="role-badge">${r}</span>`
             ).join(' ') : '<span class="role-badge no-role">No Role</span>';
             
+            const approvalBadge = u.IsApproved 
+                ? '' 
+                : '<span class="status-badge pending">⏳ Pending Approval</span>';
+            
+            const approveBtn = u.IsApproved 
+                ? '' 
+                : `<button class="btn btn-sm btn-warning" onclick="approveUser(${u.Id}, '${escapeJs(u.DisplayName)}')">✓ Approve</button>`;
+            
             return `
-            <tr data-user-id="${u.Id}">
-                <td>${escapeJs(u.DisplayName) || 'N/A'}</td>
+            <tr data-user-id="${u.Id}" data-approved="${u.IsApproved ? '1' : '0'}">
+                <td>${escapeJs(u.DisplayName) || 'N/A'} ${approvalBadge}</td>
                 <td>${u.Email}</td>
                 <td class="roles-cell">${roleDisplay}</td>
                 <td><span class="form-count">${u.FormCount} forms</span></td>
                 <td><span class="status-badge ${u.IsActive ? 'active' : 'inactive'}">${u.IsActive ? 'Active' : 'Inactive'}</span></td>
                 <td class="actions-cell">
+                    ${approveBtn}
                     <a href="/admin/users/${u.Id}/forms" class="btn btn-sm btn-primary">Manage Forms</a>
                     <button class="btn btn-sm btn-secondary" onclick="editRoles(${u.Id}, '${u.RoleIds || ''}', '${escapeJs(u.DisplayName)}')">Manage Roles</button>
                 </td>
@@ -252,6 +261,7 @@ router.get('/users', async (req, res) => {
                     }
                     .status-badge.active { background: #e8f5e9; color: #2e7d32; }
                     .status-badge.inactive { background: #ffebee; color: #c62828; }
+                    .status-badge.pending { background: #fff3e0; color: #e65100; font-size: 10px; margin-left: 8px; }
                     .btn {
                         padding: 8px 16px;
                         border: none;
@@ -269,6 +279,8 @@ router.get('/users', async (req, res) => {
                     .btn-success { background: #28a745; color: white; }
                     .btn-success:hover { background: #218838; }
                     .btn-success:disabled { background: #94d3a2; cursor: wait; }
+                    .btn-warning { background: #ff9800; color: white; }
+                    .btn-warning:hover { background: #f57c00; }
                     .modal {
                         display: none;
                         position: fixed;
@@ -327,6 +339,8 @@ router.get('/users', async (req, res) => {
                     .stat-card.with-roles.selected { border-color: #28a745; background: #f0fff4; }
                     .stat-card.no-roles .stat-number { color: #dc3545; }
                     .stat-card.no-roles.selected { border-color: #dc3545; background: #fff5f5; }
+                    .stat-card.pending-approval .stat-number { color: #ff9800; }
+                    .stat-card.pending-approval.selected { border-color: #ff9800; background: #fff8e1; }
                     .stat-card.roles-count .stat-number { color: #6f42c1; }
                     .stat-number { font-size: 28px; font-weight: bold; color: #0078d4; }
                     .stat-label { font-size: 13px; color: #666; margin-top: 5px; }
@@ -348,6 +362,10 @@ router.get('/users', async (req, res) => {
                         <div class="stat-card selected" onclick="filterByCard('all')" title="Click to show all users">
                             <div class="stat-number">${users.recordset.length}</div>
                             <div class="stat-label">Total Users</div>
+                        </div>
+                        <div class="stat-card pending-approval" onclick="filterByCard('pending')" title="Click to show pending approval">
+                            <div class="stat-number">${users.recordset.filter(u => !u.IsApproved).length}</div>
+                            <div class="stat-label">⏳ Pending Approval</div>
                         </div>
                         <div class="stat-card" onclick="filterByCard('active')" title="Click to show active users">
                             <div class="stat-number">${users.recordset.filter(u => u.IsActive).length}</div>
@@ -471,9 +489,10 @@ router.get('/users', async (req, res) => {
                         cards.forEach((card, idx) => {
                             card.classList.remove('selected');
                             if ((filterType === 'all' && idx === 0) ||
-                                (filterType === 'active' && idx === 1) ||
-                                (filterType === 'with-roles' && idx === 2) ||
-                                (filterType === 'no-roles' && idx === 3)) {
+                                (filterType === 'pending' && idx === 1) ||
+                                (filterType === 'active' && idx === 2) ||
+                                (filterType === 'with-roles' && idx === 3) ||
+                                (filterType === 'no-roles' && idx === 4)) {
                                 card.classList.add('selected');
                             }
                         });
@@ -482,9 +501,11 @@ router.get('/users', async (req, res) => {
                         rows.forEach(row => {
                             const isActive = row.querySelector('.status-badge.active') !== null;
                             const hasRoles = row.querySelector('.role-badge.no-role') === null;
+                            const isPending = row.getAttribute('data-approved') === '0';
                             
                             let show = true;
-                            if (filterType === 'active') show = isActive;
+                            if (filterType === 'pending') show = isPending;
+                            else if (filterType === 'active') show = isActive;
                             else if (filterType === 'with-roles') show = hasRoles;
                             else if (filterType === 'no-roles') show = !hasRoles;
                             
@@ -493,6 +514,27 @@ router.get('/users', async (req, res) => {
                         
                         // Clear search box
                         document.querySelector('.search-box').value = '';
+                    }
+                    
+                    async function approveUser(userId, userName) {
+                        if (!confirm('Approve user "' + userName + '"? They will be able to access the system.')) return;
+                        
+                        try {
+                            const response = await fetch('/admin/users/' + userId + '/approve', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' }
+                            });
+                            const data = await response.json();
+                            
+                            if (data.success) {
+                                alert('✅ User approved successfully!');
+                                location.reload();
+                            } else {
+                                alert('Error: ' + (data.error || 'Failed to approve user'));
+                            }
+                        } catch (err) {
+                            alert('Error: ' + err.message);
+                        }
                     }
                     
                     function filterUsers(query) {
@@ -1200,6 +1242,31 @@ router.post('/roles/:roleId/permissions', async (req, res) => {
     } catch (err) {
         console.error('Error saving role permissions:', err);
         res.status(500).send('Error: ' + err.message);
+    }
+});
+
+// Approve a user
+router.post('/users/:userId/approve', async (req, res) => {
+    try {
+        const userId = parseInt(req.params.userId);
+        const pool = await sql.connect(dbConfig);
+        
+        await pool.request()
+            .input('userId', sql.Int, userId)
+            .query('UPDATE Users SET IsApproved = 1 WHERE Id = @userId');
+        
+        // Get user info for logging
+        const user = await pool.request()
+            .input('userId', sql.Int, userId)
+            .query('SELECT DisplayName, Email FROM Users WHERE Id = @userId');
+        
+        await pool.close();
+        
+        console.log(`✅ User approved: ${user.recordset[0]?.DisplayName} (${user.recordset[0]?.Email})`);
+        res.json({ success: true, message: 'User approved successfully' });
+    } catch (err) {
+        console.error('Error approving user:', err);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 
