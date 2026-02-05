@@ -42,14 +42,16 @@ async function requireAuth(req, res, next) {
         await SessionManager.updateActivity(sessionToken);
         
         // Attach user info to request
+        const roleNames = session.roleNames || [];
         req.currentUser = {
             id: session.user_db_id,  // Use the explicit user database ID
             azureUserId: session.azure_user_id,
             email: session.email,
             displayName: session.display_name,
-            role: session.role,  // Primary role (for backward compatibility)
+            role: roleNames.length > 0 ? roleNames.join(', ') : session.role,  // Show all roles or legacy role
+            roleId: session.role_id,  // Legacy role ID for backward compatibility
             roles: session.roles || [],  // All assigned roles
-            roleNames: session.roleNames || [],  // Role names as array
+            roleNames: roleNames,  // Role names as array
             permissions: session.permissions || {},  // Form permissions
             isActive: session.is_active,
             isApproved: session.is_approved,

@@ -350,7 +350,7 @@ app.get('/dashboard', requireAuth, (req, res) => {
                         🔔
                         <span class="notification-badge" id="notificationCount" style="display: none;">0</span>
                     </a>
-                    ${req.currentUser.roleId === 31 ? '<a href="/admin" style="background:#1a1a2e;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;">⚙️ Admin Panel</a>' : ''}
+                    ${req.currentUser.hasRole('System Administrator') ? '<a href="/admin" style="background:#1a1a2e;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;">⚙️ Admin Panel</a>' : ''}
                     <a href="/auth/logout" class="logout-btn">Logout</a>
                 </div>
             </div>

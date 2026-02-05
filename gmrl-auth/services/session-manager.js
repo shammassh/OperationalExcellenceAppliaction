@@ -77,6 +77,7 @@ class SessionManager {
         }
         
         const session = result.recordset[0];
+        session.role_id = session.user_db_id ? (await pool.request().input('userId', sql.Int, session.user_db_id).query('SELECT RoleId FROM Users WHERE Id = @userId')).recordset[0]?.RoleId : null;
         
         // Get all user roles (multi-role support)
         const rolesResult = await pool.request()

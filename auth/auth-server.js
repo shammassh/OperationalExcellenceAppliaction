@@ -127,26 +127,53 @@ function initializeAuth(app) {
                         .query('UPDATE Users SET LastLoginAt = GETDATE() WHERE Id = @id');
                 }
                 
-                // Get user role
+                // Get user role (legacy)
                 const roleResult = await pool.request()
                     .input('roleId', sql.Int, user.RoleId)
                     .query('SELECT RoleName FROM UserRoles WHERE Id = @roleId');
                 
-                const roleName = roleResult.recordset[0]?.RoleName || 'User';
+                const legacyRoleName = roleResult.recordset[0]?.RoleName || 'User';
+                
+                // Get ALL user roles from UserRoleAssignments (multi-role support)
+                const allRolesResult = await pool.request()
+                    .input('userId', sql.Int, user.Id)
+                    .query(`
+                        SELECT r.Id, r.RoleName
+                        FROM UserRoleAssignments ura
+                        JOIN UserRoles r ON ura.RoleId = r.Id
+                        WHERE ura.UserId = @userId
+                        ORDER BY r.Id
+                    `);
+                
+                const roles = allRolesResult.recordset || [];
+                const roleNames = roles.map(r => r.RoleName);
+                const displayRole = roleNames.length > 0 ? roleNames.join(', ') : legacyRoleName;
                 
                 // Create session
                 const sessionId = generateSessionId();
-                sessions.set(sessionId, {
+                const sessionData = {
                     userId: user.Id,
                     email: user.Email,
                     displayName: user.DisplayName,
-                    role: roleName,
+                    role: displayRole,
                     roleId: user.RoleId,
+                    roles: roles,
+                    roleNames: roleNames,
                     accessToken: response.accessToken,
                     isApproved: user.IsApproved,
                     isActive: user.IsActive,
                     createdAt: new Date()
-                });
+                };
+                
+                // Add helper functions
+                sessionData.hasRole = function(roleName) {
+                    return this.roleNames.includes(roleName);
+                };
+                sessionData.hasAnyRole = function(...roles) {
+                    return roles.some(r => this.roleNames.includes(r));
+                };
+                
+                sessions.set(sessionId, sessionData);
                 
                 // Set session cookie
                 res.cookie('session_id', sessionId, {
