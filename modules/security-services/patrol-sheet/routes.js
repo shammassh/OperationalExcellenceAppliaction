@@ -737,13 +737,25 @@ router.get('/:id', async (req, res) => {
         const entries = entriesResult.recordset;
         const sheetDateFormatted = new Date(sheet.PatrolDate).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         
+        // Helper function to format time
+        const formatTime = (timeVal) => {
+            if (!timeVal) return '-';
+            if (timeVal instanceof Date) {
+                return timeVal.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+            }
+            // If it's a string, try to extract HH:MM
+            const str = timeVal.toString();
+            const match = str.match(/(\d{2}):(\d{2})/);
+            return match ? match[0] : str.substring(0, 5);
+        };
+        
         let entryRows = entries.map((entry, index) => `
             <tr>
                 <td>${index + 1}</td>
                 <td>${entry.GuardName}</td>
                 <td>${entry.PatrolName}</td>
-                <td>${entry.TimeIn ? entry.TimeIn.toString().substring(0, 5) : '-'}</td>
-                <td>${entry.TimeOut ? entry.TimeOut.toString().substring(0, 5) : '-'}</td>
+                <td>${formatTime(entry.TimeIn)}</td>
+                <td>${formatTime(entry.TimeOut)}</td>
             </tr>
         `).join('');
         

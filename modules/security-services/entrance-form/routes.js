@@ -28,7 +28,7 @@ router.get('/', async (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Entrance Form - ${process.env.APP_NAME}</title>
+            <title>Workers Entrance Form - ${process.env.APP_NAME}</title>
             <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; }
                 body { 
@@ -295,7 +295,7 @@ router.get('/', async (req, res) => {
         </head>
         <body>
             <div class="header">
-                <h1>🚪 Entrance Form - نموذج الدخول</h1>
+                <h1>🚪 Workers Entrance Form - نموذج الدخول</h1>
                 <div class="header-nav">
                     <a href="/security-services">← Security Services</a>
                     <a href="/dashboard">Dashboard</a>
@@ -371,7 +371,7 @@ router.get('/', async (req, res) => {
                             
                             <div class="actions-bar">
                                 <span style="color: #666; font-size: 13px;">* Required fields</span>
-                                <button type="submit" class="btn btn-success">💾 Save Entrance Form</button>
+                                <button type="submit" class="btn btn-success">💾 Save Workers Entrance Form</button>
                             </div>
                         </form>
                     </div>
@@ -750,13 +750,25 @@ router.get('/:id', async (req, res) => {
         const entries = entriesResult.recordset;
         const formDateFormatted = new Date(form.FormDate).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         
+        // Helper function to format time
+        const formatTime = (timeVal) => {
+            if (!timeVal) return '-';
+            if (timeVal instanceof Date) {
+                return timeVal.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+            }
+            // If it's a string, try to extract HH:MM
+            const str = timeVal.toString();
+            const match = str.match(/(\d{2}):(\d{2})/);
+            return match ? match[0] : str.substring(0, 5);
+        };
+        
         let entryRows = entries.map((entry, index) => `
             <tr>
                 <td>${index + 1}</td>
                 <td>${entry.FullName}</td>
                 <td>${entry.Contractor || '-'}</td>
-                <td>${entry.TimeIn ? entry.TimeIn.toString().substring(0, 5) : '-'}</td>
-                <td>${entry.TimeOut ? entry.TimeOut.toString().substring(0, 5) : '-'}</td>
+                <td>${formatTime(entry.TimeIn)}</td>
+                <td>${formatTime(entry.TimeOut)}</td>
                 <td>${entry.GuardName}</td>
             </tr>
         `).join('');
@@ -765,7 +777,7 @@ router.get('/:id', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Entrance Form - ${formDateFormatted} - ${process.env.APP_NAME}</title>
+                <title>Workers Entrance Form - ${formDateFormatted} - ${process.env.APP_NAME}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
                     body { 
@@ -882,9 +894,9 @@ router.get('/:id', async (req, res) => {
             </head>
             <body>
                 <div class="header">
-                    <h1>🚪 Entrance Form Details</h1>
+                    <h1>🚪 Workers Entrance Form Details</h1>
                     <div class="header-nav">
-                        <a href="/security-services/entrance-form">← Back to Entrance Forms</a>
+                        <a href="/security-services/entrance-form">← Back to Workers Entrance Forms</a>
                         <a href="/security-services">Security Services</a>
                     </div>
                 </div>

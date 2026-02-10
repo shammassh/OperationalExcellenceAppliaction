@@ -186,7 +186,7 @@ router.get('/', async (req, res) => {
                     </a>
                     <a href="/security-services/entrance-form" class="menu-card internal">
                         <div class="card-icon">🚪</div>
-                        <div class="card-title">Entrance Form</div>
+                        <div class="card-title">Workers Entrance Form</div>
                         <div class="card-desc">Record worker entries at Lower and Upper entrances - نموذج الدخول</div>
                         <span class="card-badge internal">Internal</span>
                     </a>
