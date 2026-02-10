@@ -330,8 +330,12 @@ router.get('/', async (req, res) => {
                                         </select>
                                     </div>
                                     <div class="form-group">
-                                        <label>Location</label>
-                                        <input type="text" id="location" name="location" placeholder="Enter location" required>
+                                        <label>Location *</label>
+                                        <select id="location" name="location" required>
+                                            <option value="">-- Select Location --</option>
+                                            <option value="HO Zouk">HO Zouk</option>
+                                            <option value="HO Dbayeh">HO Dbayeh</option>
+                                        </select>
                                     </div>
                                 </div>
                             </div>
