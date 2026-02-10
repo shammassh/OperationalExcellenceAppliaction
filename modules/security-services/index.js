@@ -13,6 +13,7 @@ const entranceFormRoutes = require('./entrance-form/routes');
 const attendanceReportRoutes = require('./attendance-report/routes');
 const visitorCarsRoutes = require('./visitor-cars/routes');
 const parkingViolationRoutes = require('./parking-violation/routes');
+const securityChecklistRoutes = require('./security-checklist/routes');
 
 // Mount sub-routes
 router.use('/delivery-log', deliveryLogRoutes);
@@ -21,6 +22,7 @@ router.use('/entrance-form', entranceFormRoutes);
 router.use('/attendance-report', attendanceReportRoutes); // Form accessible via direct URL only
 router.use('/visitor-cars', visitorCarsRoutes); // Form accessible via direct URL only
 router.use('/parking-violation', parkingViolationRoutes); // Form accessible via direct URL only
+router.use('/security-checklist', securityChecklistRoutes);
 
 // Landing Page
 router.get('/', async (req, res) => {
@@ -204,6 +206,12 @@ router.get('/', async (req, res) => {
                         <div class="card-icon">⚠️</div>
                         <div class="card-title">Incident Reports</div>
                         <div class="card-desc">Log and manage internal security incident reports</div>
+                        <span class="card-badge internal">Internal</span>
+                    </a>
+                    <a href="/security-services/security-checklist" class="menu-card internal">
+                        <div class="card-icon">📋</div>
+                        <div class="card-title">Security Checklist</div>
+                        <div class="card-desc">Weekly security checklist for each location and shift</div>
                         <span class="card-badge internal">Internal</span>
                     </a>
                 </div>

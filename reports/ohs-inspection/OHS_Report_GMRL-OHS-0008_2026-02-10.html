@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OHS Inspection Report - GMRL-OHS-0008</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f5f5f5; color: #333; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #e17055 0%, #d63031 100%); color: white; padding: 30px; border-radius: 12px; margin-bottom: 20px; }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .header-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
+        .header-item { background: rgba(255,255,255,0.1); padding: 10px 15px; border-radius: 8px; }
+        .header-item label { font-size: 12px; opacity: 0.8; display: block; }
+        .header-item span { font-size: 16px; font-weight: 600; }
+        .score-card { background: white; border-radius: 12px; padding: 30px; margin-bottom: 20px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .score-value { font-size: 72px; font-weight: bold; }
+        .score-value.pass { color: #10b981; }
+        .score-value.fail { color: #ef4444; }
+        .score-label { font-size: 24px; margin-top: 10px; }
+        .score-label.pass { color: #10b981; }
+        .score-label.fail { color: #ef4444; }
+        .section-card { background: white; border-radius: 12px; margin-bottom: 20px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .section-header { background: #fff5f5; padding: 20px; border-bottom: 1px solid #fecaca; display: flex; justify-content: space-between; align-items: center; }
+        .section-title { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .section-score { font-size: 24px; font-weight: bold; }
+        .section-score.pass { color: #10b981; }
+        .section-score.fail { color: #ef4444; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background: #f8fafc; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748b; }
+        tr:hover { background: #f8fafc; }
+        .choice-yes { color: #10b981; font-weight: 600; }
+        .choice-no { color: #ef4444; font-weight: 600; }
+        .choice-partial { color: #f59e0b; font-weight: 600; }
+        .choice-na { color: #94a3b8; }
+        .findings-card { background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .findings-title { color: #dc2626; font-size: 20px; font-weight: 600; margin-bottom: 15px; }
+        .finding-item { background: white; border-radius: 8px; padding: 15px; margin-bottom: 10px; border-left: 4px solid #ef4444; }
+        .finding-ref { font-weight: 600; color: #e17055; }
+        .finding-question { margin: 5px 0; }
+        .finding-detail { color: #64748b; font-size: 14px; }
+        .footer { text-align: center; padding: 20px; color: #64748b; font-size: 14px; }
+        @media print { body { background: white; } .container { max-width: 100%; padding: 0; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🦺 OHS Inspection Report</h1>
+            <div class="header-info">
+                <div class="header-item"><label>Document Number</label><span>GMRL-OHS-0008</span></div>
+                <div class="header-item"><label>Store</label><span>Test Storeww</span></div>
+                <div class="header-item"><label>Inspection Date</label><span>2/10/2026</span></div>
+                <div class="header-item"><label>Inspectors</label><span>Carlos Tannoury</span></div>
+                <div class="header-item"><label>Accompanied By</label><span>N/A</span></div>
+                <div class="header-item"><label>Status</label><span>Completed</span></div>
+            </div>
+        </div>
+        
+        <div class="score-card">
+            <div class="score-value fail">78%</div>
+            <div class="score-label fail">FAIL ❌</div>
+            <div style="color: #64748b; margin-top: 10px;">Threshold: 80%</div>
+        </div>
+        
+        
+        <div class="section-card">
+            <div class="section-header">
+                <div class="section-title">📋 General Housekeeping & Workplace Conditions</div>
+                <div class="section-score pass">81%</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Question</th>
+                        <th>Answer</th>
+                        <th>Score</th>
+                        <th>Finding</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    <tr>
+                        <td>1.1</td>
+                        <td>Floors are clean, dry, and free from spills, residues, or debris</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>1.10</td>
+                        <td>Temporary storage does not create safety risks</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>1.11</td>
+                        <td>Work areas are orderly and free from clutter</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>1.12</td>
+                        <td>Materials and products are stored in a stable and safe manner</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>1.13</td>
+                        <td>Spills are cleaned promptly and effectively</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>1.2</td>
+                        <td>Housekeeping standards are maintained throughout operating hours</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>1.3</td>
+                        <td>Walkways and aisles are clearly defined and unobstructed</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>1.4</td>
+                        <td>Emergency routes are free from storage, pallets, or promotional items</td>
+                        <td class="choice-no">No</td>
+                        <td>0 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>1.5</td>
+                        <td>Stock and materials are stored in an orderly and stable manner</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>1.6</td>
+                        <td>Overhead storage does not present a falling-object hazard</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>1.7</td>
+                        <td>Damaged shelving or fixtures are not observed</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>1.8</td>
+                        <td>Waste is segregated and disposed of regularly</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>1.9</td>
+                        <td>Waste containers are not overflowing</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header">
+                <div class="section-title">📋 Slips, Trips & Falls</div>
+                <div class="section-score fail">75%</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Question</th>
+                        <th>Answer</th>
+                        <th>Score</th>
+                        <th>Finding</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    <tr>
+                        <td>2.1</td>
+                        <td>Floor surfaces are intact, level, and free from cracks or loose tiles.</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2.10</td>
+                        <td>Ladders and step stools are suitable, stable, and in good condition</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2.2</td>
+                        <td>Anti-slip mats are installed where required and are in good condition.</td>
+                        <td class="choice-no">No</td>
+                        <td>0 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2.3</td>
+                        <td>Mats are secured and do not create trip hazards.</td>
+                        <td class="choice-no">No</td>
+                        <td>0 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2.4</td>
+                        <td>Wet floor signage is used during cleaning or spill response.</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2.5</td>
+                        <td>Cables, hoses, or temporary installations are not placed across walkways.</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2.6</td>
+                        <td>Changes in floor level are clearly visible and marked.</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2.7</td>
+                        <td>Staircases are clean, well-lit, and free from obstructions.</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2.8</td>
+                        <td>Stair handrails are installed, secure, and continuous</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>2.9</td>
+                        <td>Ramps are fitted with non-slip surfaces.</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header">
+                <div class="section-title">📋 Fire Safety & Emergency Exits</div>
+                <div class="section-score fail">78%</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Question</th>
+                        <th>Answer</th>
+                        <th>Score</th>
+                        <th>Finding</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    <tr>
+                        <td>3.1</td>
+                        <td>Fire extinguishers are installed at the correct mounting height.</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>3.10</td>
+                        <td>Exit doors open easily in the direction of escape.</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>3.11</td>
+                        <td>Fire alarm call points are accessible and not obstructed.</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>3.12</td>
+                        <td>Fire detection devices appear intact and undamaged</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>3.13</td>
+                        <td>The correct type of fire extinguisher is installed CO2</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>3.14</td>
+                        <td>The correct type of fire extinguisher is installed ABC</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>3.15</td>
+                        <td>Fire blankets are provided where required (e.g. food preparation or high-risk areas)</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>3.16</td>
+                        <td>Fire blankets are clearly visible and accessible</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>3.17</td>
+                        <td>Fire blankets are correctly installed and properly housed</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>3.18</td>
+                        <td>Fire blanket instructions are legible and visible</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>3.2</td>
+                        <td>Fire extinguishers are appropriate for the fire risk in the area.</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>3.3</td>
+                        <td>Fire extinguishers are visible and not hidden by stock or displays.</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>3.4</td>
+                        <td>Fire extinguishers are unobstructed and easily accessible.</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>3.5</td>
+                        <td>Fire extinguishers display valid inspection tags.</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>3.6</td>
+                        <td>Fire extinguisher pressure gauges indicate normal operating range.</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>3.7</td>
+                        <td>Fire hose reels (if applicable) are accessible and in good condition.</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>3.8</td>
+                        <td>Fire exits are clearly marked with illuminated signage.</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>3.9</td>
+                        <td>Emergency exit routes are free from storage or obstructions.</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header">
+                <div class="section-title">📋 Emergency Preparedness</div>
+                <div class="section-score fail">75%</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Question</th>
+                        <th>Answer</th>
+                        <th>Score</th>
+                        <th>Finding</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    <tr>
+                        <td>4.1</td>
+                        <td>Emergency evacuation plans are displayed and legible</td>
+                        <td class="choice-no">No</td>
+                        <td>0 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>4.2</td>
+                        <td>Assembly point signage is present and clearly identified</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>4.3</td>
+                        <td>Emergency lighting is installed and operational</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>4.4</td>
+                        <td>Emergency exits remain visible during power failure</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>4.5</td>
+                        <td>Emergency contact numbers are displayed in prominent locations</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>4.6</td>
+                        <td>Staff demonstrate awareness of basic emergency procedures</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>4.7</td>
+                        <td>Emergency equipment is not tampered with or disabled</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>4.8</td>
+                        <td>Wardens are identified and photos displayed</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header">
+                <div class="section-title">📋 Fire Detection, Alarm & Monitoring Systems</div>
+                <div class="section-score fail">73%</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Question</th>
+                        <th>Answer</th>
+                        <th>Score</th>
+                        <th>Finding</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    <tr>
+                        <td>5.1</td>
+                        <td>Fire alarm control panel is operational and powered</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>5.10</td>
+                        <td>Manual fire alarm call points are installed where required.</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>5.11</td>
+                        <td>Call points are visible, accessible, and unobstructed.</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>5.12</td>
+                        <td>Call points are not damaged or tampered with</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>5.13</td>
+                        <td>Fire detection and alarm system is not partially disabled or bypassed</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>5.2</td>
+                        <td>Fire alarm control panel shows no active faults or isolation warnings</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>5.3</td>
+                        <td>Fire alarm control panel is accessible and not obstructed</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>5.4</td>
+                        <td>Fire alarm control panel is clearly labeled and secured</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>5.5</td>
+                        <td>Smoke detectors are installed where required</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>5.6</td>
+                        <td>Heat detectors are installed where required</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>5.7</td>
+                        <td>Detectors are not obstructed, covered, or painted over</td>
+                        <td class="choice-no">No</td>
+                        <td>0 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>5.8</td>
+                        <td>Detectors appear intact and free from visible damage.</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>5.9</td>
+                        <td>Detector locations are appropriate for the area use.</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header">
+                <div class="section-title">📋 Electrical Safety</div>
+                <div class="section-score fail">79%</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Question</th>
+                        <th>Answer</th>
+                        <th>Score</th>
+                        <th>Finding</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    <tr>
+                        <td>6.1</td>
+                        <td>Electrical cables are in good condition and not frayed, cut, or damaged</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>6.10</td>
+                        <td>Access to electrical panels is unobstructed</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>6.11</td>
+                        <td>Unauthorized electrical modifications are not observed</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>6.12</td>
+                        <td>Electrical equipment is protected from water or moisture exposure.</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>6.2</td>
+                        <td>Electrical cables are routed safely and do not create trip hazards</td>
+                        <td class="choice-no">No</td>
+                        <td>0 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>6.3</td>
+                        <td>Temporary electrical connections are minimized and controlled</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>6.4</td>
+                        <td>Extension leads are used only temporarily and not as permanent wiring</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>6.5</td>
+                        <td>Multi-plugs are used only for their intended purpose</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>6.6</td>
+                        <td>Multi-plugs are not overloaded</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>6.7</td>
+                        <td>Multi-plugs are not daisy-chained</td>
+                        <td class="choice-no">No</td>
+                        <td>0 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>6.8</td>
+                        <td>Electrical sockets are not overloaded</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>6.9</td>
+                        <td>Electrical panels are closed, secured, and labeled</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header">
+                <div class="section-title">📋 Equipment, Machinery & Physical Protection</div>
+                <div class="section-score pass">81%</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Question</th>
+                        <th>Answer</th>
+                        <th>Score</th>
+                        <th>Finding</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    <tr>
+                        <td>7.1</td>
+                        <td>Equipment is suitable for its intended use</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>7.11</td>
+                        <td>Emergency stop buttons are accessible and clearly identified</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>7.12</td>
+                        <td>Equipment is switched off during cleaning or maintenance</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>7.13</td>
+                        <td>Lock-out or isolation practices are followed where required</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>7.14</td>
+                        <td>Only trained and authorized personnel operate machinery</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>7.2</td>
+                        <td>Equipment appears properly maintained</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>7.3</td>
+                        <td>Required safety guards are installed and secure</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>7.4</td>
+                        <td>Safety guards are not bypassed or removed</td>
+                        <td class="choice-no">No</td>
+                        <td>0 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>7.5</td>
+                        <td>Meat mincers are fitted with appropriate guards</td>
+                        <td class="choice-partial">Partially</td>
+                        <td>1 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>7.6</td>
+                        <td>Pushers are available and used on meat mincers</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>7.7</td>
+                        <td>Deli and cheese slicers have blade guards installed</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>7.8</td>
+                        <td>Safety interlocks on slicers are functional</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                    <tr>
+                        <td>7.9</td>
+                        <td>Moving parts are adequately protected from contact</td>
+                        <td class="choice-yes">Yes</td>
+                        <td>2 / 2</td>
+                        <td>-</td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+        
+        
+        
+        <div class="findings-card">
+            <div class="findings-title">⚠️ Findings Summary (31 items)</div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[1.2] General Housekeeping & Workplace Conditions</div>
+                <div class="finding-question">Housekeeping standards are maintained throughout operating hours</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[1.3] General Housekeeping & Workplace Conditions</div>
+                <div class="finding-question">Walkways and aisles are clearly defined and unobstructed</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[1.4] General Housekeeping & Workplace Conditions</div>
+                <div class="finding-question">Emergency routes are free from storage, pallets, or promotional items</div>
+                <div class="finding-detail">Answer: No | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[1.7] General Housekeeping & Workplace Conditions</div>
+                <div class="finding-question">Damaged shelving or fixtures are not observed</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[2.2] Slips, Trips & Falls</div>
+                <div class="finding-question">Anti-slip mats are installed where required and are in good condition.</div>
+                <div class="finding-detail">Answer: No | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[2.3] Slips, Trips & Falls</div>
+                <div class="finding-question">Mats are secured and do not create trip hazards.</div>
+                <div class="finding-detail">Answer: No | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[2.9] Slips, Trips & Falls</div>
+                <div class="finding-question">Ramps are fitted with non-slip surfaces.</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[3.13] Fire Safety & Emergency Exits</div>
+                <div class="finding-question">The correct type of fire extinguisher is installed CO2</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[3.14] Fire Safety & Emergency Exits</div>
+                <div class="finding-question">The correct type of fire extinguisher is installed ABC</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[3.15] Fire Safety & Emergency Exits</div>
+                <div class="finding-question">Fire blankets are provided where required (e.g. food preparation or high-risk areas)</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[3.16] Fire Safety & Emergency Exits</div>
+                <div class="finding-question">Fire blankets are clearly visible and accessible</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[3.17] Fire Safety & Emergency Exits</div>
+                <div class="finding-question">Fire blankets are correctly installed and properly housed</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[3.5] Fire Safety & Emergency Exits</div>
+                <div class="finding-question">Fire extinguishers display valid inspection tags.</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[3.6] Fire Safety & Emergency Exits</div>
+                <div class="finding-question">Fire extinguisher pressure gauges indicate normal operating range.</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[3.7] Fire Safety & Emergency Exits</div>
+                <div class="finding-question">Fire hose reels (if applicable) are accessible and in good condition.</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[4.1] Emergency Preparedness</div>
+                <div class="finding-question">Emergency evacuation plans are displayed and legible</div>
+                <div class="finding-detail">Answer: No | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[4.3] Emergency Preparedness</div>
+                <div class="finding-question">Emergency lighting is installed and operational</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[4.8] Emergency Preparedness</div>
+                <div class="finding-question">Wardens are identified and photos displayed</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[5.13] Fire Detection, Alarm & Monitoring Systems</div>
+                <div class="finding-question">Fire detection and alarm system is not partially disabled or bypassed</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[5.5] Fire Detection, Alarm & Monitoring Systems</div>
+                <div class="finding-question">Smoke detectors are installed where required</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[5.6] Fire Detection, Alarm & Monitoring Systems</div>
+                <div class="finding-question">Heat detectors are installed where required</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[5.7] Fire Detection, Alarm & Monitoring Systems</div>
+                <div class="finding-question">Detectors are not obstructed, covered, or painted over</div>
+                <div class="finding-detail">Answer: No | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[5.8] Fire Detection, Alarm & Monitoring Systems</div>
+                <div class="finding-question">Detectors appear intact and free from visible damage.</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[5.9] Fire Detection, Alarm & Monitoring Systems</div>
+                <div class="finding-question">Detector locations are appropriate for the area use.</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[6.12] Electrical Safety</div>
+                <div class="finding-question">Electrical equipment is protected from water or moisture exposure.</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[6.2] Electrical Safety</div>
+                <div class="finding-question">Electrical cables are routed safely and do not create trip hazards</div>
+                <div class="finding-detail">Answer: No | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[6.7] Electrical Safety</div>
+                <div class="finding-question">Multi-plugs are not daisy-chained</div>
+                <div class="finding-detail">Answer: No | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[7.12] Equipment, Machinery & Physical Protection</div>
+                <div class="finding-question">Equipment is switched off during cleaning or maintenance</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[7.3] Equipment, Machinery & Physical Protection</div>
+                <div class="finding-question">Required safety guards are installed and secure</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[7.4] Equipment, Machinery & Physical Protection</div>
+                <div class="finding-question">Safety guards are not bypassed or removed</div>
+                <div class="finding-detail">Answer: No | Finding: N/A</div>
+            </div>
+            
+            <div class="finding-item">
+                <div class="finding-ref">[7.5] Equipment, Machinery & Physical Protection</div>
+                <div class="finding-question">Meat mincers are fitted with appropriate guards</div>
+                <div class="finding-detail">Answer: Partially | Finding: N/A</div>
+            </div>
+            
+        </div>
+        
+        
+        <div class="footer">
+            Report generated on 2/10/2026, 3:20:14 PM | OHS Inspection System
+        </div>
+    </div>
+</body>
+</html>

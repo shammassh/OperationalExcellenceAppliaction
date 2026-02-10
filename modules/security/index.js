@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Security Department Module
  * Dashboard for Security Managers to view delivery logs and patrol sheets
  */
@@ -6,6 +6,12 @@
 const express = require('express');
 const router = express.Router();
 const sql = require('mssql');
+
+// Import sub-routes
+const checklistReferenceRoutes = require('./checklist-reference/routes');
+
+// Mount sub-routes
+router.use('/checklist-reference', checklistReferenceRoutes);
 
 // Database config
 const dbConfig = {
@@ -207,6 +213,7 @@ router.get('/', async (req, res) => {
                     .stat-number.attendance { color: #7b1fa2; }
                     .stat-number.visitor { color: #0d47a1; }
                     .stat-number.violation { color: #c62828; }
+                    .stat-number.checklist { color: #00897b; }
                     .stat-label {
                         font-size: 12px;
                         color: #888;
@@ -245,6 +252,17 @@ router.get('/', async (req, res) => {
                     .view-btn.violation {
                         background: #ffebee;
                         color: #c62828;
+                    }
+                    .dashboard-card.checklist {
+                        border-bottom: 5px solid #00897b;
+                    }
+                    .dashboard-card.checklist:hover {
+                        border-color: #00897b;
+                    }
+                    .stat-number.checklist { color: #00897b; }
+                    .view-btn.checklist {
+                        background: #e0f2f1;
+                        color: #00897b;
                     }
                 </style>
             </head>
@@ -363,7 +381,20 @@ router.get('/', async (req, res) => {
                                     <div class="stat-label">Total</div>
                                 </div>
                             </div>
-                            <div class="view-btn entrance">View History &#8592;’</div>
+                            <div class="view-btn entrance">View History &#8592;'</div>
+                        </a>
+                        
+                        <a href="/security/checklist-reference" class="dashboard-card checklist">
+                            <div class="card-icon">&#128203;</div>
+                            <div class="card-title">Checklist Reference</div>
+                            <div class="card-desc">Configure locations, sub-categories, and checklist items for security verification</div>
+                            <div class="card-stats">
+                                <div class="stat-item">
+                                    <div class="stat-number checklist">Setup</div>
+                                    <div class="stat-label">Admin</div>
+                                </div>
+                            </div>
+                            <div class="view-btn checklist">Manage &#8594;</div>
                         </a>
                     </div>
                 </div>
