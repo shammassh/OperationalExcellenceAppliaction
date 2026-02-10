@@ -39,7 +39,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit per file
     fileFilter: (req, file, cb) => {
         const allowedTypes = /jpeg|jpg|png|gif|webp/;
         const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -50,6 +50,9 @@ const upload = multer({
         cb(new Error('Only image files are allowed'));
     }
 });
+
+// Multiple file upload middleware (up to 10 images)
+const uploadMultiple = upload.array('images', 10);
 
 // Parking Violation Form Page
 router.get('/', (req, res) => {
@@ -193,6 +196,42 @@ router.get('/', (req, res) => {
                     border-radius: 10px;
                     box-shadow: 0 4px 15px rgba(0,0,0,0.1);
                 }
+                .preview-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                    gap: 15px;
+                    margin-top: 20px;
+                }
+                .preview-item {
+                    position: relative;
+                    border-radius: 10px;
+                    overflow: hidden;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+                }
+                .preview-item img {
+                    width: 100%;
+                    height: 150px;
+                    object-fit: cover;
+                }
+                .preview-item .remove-btn {
+                    position: absolute;
+                    top: 5px;
+                    right: 5px;
+                    background: rgba(198, 40, 40, 0.9);
+                    color: white;
+                    border: none;
+                    border-radius: 50%;
+                    width: 28px;
+                    height: 28px;
+                    cursor: pointer;
+                    font-size: 16px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .preview-item .remove-btn:hover {
+                    background: #b71c1c;
+                }
                 .btn-submit {
                     background: linear-gradient(135deg, #c62828 0%, #b71c1c 100%);
                     color: white;
@@ -272,17 +311,15 @@ router.get('/', (req, res) => {
                         
                         <div class="section-title">📷 Photo Evidence</div>
                         
-                        <div class="upload-area" id="uploadArea" onclick="document.getElementById('imageFile').click()">
-                            <input type="file" id="imageFile" name="image" accept="image/*">
+                        <div class="upload-area" id="uploadArea" onclick="document.getElementById('imageFiles').click()">
+                            <input type="file" id="imageFiles" name="images" accept="image/*" multiple>
                             <div class="upload-icon">📷</div>
                             <div class="upload-text">
                                 <strong>Click to upload</strong> or drag and drop<br>
-                                JPG, PNG, GIF up to 10MB
-                            </div>
-                            <div class="preview-container" id="previewContainer">
-                                <img id="imagePreview" src="" alt="Preview">
+                                JPG, PNG, GIF up to 10MB each (max 10 images)
                             </div>
                         </div>
+                        <div class="preview-grid" id="previewGrid"></div>
                         
                         <button type="submit" class="btn-submit" id="submitBtn">
                             Submit Violation Report
@@ -292,24 +329,60 @@ router.get('/', (req, res) => {
             </div>
             
             <script>
-                const imageInput = document.getElementById('imageFile');
+                const imageInput = document.getElementById('imageFiles');
                 const uploadArea = document.getElementById('uploadArea');
-                const previewContainer = document.getElementById('previewContainer');
-                const imagePreview = document.getElementById('imagePreview');
+                const previewGrid = document.getElementById('previewGrid');
+                let selectedFiles = [];
                 
-                imageInput.addEventListener('change', function(e) {
-                    const file = e.target.files[0];
-                    if (file) {
+                function updatePreviews() {
+                    previewGrid.innerHTML = '';
+                    selectedFiles.forEach((file, index) => {
                         const reader = new FileReader();
                         reader.onload = function(e) {
-                            imagePreview.src = e.target.result;
-                            previewContainer.style.display = 'block';
-                            uploadArea.classList.add('has-file');
-                            uploadArea.querySelector('.upload-icon').style.display = 'none';
-                            uploadArea.querySelector('.upload-text').innerHTML = '<strong>' + file.name + '</strong><br>Click to change';
+                            const div = document.createElement('div');
+                            div.className = 'preview-item';
+                            div.innerHTML = \`
+                                <img src="\${e.target.result}" alt="Preview">
+                                <button type="button" class="remove-btn" onclick="removeImage(\${index})">×</button>
+                            \`;
+                            previewGrid.appendChild(div);
                         };
                         reader.readAsDataURL(file);
+                    });
+                    
+                    if (selectedFiles.length > 0) {
+                        uploadArea.classList.add('has-file');
+                        uploadArea.querySelector('.upload-text').innerHTML = '<strong>' + selectedFiles.length + ' image(s) selected</strong><br>Click to add more';
+                    } else {
+                        uploadArea.classList.remove('has-file');
+                        uploadArea.querySelector('.upload-text').innerHTML = '<strong>Click to upload</strong> or drag and drop<br>JPG, PNG, GIF up to 10MB each (max 10 images)';
                     }
+                }
+                
+                function removeImage(index) {
+                    selectedFiles.splice(index, 1);
+                    updatePreviews();
+                    updateFileInput();
+                }
+                
+                function updateFileInput() {
+                    const dt = new DataTransfer();
+                    selectedFiles.forEach(file => dt.items.add(file));
+                    imageInput.files = dt.files;
+                }
+                
+                imageInput.addEventListener('change', function(e) {
+                    const newFiles = Array.from(e.target.files);
+                    const totalFiles = selectedFiles.length + newFiles.length;
+                    
+                    if (totalFiles > 10) {
+                        showAlert('Maximum 10 images allowed', 'error');
+                        return;
+                    }
+                    
+                    selectedFiles = [...selectedFiles, ...newFiles];
+                    updatePreviews();
+                    updateFileInput();
                 });
                 
                 // Drag and drop
@@ -324,11 +397,18 @@ router.get('/', (req, res) => {
                 
                 uploadArea.addEventListener('drop', (e) => {
                     e.preventDefault();
-                    const file = e.dataTransfer.files[0];
-                    if (file && file.type.startsWith('image/')) {
-                        imageInput.files = e.dataTransfer.files;
-                        imageInput.dispatchEvent(new Event('change'));
+                    uploadArea.style.borderColor = '#ddd';
+                    const droppedFiles = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+                    const totalFiles = selectedFiles.length + droppedFiles.length;
+                    
+                    if (totalFiles > 10) {
+                        showAlert('Maximum 10 images allowed', 'error');
+                        return;
                     }
+                    
+                    selectedFiles = [...selectedFiles, ...droppedFiles];
+                    updatePreviews();
+                    updateFileInput();
                 });
                 
                 function showAlert(message, type) {
@@ -387,7 +467,7 @@ router.get('/', (req, res) => {
 });
 
 // Save Parking Violation
-router.post('/save', upload.single('image'), async (req, res) => {
+router.post('/save', uploadMultiple, async (req, res) => {
     const user = req.currentUser;
     const { violationDate, location, parkingLotInfo } = req.body;
     
@@ -399,13 +479,14 @@ router.post('/save', upload.single('image'), async (req, res) => {
     try {
         pool = await sql.connect(dbConfig);
         
-        const imagePath = req.file ? '/uploads/parking-violations/' + req.file.filename : null;
+        // Insert violation record (ImagePath kept for backward compatibility - stores first image)
+        const firstImagePath = req.files && req.files.length > 0 ? '/uploads/parking-violations/' + req.files[0].filename : null;
         
         const result = await pool.request()
             .input('violationDate', sql.Date, violationDate)
             .input('location', sql.NVarChar, location)
             .input('parkingLotInfo', sql.NVarChar, parkingLotInfo || '')
-            .input('imagePath', sql.NVarChar, imagePath)
+            .input('imagePath', sql.NVarChar, firstImagePath)
             .input('createdBy', sql.NVarChar, user.displayName)
             .input('createdById', sql.NVarChar, user.id)
             .query(`
@@ -415,6 +496,20 @@ router.post('/save', upload.single('image'), async (req, res) => {
             `);
         
         const violationId = result.recordset[0].Id;
+        
+        // Insert all images into the images table
+        if (req.files && req.files.length > 0) {
+            for (const file of req.files) {
+                const imagePath = '/uploads/parking-violations/' + file.filename;
+                await pool.request()
+                    .input('violationId', sql.Int, violationId)
+                    .input('imagePath', sql.NVarChar, imagePath)
+                    .query(`
+                        INSERT INTO Security_ParkingViolation_Images (ViolationId, ImagePath)
+                        VALUES (@violationId, @imagePath)
+                    `);
+            }
+        }
         
         await pool.close();
         
@@ -431,23 +526,52 @@ router.get('/:id', async (req, res) => {
     const user = req.currentUser;
     const violationId = req.params.id;
     
+    let pool;
     try {
-        const pool = await sql.connect(dbConfig);
+        pool = await sql.connect(dbConfig);
         
         const result = await pool.request()
             .input('id', sql.Int, violationId)
             .query(`SELECT * FROM Security_ParkingViolations WHERE Id = @id`);
         
-        await pool.close();
-        
         if (result.recordset.length === 0) {
+            await pool.close();
             return res.status(404).send('Violation not found');
         }
         
+        // Get all images for this violation
+        const imagesResult = await pool.request()
+            .input('violationId', sql.Int, violationId)
+            .query(`SELECT ImagePath FROM Security_ParkingViolation_Images WHERE ViolationId = @violationId ORDER BY Id`);
+        
+        await pool.close();
+        
         const violation = result.recordset[0];
+        const images = imagesResult.recordset;
+        
+        // If no images in new table, fall back to legacy ImagePath
+        if (images.length === 0 && violation.ImagePath) {
+            images.push({ ImagePath: violation.ImagePath });
+        }
+        
         const violationDate = new Date(violation.ViolationDate).toLocaleDateString('en-GB', {
             weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
         });
+        
+        // Build images HTML
+        let imagesHtml = '';
+        if (images.length > 0) {
+            imagesHtml = '<div class="image-gallery">' + 
+                images.map(img => `<div class="gallery-item"><img src="${img.ImagePath}" alt="Parking Violation Photo" onclick="openLightbox('${img.ImagePath}')"></div>`).join('') +
+                '</div>';
+        } else {
+            imagesHtml = `
+                <div class="no-image">
+                    <div style="font-size: 40px; margin-bottom: 10px;">📷</div>
+                    No photos uploaded
+                </div>
+            `;
+        }
         
         res.send(`
             <!DOCTYPE html>
@@ -463,7 +587,7 @@ router.get('/:id', async (req, res) => {
                         min-height: 100vh;
                         padding: 20px;
                     }
-                    .container { max-width: 800px; margin: 0 auto; }
+                    .container { max-width: 900px; margin: 0 auto; }
                     .header {
                         background: rgba(255,255,255,0.95);
                         border-radius: 15px;
@@ -529,14 +653,25 @@ router.get('/:id', async (req, res) => {
                         margin-bottom: 30px;
                         line-height: 1.6;
                     }
-                    .image-container {
-                        text-align: center;
+                    .image-gallery {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                        gap: 15px;
                     }
-                    .image-container img {
-                        max-width: 100%;
-                        max-height: 500px;
+                    .gallery-item {
                         border-radius: 10px;
+                        overflow: hidden;
                         box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+                        cursor: pointer;
+                        transition: transform 0.3s;
+                    }
+                    .gallery-item:hover {
+                        transform: scale(1.02);
+                    }
+                    .gallery-item img {
+                        width: 100%;
+                        height: 200px;
+                        object-fit: cover;
                     }
                     .no-image {
                         background: #f8f9fa;
@@ -551,6 +686,35 @@ router.get('/:id', async (req, res) => {
                         border-top: 1px solid #eee;
                         font-size: 13px;
                         color: #888;
+                    }
+                    /* Lightbox */
+                    .lightbox {
+                        display: none;
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0,0,0,0.9);
+                        z-index: 1000;
+                        justify-content: center;
+                        align-items: center;
+                    }
+                    .lightbox.active {
+                        display: flex;
+                    }
+                    .lightbox img {
+                        max-width: 90%;
+                        max-height: 90%;
+                        border-radius: 10px;
+                    }
+                    .lightbox-close {
+                        position: absolute;
+                        top: 20px;
+                        right: 30px;
+                        color: white;
+                        font-size: 40px;
+                        cursor: pointer;
                     }
                 </style>
             </head>
@@ -585,28 +749,38 @@ router.get('/:id', async (req, res) => {
                             <div class="info-text">${violation.ParkingLotInfo}</div>
                         ` : ''}
                         
-                        <div class="section-title">📷 Photo Evidence</div>
-                        <div class="image-container">
-                            ${violation.ImagePath ? `
-                                <img src="${violation.ImagePath}" alt="Parking Violation Photo">
-                            ` : `
-                                <div class="no-image">
-                                    <div style="font-size: 40px; margin-bottom: 10px;">📷</div>
-                                    No photo uploaded
-                                </div>
-                            `}
-                        </div>
+                        <div class="section-title">📷 Photo Evidence (${images.length} image${images.length !== 1 ? 's' : ''})</div>
+                        ${imagesHtml}
                         
                         <div class="footer-info">
                             Report created on ${new Date(violation.CreatedAt).toLocaleString('en-GB')}
                         </div>
                     </div>
                 </div>
+                
+                <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+                    <span class="lightbox-close">&times;</span>
+                    <img id="lightboxImg" src="" alt="Full size">
+                </div>
+                
+                <script>
+                    function openLightbox(src) {
+                        document.getElementById('lightboxImg').src = src;
+                        document.getElementById('lightbox').classList.add('active');
+                    }
+                    function closeLightbox() {
+                        document.getElementById('lightbox').classList.remove('active');
+                    }
+                    document.addEventListener('keydown', (e) => {
+                        if (e.key === 'Escape') closeLightbox();
+                    });
+                </script>
             </body>
             </html>
         `);
     } catch (err) {
         console.error('Error loading parking violation:', err);
+        if (pool) await pool.close();
         res.status(500).send('Error: ' + err.message);
     }
 });
