@@ -9,13 +9,13 @@ const sql = require('mssql');
 
 // Database config
 const dbConfig = {
-    server: process.env.DB_SERVER || 'localhost',
-    database: process.env.DB_NAME || 'OEApp_UAT',
-    user: process.env.DB_USER || 'sa',
-    password: process.env.DB_PASSWORD || 'Kokowawa123@@',
+    server: process.env.SQL_SERVER || 'localhost',
+    database: process.env.SQL_DATABASE || 'OEApp_UAT',
+    user: process.env.SQL_USER || 'sa',
+    password: process.env.SQL_PASSWORD,
     options: {
-        encrypt: false,
-        trustServerCertificate: true
+        encrypt: process.env.SQL_ENCRYPT === 'true',
+        trustServerCertificate: process.env.SQL_TRUST_CERT === 'true'
     }
 };
 
@@ -198,6 +198,18 @@ router.get('/', async (req, res) => {
                             <div class="stat stat-total">
                                 <span class="stat-value">${hrTotal}</span>
                                 Total
+                            </div>
+                        </div>
+                    </a>
+                    
+                    <!-- Parking Violations History -->
+                    <a href="/hr/parking-violations" class="card">
+                        <div class="card-icon">🅿️</div>
+                        <div class="card-title">Parking Violations</div>
+                        <div class="card-desc">View all parking violation reports submitted by security</div>
+                        <div class="card-stats">
+                            <div class="stat stat-total">
+                                <span class="stat-value">View History</span>
                             </div>
                         </div>
                     </a>
@@ -458,6 +470,461 @@ router.get('/extra-cleaning', async (req, res) => {
         `);
     } catch (err) {
         console.error('Error loading Extra Cleaning HR requests:', err);
+        res.status(500).send('Error: ' + err.message);
+    }
+});
+
+// Parking Violations History for HR
+router.get('/parking-violations', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        const result = await pool.request()
+            .query(`
+                SELECT v.*, 
+                       (SELECT COUNT(*) FROM Security_ParkingViolation_Images WHERE ViolationId = v.Id) as ImageCount
+                FROM Security_ParkingViolations v
+                ORDER BY v.ViolationDate DESC, v.CreatedAt DESC
+            `);
+        
+        await pool.close();
+        
+        const violations = result.recordset;
+        
+        let tableRows = violations.map(v => {
+            const violationDate = new Date(v.ViolationDate).toLocaleDateString('en-GB', { 
+                weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
+            });
+            const createdAt = new Date(v.CreatedAt).toLocaleDateString('en-GB');
+            const imageCount = v.ImageCount || (v.ImagePath ? 1 : 0);
+            
+            return `
+                <tr onclick="window.location.href='/hr/parking-violations/${v.Id}'" style="cursor: pointer;">
+                    <td>${v.Id}</td>
+                    <td>${violationDate}</td>
+                    <td>${v.Location}</td>
+                    <td>${v.ParkingLotInfo || '-'}</td>
+                    <td>${imageCount} 📷</td>
+                    <td>${v.CreatedBy}</td>
+                    <td>${createdAt}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Parking Violations - HR - ${process.env.APP_NAME}</title>
+                <style>
+                    * { box-sizing: border-box; }
+                    body { 
+                        font-family: 'Segoe UI', Arial, sans-serif; 
+                        max-width: 1400px; 
+                        margin: 0 auto; 
+                        padding: 20px;
+                        background: #f5f5f5;
+                    }
+                    .header {
+                        background: linear-gradient(135deg, #c62828 0%, #b71c1c 100%);
+                        color: white;
+                        padding: 25px;
+                        border-radius: 10px;
+                        margin-bottom: 25px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    }
+                    .header h1 { margin: 0; font-size: 24px; }
+                    .header-nav a {
+                        color: white;
+                        text-decoration: none;
+                        margin-left: 20px;
+                        opacity: 0.9;
+                    }
+                    .header-nav a:hover { opacity: 1; }
+                    .card {
+                        background: white;
+                        border-radius: 10px;
+                        padding: 25px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    }
+                    .filters {
+                        display: flex;
+                        gap: 15px;
+                        margin-bottom: 20px;
+                        flex-wrap: wrap;
+                    }
+                    .filters input, .filters select {
+                        padding: 10px 15px;
+                        border: 1px solid #ddd;
+                        border-radius: 6px;
+                        font-size: 14px;
+                    }
+                    .filters input { min-width: 200px; }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                    }
+                    th {
+                        background: #f8f9fa;
+                        padding: 12px 15px;
+                        text-align: left;
+                        font-weight: 600;
+                        color: #333;
+                        border-bottom: 2px solid #dee2e6;
+                    }
+                    td {
+                        padding: 12px 15px;
+                        border-bottom: 1px solid #eee;
+                    }
+                    tr:hover {
+                        background: #fff5f5;
+                    }
+                    .empty-state {
+                        text-align: center;
+                        padding: 60px;
+                        color: #666;
+                    }
+                    .stats-bar {
+                        display: flex;
+                        gap: 20px;
+                        margin-bottom: 20px;
+                    }
+                    .stat-item {
+                        background: #f8f9fa;
+                        padding: 15px 25px;
+                        border-radius: 8px;
+                        text-align: center;
+                    }
+                    .stat-value {
+                        font-size: 28px;
+                        font-weight: 700;
+                        color: #c62828;
+                    }
+                    .stat-label {
+                        font-size: 12px;
+                        color: #666;
+                        text-transform: uppercase;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>🅿️ Parking Violations History</h1>
+                    <div class="header-nav">
+                        <a href="/hr">← Back to HR</a>
+                        <a href="/dashboard">Dashboard</a>
+                    </div>
+                </div>
+                
+                <div class="stats-bar">
+                    <div class="stat-item">
+                        <div class="stat-value">${violations.length}</div>
+                        <div class="stat-label">Total Violations</div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="filters">
+                        <input type="text" id="searchBox" placeholder="🔍 Search..." onkeyup="filterTable()">
+                        <select id="filterLocation" onchange="filterTable()">
+                            <option value="">All Locations</option>
+                            <option value="HO Zouk">HO Zouk</option>
+                            <option value="HO Dbayeh">HO Dbayeh</option>
+                        </select>
+                    </div>
+                    
+                    ${violations.length > 0 ? `
+                        <table id="violationsTable">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Date</th>
+                                    <th>Location</th>
+                                    <th>Info</th>
+                                    <th>Photos</th>
+                                    <th>Reported By</th>
+                                    <th>Created</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tableRows}
+                            </tbody>
+                        </table>
+                    ` : `
+                        <div class="empty-state">
+                            <div style="font-size: 60px; margin-bottom: 15px;">🅿️</div>
+                            <p>No parking violations found</p>
+                        </div>
+                    `}
+                </div>
+                
+                <script>
+                    function filterTable() {
+                        const search = document.getElementById('searchBox').value.toLowerCase();
+                        const location = document.getElementById('filterLocation').value.toLowerCase();
+                        const rows = document.querySelectorAll('#violationsTable tbody tr');
+                        
+                        rows.forEach(row => {
+                            const text = row.textContent.toLowerCase();
+                            const matchesSearch = !search || text.includes(search);
+                            const matchesLocation = !location || text.includes(location);
+                            row.style.display = matchesSearch && matchesLocation ? '' : 'none';
+                        });
+                    }
+                </script>
+            </body>
+            </html>
+        `);
+    } catch (err) {
+        console.error('Error loading parking violations:', err);
+        res.status(500).send('Error: ' + err.message);
+    }
+});
+
+// View Single Parking Violation (HR)
+router.get('/parking-violations/:id', async (req, res) => {
+    const violationId = req.params.id;
+    
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        
+        const result = await pool.request()
+            .input('id', sql.Int, violationId)
+            .query(`SELECT * FROM Security_ParkingViolations WHERE Id = @id`);
+        
+        if (result.recordset.length === 0) {
+            await pool.close();
+            return res.status(404).send('Violation not found');
+        }
+        
+        // Get all images
+        const imagesResult = await pool.request()
+            .input('violationId', sql.Int, violationId)
+            .query(`SELECT ImagePath FROM Security_ParkingViolation_Images WHERE ViolationId = @violationId ORDER BY Id`);
+        
+        await pool.close();
+        
+        const violation = result.recordset[0];
+        const images = imagesResult.recordset;
+        
+        // Fall back to legacy ImagePath if no images in new table
+        if (images.length === 0 && violation.ImagePath) {
+            images.push({ ImagePath: violation.ImagePath });
+        }
+        
+        const violationDate = new Date(violation.ViolationDate).toLocaleDateString('en-GB', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
+        
+        let imagesHtml = '';
+        if (images.length > 0) {
+            imagesHtml = '<div class="image-gallery">' + 
+                images.map(img => `<div class="gallery-item"><img src="${img.ImagePath}" alt="Parking Violation Photo" onclick="openLightbox('${img.ImagePath}')"></div>`).join('') +
+                '</div>';
+        } else {
+            imagesHtml = `
+                <div class="no-image">
+                    <div style="font-size: 40px; margin-bottom: 10px;">📷</div>
+                    No photos uploaded
+                </div>
+            `;
+        }
+        
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Parking Violation #${violation.Id} - HR - ${process.env.APP_NAME}</title>
+                <style>
+                    * { box-sizing: border-box; }
+                    body { 
+                        font-family: 'Segoe UI', Arial, sans-serif; 
+                        max-width: 900px; 
+                        margin: 0 auto; 
+                        padding: 20px;
+                        background: #f5f5f5;
+                    }
+                    .header {
+                        background: linear-gradient(135deg, #c62828 0%, #b71c1c 100%);
+                        color: white;
+                        padding: 25px;
+                        border-radius: 10px;
+                        margin-bottom: 25px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    }
+                    .header h1 { margin: 0; font-size: 24px; }
+                    .header-nav a {
+                        color: white;
+                        text-decoration: none;
+                        margin-left: 20px;
+                        opacity: 0.9;
+                    }
+                    .header-nav a:hover { opacity: 1; }
+                    .card {
+                        background: white;
+                        border-radius: 10px;
+                        padding: 30px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    }
+                    .info-grid {
+                        display: grid;
+                        grid-template-columns: repeat(3, 1fr);
+                        gap: 20px;
+                        margin-bottom: 30px;
+                        padding-bottom: 20px;
+                        border-bottom: 1px solid #eee;
+                    }
+                    .info-item label {
+                        display: block;
+                        font-size: 12px;
+                        color: #888;
+                        text-transform: uppercase;
+                        margin-bottom: 5px;
+                    }
+                    .info-item span {
+                        font-size: 16px;
+                        font-weight: 600;
+                        color: #333;
+                    }
+                    .section-title {
+                        font-size: 18px;
+                        font-weight: 600;
+                        color: #333;
+                        margin-bottom: 15px;
+                    }
+                    .info-text {
+                        background: #f8f9fa;
+                        padding: 20px;
+                        border-radius: 10px;
+                        margin-bottom: 25px;
+                        line-height: 1.6;
+                    }
+                    .image-gallery {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                        gap: 15px;
+                    }
+                    .gallery-item {
+                        border-radius: 10px;
+                        overflow: hidden;
+                        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+                        cursor: pointer;
+                        transition: transform 0.3s;
+                    }
+                    .gallery-item:hover { transform: scale(1.02); }
+                    .gallery-item img {
+                        width: 100%;
+                        height: 200px;
+                        object-fit: cover;
+                    }
+                    .no-image {
+                        background: #f8f9fa;
+                        padding: 60px;
+                        border-radius: 10px;
+                        text-align: center;
+                        color: #888;
+                    }
+                    .footer-info {
+                        margin-top: 25px;
+                        padding-top: 20px;
+                        border-top: 1px solid #eee;
+                        font-size: 13px;
+                        color: #888;
+                    }
+                    .lightbox {
+                        display: none;
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0,0,0,0.9);
+                        z-index: 1000;
+                        justify-content: center;
+                        align-items: center;
+                    }
+                    .lightbox.active { display: flex; }
+                    .lightbox img {
+                        max-width: 90%;
+                        max-height: 90%;
+                        border-radius: 10px;
+                    }
+                    .lightbox-close {
+                        position: absolute;
+                        top: 20px;
+                        right: 30px;
+                        color: white;
+                        font-size: 40px;
+                        cursor: pointer;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>🅿️ Parking Violation #${violation.Id}</h1>
+                    <div class="header-nav">
+                        <a href="/hr/parking-violations">← Back to Violations</a>
+                        <a href="/hr">HR Dashboard</a>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Date</label>
+                            <span>${violationDate}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Location</label>
+                            <span>${violation.Location}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Reported By</label>
+                            <span>${violation.CreatedBy}</span>
+                        </div>
+                    </div>
+                    
+                    ${violation.ParkingLotInfo ? `
+                        <div class="section-title">📋 Parking Lot Information</div>
+                        <div class="info-text">${violation.ParkingLotInfo}</div>
+                    ` : ''}
+                    
+                    <div class="section-title">📷 Photo Evidence (${images.length} image${images.length !== 1 ? 's' : ''})</div>
+                    ${imagesHtml}
+                    
+                    <div class="footer-info">
+                        Report created on ${new Date(violation.CreatedAt).toLocaleString('en-GB')}
+                    </div>
+                </div>
+                
+                <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+                    <span class="lightbox-close">&times;</span>
+                    <img id="lightboxImg" src="" alt="Full size">
+                </div>
+                
+                <script>
+                    function openLightbox(src) {
+                        document.getElementById('lightboxImg').src = src;
+                        document.getElementById('lightbox').classList.add('active');
+                    }
+                    function closeLightbox() {
+                        document.getElementById('lightbox').classList.remove('active');
+                    }
+                    document.addEventListener('keydown', (e) => {
+                        if (e.key === 'Escape') closeLightbox();
+                    });
+                </script>
+            </body>
+            </html>
+        `);
+    } catch (err) {
+        console.error('Error viewing parking violation:', err);
+        if (pool) await pool.close();
         res.status(500).send('Error: ' + err.message);
     }
 });
