@@ -1132,7 +1132,13 @@
             try {
                 showToast('Preparing download...', 'success');
                 const result = await apiCall(`/schemas/${schemaId}`);
+                
+                if (!result.success || !result.data) {
+                    throw new Error(result.error || 'Template not found');
+                }
+                
                 const schema = result.data;
+                schema.sections = schema.sections || [];
 
                 const backup = {
                     exportDate: new Date().toISOString(),
@@ -1182,12 +1188,18 @@
 
             try {
                 const result = await apiCall(`/schemas/${schemaId}`);
+                
+                if (!result.success || !result.data) {
+                    throw new Error(result.error || 'Template not found');
+                }
+                
                 const template = result.data;
+                template.sections = template.sections || [];
 
-                const totalSections = template.sections?.length || 0;
-                const totalItems = template.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0;
-                const totalCoeff = template.sections?.reduce((sum, s) => 
-                    sum + (s.items?.reduce((itemSum, item) => itemSum + (item.coeff || 0), 0) || 0), 0) || 0;
+                const totalSections = template.sections.length;
+                const totalItems = template.sections.reduce((sum, s) => sum + (s.items?.length || 0), 0);
+                const totalCoeff = template.sections.reduce((sum, s) => 
+                    sum + (s.items?.reduce((itemSum, item) => itemSum + (item.coeff || 0), 0) || 0), 0);
 
                 let html = `
                     <div class="template-summary">

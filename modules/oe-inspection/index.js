@@ -474,7 +474,7 @@ router.get('/api/templates/schemas/:schemaId', async (req, res) => {
             const itemsResult = await pool.request()
                 .input('sectionId', sql.Int, section.sectionId)
                 .query(`
-                    SELECT Id as itemId, ReferenceValue as referenceValue, Title as title, Coeff as coeff, Answer as answer, CR as cr
+                    SELECT Id as itemId, ReferenceValue as referenceValue, Question as title, Coefficient as coeff, AnswerOptions as answer, Criteria as cr
                     FROM OE_InspectionTemplateItems
                     WHERE SectionId = @sectionId AND IsActive = 1
                     ORDER BY ReferenceValue
