@@ -207,14 +207,14 @@ app.get('/dashboard', requireAuth, (req, res) => {
     // Build menu items based on permissions
     const allMenuItems = [
         { id: 'stores', icon: '🏪', title: 'Stores', href: '/stores', desc: 'Store operations & management' },
-        { id: 'security-services', icon: '🛡️', title: 'Security', href: '/security-services', desc: 'Internal & Third Party Security' },
+        { id: 'security-services', icon: '🏢', title: 'Facility Management', href: '/security-services', desc: 'Facility services & management' },
         { id: 'personnel', icon: '👤', title: 'Personnel', href: '/personnel', desc: 'Personnel forms & requests' },
         { id: 'ohs', icon: '🦺', title: 'Occupational Health & Safety', href: '/ohs', desc: 'OHS incidents & inspections' },
         { id: 'ohs-inspection', icon: '🛡️', title: 'OHS Inspection', href: '/ohs-inspection', desc: 'OHS safety inspections & audits' },
         { id: 'oe', icon: '📋', title: 'Operational Excellence', href: '/operational-excellence', desc: 'Audits, action plans & reports' },
         { id: 'oe-inspection', icon: '🔍', title: 'OE Inspection', href: '/oe-inspection', desc: 'OE inspections, reports & action plans' },
         { id: 'thirdparty', icon: '🤝', title: 'Third-Party Services', href: '/third-party', desc: 'Service providers & compliance' },
-        { id: 'security', icon: '🔒', title: 'Security Department', href: '/security', desc: 'Security incidents & inspections' },
+        { id: 'security', icon: '🏢', title: 'Facility Management Department', href: '/security', desc: 'Facility incidents & inspections' },
         { id: 'hr', icon: '👥', title: 'HR & Talent', href: '/hr', desc: 'Employee relations & cases' }
     ];
     
