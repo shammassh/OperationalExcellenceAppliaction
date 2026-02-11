@@ -208,10 +208,10 @@ class DataService {
             const result = await this.pool.request()
                 .input('AuditID', sql.Int, auditId)
                 .query(`
-                    SELECT PictureID, ResponseID, FileName, FileData, ContentType, PictureType, CreatedAt
-                    FROM AuditPictures
-                    WHERE AuditID = @AuditID
-                    ORDER BY ResponseID, CreatedAt
+                    SELECT Id as PictureID, ItemId as ResponseID, FileName, FileData, ContentType, PictureType, CreatedAt
+                    FROM OE_InspectionPictures
+                    WHERE InspectionId = @AuditID
+                    ORDER BY ItemId, CreatedAt
                 `);
 
             // Group by responseId
@@ -223,14 +223,15 @@ class DataService {
                     pictures[responseId] = [];
                 }
 
+                // FileData is stored as base64 string, not binary
                 const pic = {
                     pictureId: row.PictureID,
                     fileName: row.FileName,
                     contentType: row.ContentType,
                     pictureType: row.PictureType,
                     createdAt: row.CreatedAt,
-                    // Convert binary to base64 data URL
-                    dataUrl: `data:${row.ContentType};base64,${row.FileData.toString('base64')}`
+                    // FileData is already base64 string
+                    dataUrl: `data:${row.ContentType};base64,${row.FileData}`
                 };
                 
                 console.log(`   📷 Picture ${row.PictureID}: ResponseID=${responseId}, Type="${row.PictureType}"`);

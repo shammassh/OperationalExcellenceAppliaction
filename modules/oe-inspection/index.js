@@ -958,8 +958,8 @@ router.post('/api/settings', async (req, res) => {
     }
 });
 
-// Get stores list
-router.get('/api/stores', async (req, res) => {
+// Get stores list (simple list for dropdowns)
+router.get('/api/stores-list', async (req, res) => {
     try {
         const pool = await sql.connect(dbConfig);
         const result = await pool.request().query(`
@@ -2214,8 +2214,8 @@ router.get('/api/audits/:auditId/fridge-readings', async (req, res) => {
         const result = await pool.request()
             .input('auditId', sql.Int, auditId)
             .query(`
-                SELECT Id, ReadingType, UnitTemp as unit, DisplayTemp as display, 
-                       ProbeTemp as probe, Issue as issue, SectionName as sectionName
+                SELECT Id, FridgeNumber, UnitTemp as unit, DisplayTemp as display, 
+                       ProbeTemp as probe, Issue as issue, IsCompliant
                 FROM OE_FridgeReadings
                 WHERE InspectionId = @auditId
                 ORDER BY CreatedAt
@@ -2223,16 +2223,10 @@ router.get('/api/audits/:auditId/fridge-readings', async (req, res) => {
         
         await pool.close();
         
-        const goodReadings = result.recordset.filter(r => r.ReadingType === 'Good');
-        const badReadings = result.recordset.filter(r => r.ReadingType === 'Bad');
+        const goodReadings = result.recordset.filter(r => r.IsCompliant === true || r.IsCompliant === 1);
+        const badReadings = result.recordset.filter(r => r.IsCompliant === false || r.IsCompliant === 0);
         
-        // Build enabledSections from the data
-        const enabledSections = {};
-        result.recordset.forEach(r => {
-            if (r.sectionName) enabledSections[r.sectionName] = true;
-        });
-        
-        res.json({ success: true, data: { goodReadings, badReadings, enabledSections } });
+        res.json({ success: true, data: { goodReadings, badReadings, enabledSections: {} } });
     } catch (error) {
         console.error('Error fetching fridge readings:', error);
         res.status(500).json({ success: false, error: error.message });
