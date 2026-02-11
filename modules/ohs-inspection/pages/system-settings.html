@@ -3,171 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OHS Inspection - System Settings</title>
+    <title>Settings - OHS Inspection System</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
             min-height: 100vh;
-            color: #1e293b;
         }
 
         .header {
             background: rgba(255, 255, 255, 0.95);
-            border-bottom: 1px solid rgba(225, 112, 85, 0.3);
-            padding: 1rem 2rem;
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            padding: 20px 40px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
         }
 
-        .header-left { display: flex; align-items: center; gap: 1rem; }
-
-        .back-btn {
-            background: linear-gradient(135deg, #475569 0%, #334155 100%);
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.3s ease;
-            text-decoration: none;
-        }
-
-        .header-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            background: linear-gradient(135deg, #e17055, #d63031);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .main-container { max-width: 1000px; margin: 2rem auto; padding: 0 2rem; }
-
-        .settings-card {
-            background: white;
-            border-radius: 16px;
-            padding: 2rem;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            border: 1px solid rgba(225, 112, 85, 0.2);
-        }
-
-        .settings-card-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: #1e293b;
-            margin-bottom: 1.5rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 1px solid rgba(225, 112, 85, 0.2);
+        .header h1 {
+            color: #1e3a5f;
+            font-size: 28px;
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 12px;
         }
 
-        .settings-row {
+        .header-actions {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 0;
-            border-bottom: 1px solid #f1f5f9;
-        }
-
-        .settings-row:last-child { border-bottom: none; }
-
-        .settings-label { flex: 1; }
-        .settings-label-title { font-weight: 500; color: #1e293b; margin-bottom: 0.25rem; }
-        .settings-label-desc { font-size: 0.85rem; color: #64748b; }
-
-        .settings-value {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .form-input {
-            padding: 0.75rem 1rem;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            font-size: 0.95rem;
-            color: #1e293b;
-            width: 200px;
-        }
-
-        .form-input:focus {
-            outline: none;
-            border-color: #e17055;
-        }
-
-        .form-select {
-            padding: 0.75rem 1rem;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            font-size: 0.95rem;
-            color: #1e293b;
-            background: white;
-            width: 200px;
-            cursor: pointer;
-        }
-
-        .toggle-switch {
-            position: relative;
-            width: 50px;
-            height: 26px;
-        }
-
-        .toggle-switch input { display: none; }
-
-        .toggle-slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: #cbd5e1;
-            border-radius: 13px;
-            transition: 0.3s;
-        }
-
-        .toggle-slider:before {
-            content: "";
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            left: 3px;
-            bottom: 3px;
-            background: white;
-            border-radius: 50%;
-            transition: 0.3s;
-        }
-
-        .toggle-switch input:checked + .toggle-slider {
-            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
-        }
-
-        .toggle-switch input:checked + .toggle-slider:before {
-            transform: translateX(24px);
+            gap: 12px;
         }
 
         .btn {
-            padding: 0.75rem 1.5rem;
+            padding: 12px 24px;
             border: none;
             border-radius: 8px;
-            font-size: 0.95rem;
+            font-size: 14px;
             font-weight: 600;
             cursor: pointer;
+            transition: all 0.3s ease;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            transition: all 0.3s ease;
+            gap: 8px;
         }
 
         .btn-primary {
@@ -180,230 +62,1380 @@
             box-shadow: 0 4px 15px rgba(225, 112, 85, 0.4);
         }
 
-        .btn-secondary { background: #f1f5f9; color: #475569; }
+        .btn-secondary {
+            background: #f8f9fa;
+            color: #495057;
+            border: 1px solid #dee2e6;
+        }
 
-        .actions-bar {
+        .btn-secondary:hover {
+            background: #e9ecef;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .info-banner {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .info-banner .icon {
+            font-size: 40px;
+        }
+
+        .info-banner .text h3 {
+            color: #1e3a5f;
+            margin-bottom: 4px;
+        }
+
+        .info-banner .text p {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .schema-tabs {
+            background: white;
+            border-radius: 16px 16px 0 0;
+            display: flex;
+            overflow-x: auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .schema-tab {
+            padding: 16px 24px;
+            border: none;
+            background: none;
+            font-size: 14px;
+            font-weight: 600;
+            color: #6b7280;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 3px solid transparent;
+            white-space: nowrap;
+        }
+
+        .schema-tab:hover {
+            color: #e17055;
+            background: #f9fafb;
+        }
+
+        .schema-tab.active {
+            color: #e17055;
+            border-bottom-color: #e17055;
+            background: #f9fafb;
+        }
+
+        .settings-panel {
+            background: white;
+            border-radius: 0 0 16px 16px;
+            padding: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .settings-section {
+            margin-bottom: 30px;
+        }
+
+        .settings-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1e3a5f;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #f3f4f6;
+        }
+
+        .overall-setting {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 2px solid #f59e0b;
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .overall-setting .label {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .overall-setting .label .icon {
+            font-size: 32px;
+        }
+
+        .overall-setting .label h4 {
+            font-size: 16px;
+            color: #92400e;
+            margin-bottom: 4px;
+        }
+
+        .overall-setting .label p {
+            font-size: 13px;
+            color: #b45309;
+        }
+
+        .grade-input-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .grade-input {
+            width: 80px;
+            padding: 12px 16px;
+            font-size: 18px;
+            font-weight: 700;
+            text-align: center;
+            border: 2px solid #d1d5db;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .grade-input:focus {
+            outline: none;
+            border-color: #e17055;
+            box-shadow: 0 0 0 3px rgba(225, 112, 85, 0.2);
+        }
+
+        .grade-input.changed {
+            border-color: #f59e0b;
+            background: #fffbeb;
+        }
+
+        .percent-label {
+            font-size: 18px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .sections-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .section-card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        .section-card:hover {
+            border-color: #e17055;
+            background: #fff7f5;
+        }
+
+        .section-card .section-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .section-card .section-icon {
+            font-size: 24px;
+        }
+
+        .section-card .section-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .section-card .section-number {
+            font-size: 11px;
+            color: #9ca3af;
+        }
+
+        .section-grade-input {
+            width: 60px;
+            padding: 8px 10px;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            border: 2px solid #d1d5db;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .section-grade-input:focus {
+            outline: none;
+            border-color: #e17055;
+            box-shadow: 0 0 0 3px rgba(225, 112, 85, 0.2);
+        }
+
+        .section-grade-input.changed {
+            border-color: #f59e0b;
+            background: #fffbeb;
+        }
+
+        .save-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 16px 40px;
             display: flex;
             justify-content: flex-end;
-            gap: 1rem;
-            margin-top: 2rem;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            z-index: 100;
+        }
+
+        .save-bar.visible {
+            transform: translateY(0);
+        }
+
+        .save-bar .changes-text {
+            color: #f59e0b;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #e5e7eb;
+            border-top-color: #e17055;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         .toast {
             position: fixed;
-            bottom: 2rem;
-            right: 2rem;
+            bottom: 100px;
+            right: 30px;
             background: #10b981;
             color: white;
-            padding: 1rem 2rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-            transform: translateY(100px);
-            opacity: 0;
-            transition: all 0.3s;
+            padding: 16px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
+            z-index: 200;
         }
 
-        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.visible {
+            transform: translateX(0);
+        }
+
+        .toast.error {
+            background: #ef4444;
+        }
+
+        /* Sub-tabs */
+        .sub-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .sub-tab {
+            padding: 12px 24px;
+            border: none;
+            background: none;
+            font-size: 14px;
+            font-weight: 600;
+            color: #6b7280;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+        }
+
+        .sub-tab:hover {
+            color: #e17055;
+        }
+
+        .sub-tab.active {
+            color: #e17055;
+            border-bottom-color: #e17055;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Checklist Info Styles */
+        .checklist-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .checklist-info-card {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            gap: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .checklist-info-card:hover {
+            border-color: #e17055;
+            box-shadow: 0 4px 12px rgba(225, 112, 85, 0.15);
+        }
+
+        .checklist-info-icon {
+            font-size: 32px;
+            flex-shrink: 0;
+        }
+
+        .checklist-info-content {
+            flex: 1;
+        }
+
+        .checklist-info-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+
+        .checklist-info-input {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 15px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .checklist-info-input:focus {
+            outline: none;
+            border-color: #e17055;
+            box-shadow: 0 0 0 3px rgba(225, 112, 85, 0.2);
+        }
+
+        .checklist-info-input.changed {
+            border-color: #f59e0b;
+            background: #fffbeb;
+        }
+
+        .checklist-info-hint {
+            font-size: 12px;
+            color: #9ca3af;
+            margin-top: 8px;
+        }
+
+        /* Section Icons Styles */
+        .icon-picker-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .section-icon-card {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .section-icon-card:hover {
+            border-color: #e17055;
+            box-shadow: 0 4px 12px rgba(225, 112, 85, 0.15);
+        }
+
+        .section-icon-card.changed {
+            border-color: #f59e0b;
+            background: #fffbeb;
+        }
+
+        .current-icon-display {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid #e5e7eb;
+        }
+
+        .current-icon-display:hover {
+            background: linear-gradient(135deg, #fff7f5 0%, #fee2e2 100%);
+            border-color: #e17055;
+            transform: scale(1.05);
+        }
+
+        .section-icon-info {
+            flex: 1;
+        }
+
+        .section-icon-name {
+            font-weight: 600;
+            color: #1f2937;
+            font-size: 14px;
+        }
+
+        .section-icon-number {
+            font-size: 12px;
+            color: #9ca3af;
+            margin-top: 2px;
+        }
+
+        .icon-picker-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .icon-picker-modal.active {
+            display: flex;
+        }
+
+        .icon-picker-content {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .icon-picker-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .icon-picker-header h3 {
+            color: #1e3a5f;
+            font-size: 18px;
+        }
+
+        .icon-picker-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #9ca3af;
+            transition: color 0.2s;
+        }
+
+        .icon-picker-close:hover {
+            color: #ef4444;
+        }
+
+        .icon-picker-section {
+            margin-bottom: 16px;
+        }
+
+        .icon-picker-section h4 {
+            font-size: 12px;
+            color: #6b7280;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .icon-options {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 8px;
+        }
+
+        .icon-option {
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .icon-option:hover {
+            background: #fff7f5;
+            border-color: #e17055;
+            transform: scale(1.1);
+        }
+
+        .icon-option.selected {
+            background: #e17055;
+            border-color: #d63031;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+
+            .overall-setting {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+
+            .sections-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        <div class="header-left">
-            <a href="/ohs-inspection" class="back-btn">← Back</a>
-            <span class="header-title">⚙️ System Settings</span>
+        <h1>🦺 OHS Inspection Settings</h1>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="window.location.href='/ohs-inspection'">
+                <span>←</span> Back
+            </button>
         </div>
     </div>
 
-    <div class="main-container">
-        <div class="settings-card">
-            <div class="settings-card-title">📄 Document Settings</div>
-            
-            <div class="settings-row">
-                <div class="settings-label">
-                    <div class="settings-label-title">Document Number Prefix</div>
-                    <div class="settings-label-desc">Prefix for OHS inspection document numbers</div>
-                </div>
-                <div class="settings-value">
-                    <input type="text" class="form-input" id="docPrefix" value="GMRL-OHS">
-                </div>
-            </div>
-
-            <div class="settings-row">
-                <div class="settings-label">
-                    <div class="settings-label-title">Starting Number</div>
-                    <div class="settings-label-desc">Next document number to be assigned</div>
-                </div>
-                <div class="settings-value">
-                    <input type="number" class="form-input" id="startingNumber" value="1">
-                </div>
+    <div class="container">
+        <div class="info-banner">
+            <div class="icon">⚙️</div>
+            <div class="text">
+                <h3>Schema Configuration</h3>
+                <p>Configure passing grades and checklist information for each OHS inspection schema.</p>
             </div>
         </div>
 
-        <div class="settings-card">
-            <div class="settings-card-title">📊 Scoring Settings</div>
-            
-            <div class="settings-row">
-                <div class="settings-label">
-                    <div class="settings-label-title">Pass Threshold (%)</div>
-                    <div class="settings-label-desc">Minimum score to pass an inspection</div>
-                </div>
-                <div class="settings-value">
-                    <input type="number" class="form-input" id="passThreshold" value="80" min="0" max="100">
-                </div>
+        <div id="schemaTabsContainer">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>Loading schemas...</div>
             </div>
-
-            <div class="settings-row">
-                <div class="settings-label">
-                    <div class="settings-label-title">Warning Threshold (%)</div>
-                    <div class="settings-label-desc">Score below this triggers a warning</div>
-                </div>
-                <div class="settings-value">
-                    <input type="number" class="form-input" id="warningThreshold" value="60" min="0" max="100">
-                </div>
-            </div>
-        </div>
-
-        <div class="settings-card">
-            <div class="settings-card-title">🔔 Notifications</div>
-            
-            <div class="settings-row">
-                <div class="settings-label">
-                    <div class="settings-label-title">Email Notifications</div>
-                    <div class="settings-label-desc">Send email when inspection is completed</div>
-                </div>
-                <div class="settings-value">
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="emailNotifications" checked>
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-            </div>
-
-            <div class="settings-row">
-                <div class="settings-label">
-                    <div class="settings-label-title">Notification Recipients</div>
-                    <div class="settings-label-desc">Email addresses (comma separated)</div>
-                </div>
-                <div class="settings-value">
-                    <input type="text" class="form-input" id="notificationEmails" placeholder="email@example.com" style="width: 300px;">
-                </div>
-            </div>
-        </div>
-
-        <div class="settings-card">
-            <div class="settings-card-title">📁 Report Settings</div>
-            
-            <div class="settings-row">
-                <div class="settings-label">
-                    <div class="settings-label-title">Auto-generate Report</div>
-                    <div class="settings-label-desc">Automatically generate report when completing inspection</div>
-                </div>
-                <div class="settings-value">
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="autoGenerateReport" checked>
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-            </div>
-
-            <div class="settings-row">
-                <div class="settings-label">
-                    <div class="settings-label-title">Include Photos in Report</div>
-                    <div class="settings-label-desc">Embed uploaded photos in the generated report</div>
-                </div>
-                <div class="settings-value">
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="includePhotos" checked>
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-            </div>
-        </div>
-
-        <div class="actions-bar">
-            <button class="btn btn-secondary" onclick="resetDefaults()">Reset to Defaults</button>
-            <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
         </div>
     </div>
 
-    <div class="toast" id="toast"></div>
+    <div class="save-bar" id="saveBar">
+        <div class="changes-text">
+            <span>⚠️</span>
+            <span id="changesCount">0 unsaved changes</span>
+        </div>
+        <button class="btn btn-secondary" onclick="discardChanges()">Discard</button>
+        <button class="btn btn-success" onclick="saveChanges()">
+            <span>💾</span> Save Changes
+        </button>
+    </div>
+
+    <div class="toast" id="toast">
+        <span id="toastIcon">✓</span>
+        <span id="toastMessage">Settings saved</span>
+    </div>
+
+    <!-- Icon Picker Modal -->
+    <div class="icon-picker-modal" id="iconPickerModal">
+        <div class="icon-picker-content">
+            <div class="icon-picker-header">
+                <h3 id="iconPickerTitle">Select Icon</h3>
+                <button class="icon-picker-close" onclick="closeIconPicker()">&times;</button>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>🦺 Safety & PPE</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('🦺')">🦺</div>
+                    <div class="icon-option" onclick="selectIcon('🥽')">🥽</div>
+                    <div class="icon-option" onclick="selectIcon('🧤')">🧤</div>
+                    <div class="icon-option" onclick="selectIcon('👷')">👷</div>
+                    <div class="icon-option" onclick="selectIcon('🪖')">🪖</div>
+                    <div class="icon-option" onclick="selectIcon('🛡️')">🛡️</div>
+                    <div class="icon-option" onclick="selectIcon('⛑️')">⛑️</div>
+                    <div class="icon-option" onclick="selectIcon('🧯')">🧯</div>
+                </div>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>⚠️ Hazards & Warning</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('⚠️')">⚠️</div>
+                    <div class="icon-option" onclick="selectIcon('🚨')">🚨</div>
+                    <div class="icon-option" onclick="selectIcon('☣️')">☣️</div>
+                    <div class="icon-option" onclick="selectIcon('☢️')">☢️</div>
+                    <div class="icon-option" onclick="selectIcon('⚡')">⚡</div>
+                    <div class="icon-option" onclick="selectIcon('🔥')">🔥</div>
+                    <div class="icon-option" onclick="selectIcon('💥')">💥</div>
+                    <div class="icon-option" onclick="selectIcon('🚫')">🚫</div>
+                </div>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>🏗️ Construction & Tools</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('🏗️')">🏗️</div>
+                    <div class="icon-option" onclick="selectIcon('🔧')">🔧</div>
+                    <div class="icon-option" onclick="selectIcon('🔨')">🔨</div>
+                    <div class="icon-option" onclick="selectIcon('🪛')">🪛</div>
+                    <div class="icon-option" onclick="selectIcon('⚙️')">⚙️</div>
+                    <div class="icon-option" onclick="selectIcon('🛠️')">🛠️</div>
+                    <div class="icon-option" onclick="selectIcon('🪜')">🪜</div>
+                    <div class="icon-option" onclick="selectIcon('🔩')">🔩</div>
+                </div>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>🧹 Housekeeping</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('🧹')">🧹</div>
+                    <div class="icon-option" onclick="selectIcon('🧼')">🧼</div>
+                    <div class="icon-option" onclick="selectIcon('🚿')">🚿</div>
+                    <div class="icon-option" onclick="selectIcon('🚻')">🚻</div>
+                    <div class="icon-option" onclick="selectIcon('🗑️')">🗑️</div>
+                    <div class="icon-option" onclick="selectIcon('♻️')">♻️</div>
+                    <div class="icon-option" onclick="selectIcon('✨')">✨</div>
+                    <div class="icon-option" onclick="selectIcon('💧')">💧</div>
+                </div>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>🏢 Facilities</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('🏢')">🏢</div>
+                    <div class="icon-option" onclick="selectIcon('🚪')">🚪</div>
+                    <div class="icon-option" onclick="selectIcon('🪟')">🪟</div>
+                    <div class="icon-option" onclick="selectIcon('💡')">💡</div>
+                    <div class="icon-option" onclick="selectIcon('🔌')">🔌</div>
+                    <div class="icon-option" onclick="selectIcon('🛗')">🛗</div>
+                    <div class="icon-option" onclick="selectIcon('🚰')">🚰</div>
+                    <div class="icon-option" onclick="selectIcon('💨')">💨</div>
+                </div>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>📋 Documentation</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('📋')">📋</div>
+                    <div class="icon-option" onclick="selectIcon('📝')">📝</div>
+                    <div class="icon-option" onclick="selectIcon('📊')">📊</div>
+                    <div class="icon-option" onclick="selectIcon('📜')">📜</div>
+                    <div class="icon-option" onclick="selectIcon('✅')">✅</div>
+                    <div class="icon-option" onclick="selectIcon('📷')">📷</div>
+                    <div class="icon-option" onclick="selectIcon('🎯')">🎯</div>
+                    <div class="icon-option" onclick="selectIcon('🔍')">🔍</div>
+                </div>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>👥 Training & People</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('👥')">👥</div>
+                    <div class="icon-option" onclick="selectIcon('🎓')">🎓</div>
+                    <div class="icon-option" onclick="selectIcon('📚')">📚</div>
+                    <div class="icon-option" onclick="selectIcon('🏆')">🏆</div>
+                    <div class="icon-option" onclick="selectIcon('⭐')">⭐</div>
+                    <div class="icon-option" onclick="selectIcon('💪')">💪</div>
+                    <div class="icon-option" onclick="selectIcon('🤝')">🤝</div>
+                    <div class="icon-option" onclick="selectIcon('💼')">💼</div>
+                </div>
+            </div>
+            
+            <div class="icon-picker-section">
+                <h4>🏥 Medical & First Aid</h4>
+                <div class="icon-options">
+                    <div class="icon-option" onclick="selectIcon('🏥')">🏥</div>
+                    <div class="icon-option" onclick="selectIcon('🩹')">🩹</div>
+                    <div class="icon-option" onclick="selectIcon('💊')">💊</div>
+                    <div class="icon-option" onclick="selectIcon('🩺')">🩺</div>
+                    <div class="icon-option" onclick="selectIcon('🚑')">🚑</div>
+                    <div class="icon-option" onclick="selectIcon('❤️')">❤️</div>
+                    <div class="icon-option" onclick="selectIcon('🧬')">🧬</div>
+                    <div class="icon-option" onclick="selectIcon('🩻')">🩻</div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
-        async function loadSettings() {
-            try {
-                const response = await fetch('/ohs-inspection/api/settings');
-                const result = await response.json();
+        let schemas = [];
+        let currentSchemaId = null;
+        let currentSubTab = 'grades';
+        let originalValues = {};
+        let currentValues = {};
+        let originalChecklistInfo = {};
+        let currentChecklistInfo = {};
+        let originalSectionIcons = {};
+        let currentSectionIcons = {};
+        let hasChanges = false;
+        let hasChecklistChanges = false;
+        let hasIconChanges = false;
+        let currentIconPickerSectionId = null;
 
-                if (result.success && result.data) {
-                    const s = result.data;
-                    document.getElementById('docPrefix').value = s.docPrefix || 'GMRL-OHS';
-                    document.getElementById('startingNumber').value = s.startingNumber || 1;
-                    document.getElementById('passThreshold').value = s.passThreshold || 80;
-                    document.getElementById('warningThreshold').value = s.warningThreshold || 60;
-                    document.getElementById('emailNotifications').checked = s.emailNotifications !== false;
-                    document.getElementById('notificationEmails').value = s.notificationEmails || '';
-                    document.getElementById('autoGenerateReport').checked = s.autoGenerateReport !== false;
-                    document.getElementById('includePhotos').checked = s.includePhotos !== false;
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadSchemas();
+        });
+
+        async function loadSchemas() {
+            try {
+                const response = await fetch('/ohs-inspection/api/schemas');
+                if (!response.ok) throw new Error('Failed to load schemas');
+                
+                const data = await response.json();
+                schemas = data.schemas || [];
+
+                if (schemas.length === 0) {
+                    document.getElementById('schemaTabsContainer').innerHTML = `
+                        <div class="settings-panel">
+                            <div style="text-align: center; padding: 40px; color: #6b7280;">
+                                <div style="font-size: 48px; margin-bottom: 16px;">📋</div>
+                                <h3>No Schemas Found</h3>
+                                <p>Create a schema in Template Builder first.</p>
+                            </div>
+                        </div>
+                    `;
+                    return;
                 }
+
+                renderTabs();
+                selectSchema(schemas[0].SchemaID);
+
             } catch (error) {
-                console.error('Error loading settings:', error);
+                console.error('Error loading schemas:', error);
+                document.getElementById('schemaTabsContainer').innerHTML = `
+                    <div class="settings-panel">
+                        <div style="text-align: center; padding: 40px; color: #ef4444;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+                            <h3>Error Loading Settings</h3>
+                            <p>${error.message}</p>
+                        </div>
+                    </div>
+                `;
             }
         }
 
-        async function saveSettings() {
-            const settings = {
-                docPrefix: document.getElementById('docPrefix').value,
-                startingNumber: parseInt(document.getElementById('startingNumber').value),
-                passThreshold: parseInt(document.getElementById('passThreshold').value),
-                warningThreshold: parseInt(document.getElementById('warningThreshold').value),
-                emailNotifications: document.getElementById('emailNotifications').checked,
-                notificationEmails: document.getElementById('notificationEmails').value,
-                autoGenerateReport: document.getElementById('autoGenerateReport').checked,
-                includePhotos: document.getElementById('includePhotos').checked
-            };
+        function renderTabs() {
+            const tabsHtml = `
+                <div class="schema-tabs" id="schemaTabs">
+                    ${schemas.map(schema => `
+                        <button class="schema-tab" data-schema-id="${schema.SchemaID}" onclick="selectSchema(${schema.SchemaID})">
+                            🦺 ${schema.SchemaName}
+                        </button>
+                    `).join('')}
+                </div>
+                <div class="settings-panel" id="settingsPanel">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <div>Loading settings...</div>
+                    </div>
+                </div>
+            `;
 
-            try {
-                const response = await fetch('/ohs-inspection/api/settings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(settings)
-                });
+            document.getElementById('schemaTabsContainer').innerHTML = tabsHtml;
+        }
 
-                const result = await response.json();
-                if (result.success) {
-                    showToast('Settings saved successfully!');
-                } else {
-                    alert('Error: ' + result.error);
+        async function selectSchema(schemaId) {
+            if (hasChanges || hasChecklistChanges || hasIconChanges) {
+                if (!confirm('You have unsaved changes. Discard them?')) {
+                    return;
                 }
+            }
+
+            currentSchemaId = schemaId;
+            hasChanges = false;
+            hasChecklistChanges = false;
+            hasIconChanges = false;
+            updateSaveBar();
+
+            // Update tab styling
+            document.querySelectorAll('.schema-tab').forEach(tab => {
+                tab.classList.toggle('active', parseInt(tab.dataset.schemaId) === schemaId);
+            });
+
+            const schema = schemas.find(s => s.SchemaID === schemaId);
+            if (!schema) return;
+
+            // Store original values for grades
+            originalValues = {
+                overallPassingGrade: parseInt(schema.overallPassingGrade) || 80,
+                sections: {}
+            };
+            (schema.sections || []).forEach(s => {
+                originalValues.sections[s.SectionID] = s.PassingGrade || 80;
+            });
+            currentValues = JSON.parse(JSON.stringify(originalValues));
+
+            // Initialize section icons
+            initializeSectionIcons(schema);
+
+            // Load checklist info for this schema
+            await loadChecklistInfo(schemaId);
+
+            renderSettings(schema);
+        }
+
+        async function loadChecklistInfo(schemaId) {
+            try {
+                const response = await fetch(`/ohs-inspection/api/schema-checklist-info/${schemaId}`);
+                const data = await response.json();
+                if (data.success) {
+                    originalChecklistInfo = { ...data.info };
+                    currentChecklistInfo = { ...data.info };
+                } else {
+                    originalChecklistInfo = { creationDate: '', revisionDate: '', edition: '', reportTitle: '', documentPrefix: '' };
+                    currentChecklistInfo = { creationDate: '', revisionDate: '', edition: '', reportTitle: '', documentPrefix: '' };
+                }
+            } catch (error) {
+                console.error('Error loading checklist info:', error);
+                originalChecklistInfo = { creationDate: '', revisionDate: '', edition: '', reportTitle: '', documentPrefix: '' };
+                currentChecklistInfo = { creationDate: '', revisionDate: '', edition: '', reportTitle: '', documentPrefix: '' };
+            }
+        }
+
+        function switchSubTab(tab) {
+            currentSubTab = tab;
+            document.querySelectorAll('.sub-tab').forEach(t => {
+                t.classList.toggle('active', t.dataset.tab === tab);
+            });
+            document.querySelectorAll('.tab-content').forEach(c => {
+                c.classList.toggle('active', c.id === `${tab}Content`);
+            });
+        }
+
+        function renderSettings(schema) {
+            const sections = schema.sections || [];
+            
+            const settingsHtml = `
+                <div class="sub-tabs">
+                    <button class="sub-tab ${currentSubTab === 'grades' ? 'active' : ''}" data-tab="grades" onclick="switchSubTab('grades')">
+                        📊 Passing Grades
+                    </button>
+                    <button class="sub-tab ${currentSubTab === 'icons' ? 'active' : ''}" data-tab="icons" onclick="switchSubTab('icons')">
+                        🎯 Section Icons
+                    </button>
+                    <button class="sub-tab ${currentSubTab === 'checklist' ? 'active' : ''}" data-tab="checklist" onclick="switchSubTab('checklist')">
+                        📝 Checklist Info
+                    </button>
+                </div>
+
+                <!-- Grades Tab -->
+                <div class="tab-content ${currentSubTab === 'grades' ? 'active' : ''}" id="gradesContent">
+                    <div class="settings-section">
+                        <div class="section-title">
+                            <span>🎯</span>
+                            Overall Passing Grade
+                        </div>
+                        <div class="overall-setting">
+                            <div class="label">
+                                <div class="icon">🏆</div>
+                                <div>
+                                    <h4>${schema.SchemaName}</h4>
+                                    <p>Minimum overall score required to pass the inspection</p>
+                                </div>
+                            </div>
+                            <div class="grade-input-group">
+                                <input type="number" 
+                                       class="grade-input" 
+                                       id="overallGrade"
+                                       value="${parseInt(schema.overallPassingGrade) || 80}" 
+                                       min="0" 
+                                       max="100"
+                                       onchange="updateOverallGrade(this.value)"
+                                       oninput="markOverallChanged(this)">
+                                <span class="percent-label">%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${sections.length > 0 ? `
+                    <div class="settings-section">
+                        <div class="section-title">
+                            <span>📋</span>
+                            Section Passing Grades
+                            <span style="font-size: 12px; font-weight: 400; color: #9ca3af; margin-left: auto;">
+                                ${sections.length} sections
+                            </span>
+                        </div>
+                        <div class="sections-grid">
+                            ${sections.map(section => `
+                                <div class="section-card">
+                                    <div class="section-info">
+                                        <span class="section-icon">${section.SectionIcon || '📄'}</span>
+                                        <div>
+                                            <div class="section-name">${section.SectionName}</div>
+                                            <div class="section-number">Section ${section.SectionOrder}</div>
+                                        </div>
+                                    </div>
+                                    <div class="grade-input-group">
+                                        <input type="number" 
+                                               class="section-grade-input" 
+                                               data-section-id="${section.SectionID}"
+                                               value="${section.PassingGrade || 80}" 
+                                               min="0" 
+                                               max="100"
+                                               onchange="updateSectionGrade(${section.SectionID}, this.value)"
+                                               oninput="markSectionChanged(this, ${section.SectionID})">
+                                        <span style="font-size: 12px; color: #6b7280;">%</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    ` : '<p style="color: #6b7280; text-align: center; padding: 20px;">No sections configured yet.</p>'}
+                </div>
+
+                <!-- Section Icons Tab -->
+                <div class="tab-content ${currentSubTab === 'icons' ? 'active' : ''}" id="iconsContent">
+                    <div class="settings-section">
+                        <div class="section-title">
+                            <span>🎯</span>
+                            Section Icons
+                        </div>
+                        <p style="color: #6b7280; margin-bottom: 20px; font-size: 14px;">
+                            Click on a section's icon to change it. Icons appear in reports and dashboards.
+                        </p>
+                        
+                        ${sections.length > 0 ? `
+                        <div class="icon-picker-grid">
+                            ${sections.map(section => `
+                                <div class="section-icon-card" id="iconCard-${section.SectionID}">
+                                    <div class="current-icon-display" 
+                                         onclick="openIconPicker(${section.SectionID}, '${section.SectionName.replace(/'/g, "\\'")}', '${section.SectionIcon || '📋'}')"
+                                         id="iconDisplay-${section.SectionID}">
+                                        ${section.SectionIcon || '📋'}
+                                    </div>
+                                    <div class="section-icon-info">
+                                        <div class="section-icon-name">${section.SectionName}</div>
+                                        <div class="section-icon-number">Section ${section.SectionOrder}</div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        ` : '<p style="color: #6b7280; text-align: center; padding: 20px;">No sections configured yet.</p>'}
+                    </div>
+                </div>
+
+                <!-- Checklist Info Tab -->
+                <div class="tab-content ${currentSubTab === 'checklist' ? 'active' : ''}" id="checklistContent">
+                    <div class="settings-section">
+                        <div class="section-title">
+                            <span>📝</span>
+                            Checklist Information
+                        </div>
+                        <p style="color: #6b7280; margin-bottom: 20px; font-size: 14px;">
+                            Configure the metadata for this checklist schema. This information appears in inspection reports.
+                        </p>
+                        
+                        <div class="checklist-info-grid">
+                            <div class="checklist-info-card">
+                                <div class="checklist-info-icon">📅</div>
+                                <div class="checklist-info-content">
+                                    <label class="checklist-info-label">Creation Date</label>
+                                    <input type="date" 
+                                           class="checklist-info-input" 
+                                           id="creationDate"
+                                           value="${currentChecklistInfo.creationDate || ''}"
+                                           onchange="updateChecklistInfo('creationDate', this.value)">
+                                    <p class="checklist-info-hint">The date this checklist was originally created</p>
+                                </div>
+                            </div>
+                            
+                            <div class="checklist-info-card">
+                                <div class="checklist-info-icon">🔄</div>
+                                <div class="checklist-info-content">
+                                    <label class="checklist-info-label">Last Revision Date</label>
+                                    <input type="date" 
+                                           class="checklist-info-input" 
+                                           id="revisionDate"
+                                           value="${currentChecklistInfo.revisionDate || ''}"
+                                           onchange="updateChecklistInfo('revisionDate', this.value)">
+                                    <p class="checklist-info-hint">The date of the most recent revision</p>
+                                </div>
+                            </div>
+                            
+                            <div class="checklist-info-card">
+                                <div class="checklist-info-icon">📋</div>
+                                <div class="checklist-info-content">
+                                    <label class="checklist-info-label">Edition</label>
+                                    <input type="text" 
+                                           class="checklist-info-input" 
+                                           id="edition"
+                                           value="${currentChecklistInfo.edition || ''}"
+                                           placeholder="e.g., 1.0, 2.1, Rev A"
+                                           onchange="updateChecklistInfo('edition', this.value)">
+                                    <p class="checklist-info-hint">Version number or edition identifier</p>
+                                </div>
+                            </div>
+                            
+                            <div class="checklist-info-card">
+                                <div class="checklist-info-icon">🏷️</div>
+                                <div class="checklist-info-content">
+                                    <label class="checklist-info-label">Report Title</label>
+                                    <input type="text" 
+                                           class="checklist-info-input" 
+                                           id="reportTitle"
+                                           value="${currentChecklistInfo.reportTitle || ''}"
+                                           placeholder="e.g., OHS Inspection Report"
+                                           onchange="updateChecklistInfo('reportTitle', this.value)">
+                                    <p class="checklist-info-hint">The title shown on generated reports</p>
+                                </div>
+                            </div>
+                            
+                            <div class="checklist-info-card">
+                                <div class="checklist-info-icon">🔢</div>
+                                <div class="checklist-info-content">
+                                    <label class="checklist-info-label">Document Number Prefix</label>
+                                    <input type="text" 
+                                           class="checklist-info-input" 
+                                           id="documentPrefix"
+                                           value="${currentChecklistInfo.documentPrefix || ''}"
+                                           placeholder="e.g., GMRL-OHS"
+                                           onchange="updateChecklistInfo('documentPrefix', this.value)">
+                                    <p class="checklist-info-hint">Prefix for inspection document numbers</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('settingsPanel').innerHTML = settingsHtml;
+        }
+
+        // Checklist Info Functions
+        function updateChecklistInfo(field, value) {
+            currentChecklistInfo[field] = value;
+            const input = document.getElementById(field);
+            if (input) {
+                input.classList.add('changed');
+            }
+            checkForChecklistChanges();
+        }
+
+        function checkForChecklistChanges() {
+            hasChecklistChanges = JSON.stringify(currentChecklistInfo) !== JSON.stringify(originalChecklistInfo);
+            updateSaveBar();
+        }
+
+        // Section Icons Functions
+        function openIconPicker(sectionId, sectionName, currentIcon) {
+            currentIconPickerSectionId = sectionId;
+            document.getElementById('iconPickerTitle').textContent = `Select Icon for "${sectionName}"`;
+            
+            // Highlight current icon
+            document.querySelectorAll('.icon-option').forEach(opt => {
+                opt.classList.remove('selected');
+                if (opt.textContent.trim() === currentIcon) {
+                    opt.classList.add('selected');
+                }
+            });
+            
+            document.getElementById('iconPickerModal').classList.add('active');
+        }
+
+        function closeIconPicker() {
+            document.getElementById('iconPickerModal').classList.remove('active');
+            currentIconPickerSectionId = null;
+        }
+
+        function selectIcon(icon) {
+            if (!currentIconPickerSectionId) return;
+            
+            // Update display
+            const display = document.getElementById(`iconDisplay-${currentIconPickerSectionId}`);
+            const card = document.getElementById(`iconCard-${currentIconPickerSectionId}`);
+            
+            if (display) {
+                display.textContent = icon;
+            }
+            if (card) {
+                card.classList.add('changed');
+            }
+            
+            // Store the change
+            currentSectionIcons[currentIconPickerSectionId] = icon;
+            checkForIconChanges();
+            
+            closeIconPicker();
+        }
+
+        function checkForIconChanges() {
+            hasIconChanges = JSON.stringify(currentSectionIcons) !== JSON.stringify(originalSectionIcons);
+            updateSaveBar();
+        }
+
+        function initializeSectionIcons(schema) {
+            originalSectionIcons = {};
+            currentSectionIcons = {};
+            (schema.sections || []).forEach(section => {
+                originalSectionIcons[section.SectionID] = section.SectionIcon || '📋';
+                currentSectionIcons[section.SectionID] = section.SectionIcon || '📋';
+            });
+        }
+
+        function markOverallChanged(input) {
+            const value = parseInt(input.value) || 0;
+            const isChanged = value !== originalValues.overallPassingGrade;
+            input.classList.toggle('changed', isChanged);
+            currentValues.overallPassingGrade = value;
+            checkForChanges();
+        }
+
+        function markSectionChanged(input, sectionId) {
+            const value = parseInt(input.value) || 0;
+            const isChanged = value !== originalValues.sections[sectionId];
+            input.classList.toggle('changed', isChanged);
+            currentValues.sections[sectionId] = value;
+            checkForChanges();
+        }
+
+        function updateOverallGrade(value) {
+            currentValues.overallPassingGrade = parseInt(value) || 0;
+            checkForChanges();
+        }
+
+        function updateSectionGrade(sectionId, value) {
+            currentValues.sections[sectionId] = parseInt(value) || 0;
+            checkForChanges();
+        }
+
+        function checkForChanges() {
+            let changeCount = 0;
+
+            if (currentValues.overallPassingGrade !== originalValues.overallPassingGrade) {
+                changeCount++;
+            }
+
+            for (const sectionId in currentValues.sections) {
+                if (currentValues.sections[sectionId] !== originalValues.sections[sectionId]) {
+                    changeCount++;
+                }
+            }
+
+            hasChanges = changeCount > 0;
+            updateSaveBar();
+        }
+
+        function updateSaveBar() {
+            const saveBar = document.getElementById('saveBar');
+            
+            let changeItems = [];
+            if (hasChanges) changeItems.push('grades');
+            if (hasIconChanges) changeItems.push('section icons');
+            if (hasChecklistChanges) changeItems.push('checklist info');
+            
+            let changeText = changeItems.length > 0 
+                ? `${changeItems.join(', ')} changed`
+                : '0 unsaved changes';
+            
+            document.getElementById('changesCount').textContent = changeText;
+            saveBar.classList.toggle('visible', hasChanges || hasChecklistChanges || hasIconChanges);
+        }
+
+        function discardChanges() {
+            const schema = schemas.find(s => s.SchemaID === currentSchemaId);
+            if (schema) {
+                currentValues = JSON.parse(JSON.stringify(originalValues));
+                currentChecklistInfo = { ...originalChecklistInfo };
+                currentSectionIcons = { ...originalSectionIcons };
+                hasChanges = false;
+                hasChecklistChanges = false;
+                hasIconChanges = false;
+                renderSettings(schema);
+                updateSaveBar();
+            }
+        }
+
+        async function saveChanges() {
+            try {
+                const schema = schemas.find(s => s.SchemaID === currentSchemaId);
+                let savedGrades = false;
+                let savedChecklist = false;
+                let savedIcons = false;
+
+                // Save grades if changed
+                if (hasChanges) {
+                    const settings = {
+                        overallPassingGrade: currentValues.overallPassingGrade,
+                        sections: Object.entries(currentValues.sections).map(([sectionId, passingGrade]) => {
+                            const section = (schema.sections || []).find(s => s.SectionID === parseInt(sectionId));
+                            return {
+                                sectionId: parseInt(sectionId),
+                                sectionName: section?.SectionName || '',
+                                passingGrade
+                            };
+                        })
+                    };
+
+                    const response = await fetch(`/ohs-inspection/api/schema/${currentSchemaId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(settings)
+                    });
+
+                    if (!response.ok) throw new Error('Failed to save grades');
+                    
+                    originalValues = JSON.parse(JSON.stringify(currentValues));
+                    schema.overallPassingGrade = currentValues.overallPassingGrade;
+                    (schema.sections || []).forEach(s => {
+                        s.PassingGrade = currentValues.sections[s.SectionID];
+                    });
+                    savedGrades = true;
+                }
+
+                // Save section icons if changed
+                if (hasIconChanges) {
+                    const iconUpdates = Object.entries(currentSectionIcons)
+                        .filter(([sectionId, icon]) => icon !== originalSectionIcons[sectionId])
+                        .map(([sectionId, icon]) => ({ sectionId: parseInt(sectionId), icon }));
+                    
+                    if (iconUpdates.length > 0) {
+                        const response = await fetch(`/ohs-inspection/api/section-icons/${currentSchemaId}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ icons: iconUpdates })
+                        });
+
+                        const result = await response.json();
+                        if (!response.ok || !result.success) {
+                            throw new Error(result.error || 'Failed to save section icons');
+                        }
+                        
+                        // Update schema sections with new icons
+                        (schema.sections || []).forEach(s => {
+                            if (currentSectionIcons[s.SectionID]) {
+                                s.SectionIcon = currentSectionIcons[s.SectionID];
+                            }
+                        });
+                        
+                        originalSectionIcons = { ...currentSectionIcons };
+                        savedIcons = true;
+                    }
+                }
+
+                // Save checklist info if changed
+                if (hasChecklistChanges) {
+                    const response = await fetch(`/ohs-inspection/api/schema-checklist-info/${currentSchemaId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(currentChecklistInfo)
+                    });
+
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.error || 'Failed to save checklist info');
+                    }
+                    
+                    originalChecklistInfo = { ...currentChecklistInfo };
+                    savedChecklist = true;
+                }
+
+                hasChanges = false;
+                hasChecklistChanges = false;
+                hasIconChanges = false;
+                updateSaveBar();
+
+                document.querySelectorAll('.changed').forEach(el => el.classList.remove('changed'));
+
+                let savedItems = [];
+                if (savedGrades) savedItems.push('grades');
+                if (savedIcons) savedItems.push('section icons');
+                if (savedChecklist) savedItems.push('checklist info');
+                
+                const message = savedItems.length > 0 
+                    ? `Saved: ${savedItems.join(', ')}!`
+                    : 'No changes to save';
+                
+                showToast(message, 'success');
+
             } catch (error) {
                 console.error('Error saving settings:', error);
-                alert('Error saving settings');
+                showToast('Failed to save: ' + error.message, 'error');
             }
         }
 
-        function resetDefaults() {
-            if (!confirm('Reset all settings to defaults?')) return;
-
-            document.getElementById('docPrefix').value = 'GMRL-OHS';
-            document.getElementById('startingNumber').value = 1;
-            document.getElementById('passThreshold').value = 80;
-            document.getElementById('warningThreshold').value = 60;
-            document.getElementById('emailNotifications').checked = true;
-            document.getElementById('notificationEmails').value = '';
-            document.getElementById('autoGenerateReport').checked = true;
-            document.getElementById('includePhotos').checked = true;
-
-            showToast('Settings reset to defaults');
-        }
-
-        function showToast(message) {
+        function showToast(message, type = 'success') {
             const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 3000);
-        }
+            const toastIcon = document.getElementById('toastIcon');
+            const toastMessage = document.getElementById('toastMessage');
 
-        loadSettings();
+            toastIcon.textContent = type === 'success' ? '✓' : '✗';
+            toastMessage.textContent = message;
+            toast.classList.toggle('error', type === 'error');
+            toast.classList.add('visible');
+
+            setTimeout(() => {
+                toast.classList.remove('visible');
+            }, 3000);
+        }
     </script>
 </body>
 </html>

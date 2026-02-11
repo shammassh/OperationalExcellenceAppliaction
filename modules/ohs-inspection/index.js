@@ -329,10 +329,11 @@ router.get('/api/templates/schemas', async (req, res) => {
                 t.Id as schemaId,
                 t.TemplateName as schemaName,
                 t.Description as description,
-                t.CreatedBy as createdBy,
+                ISNULL(u.DisplayName, 'Unknown') as createdBy,
                 t.CreatedAt as createdDate,
                 (SELECT COUNT(*) FROM OHS_InspectionTemplateSections ts WHERE ts.TemplateId = t.Id AND ts.IsActive = 1) as sectionCount
             FROM OHS_InspectionTemplates t
+            LEFT JOIN Users u ON t.CreatedBy = u.Id
             WHERE t.IsActive = 1
             ORDER BY t.TemplateName
         `);
@@ -1662,6 +1663,137 @@ router.get('/api/schemas', async (req, res) => {
     } catch (error) {
         console.error('Error fetching schemas:', error);
         res.json({ success: true, schemas: [] });
+    }
+});
+
+// Get schema checklist info
+router.get('/api/schema-checklist-info/:schemaId', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request()
+            .input('schemaId', sql.Int, req.params.schemaId)
+            .query(`
+                SELECT SettingKey, SettingValue 
+                FROM OHS_InspectionSettings 
+                WHERE SettingKey LIKE 'CHECKLIST_%_' + CAST(@schemaId AS VARCHAR)
+            `);
+        await pool.close();
+        
+        const info = {
+            creationDate: '',
+            revisionDate: '',
+            edition: '',
+            reportTitle: 'OHS Inspection Report',
+            documentPrefix: 'GMRL-OHS'
+        };
+        
+        result.recordset.forEach(row => {
+            const key = row.SettingKey.replace(/_\d+$/, '').replace('CHECKLIST_', '');
+            const camelKey = key.toLowerCase().replace(/_([a-z])/g, (m, c) => c.toUpperCase());
+            if (info.hasOwnProperty(camelKey)) {
+                info[camelKey] = row.SettingValue;
+            }
+        });
+        
+        res.json({ success: true, info });
+    } catch (error) {
+        console.error('Error fetching checklist info:', error);
+        res.json({ success: true, info: { creationDate: '', revisionDate: '', edition: '', reportTitle: 'OHS Inspection Report', documentPrefix: 'GMRL-OHS' } });
+    }
+});
+
+// Save schema checklist info
+router.post('/api/schema-checklist-info/:schemaId', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const schemaId = req.params.schemaId;
+        const info = req.body;
+        
+        for (const [key, value] of Object.entries(info)) {
+            const settingKey = 'CHECKLIST_' + key.replace(/([A-Z])/g, '_$1').toUpperCase() + '_' + schemaId;
+            await pool.request()
+                .input('key', sql.NVarChar, settingKey)
+                .input('value', sql.NVarChar, value || '')
+                .query(`
+                    IF EXISTS (SELECT 1 FROM OHS_InspectionSettings WHERE SettingKey = @key)
+                        UPDATE OHS_InspectionSettings SET SettingValue = @value, UpdatedAt = GETDATE() WHERE SettingKey = @key
+                    ELSE
+                        INSERT INTO OHS_InspectionSettings (SettingKey, SettingValue) VALUES (@key, @value)
+                `);
+        }
+        
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error saving checklist info:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Save schema settings (grades)
+router.post('/api/schema/:schemaId', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const schemaId = req.params.schemaId;
+        const { overallPassingGrade, sections } = req.body;
+        
+        // Save overall passing grade
+        await pool.request()
+            .input('key', sql.NVarChar, 'PASSING_SCORE_' + schemaId)
+            .input('value', sql.NVarChar, String(overallPassingGrade))
+            .query(`
+                IF EXISTS (SELECT 1 FROM OHS_InspectionSettings WHERE SettingKey = @key)
+                    UPDATE OHS_InspectionSettings SET SettingValue = @value, UpdatedAt = GETDATE() WHERE SettingKey = @key
+                ELSE
+                    INSERT INTO OHS_InspectionSettings (SettingKey, SettingValue) VALUES (@key, @value)
+            `);
+        
+        // Save section grades
+        if (sections && Array.isArray(sections)) {
+            for (const sg of sections) {
+                await pool.request()
+                    .input('sectionId', sql.Int, sg.sectionId)
+                    .input('grade', sql.Int, sg.passingGrade)
+                    .query(`
+                        UPDATE OHS_InspectionTemplateSections 
+                        SET PassingGrade = @grade 
+                        WHERE Id = @sectionId
+                    `);
+            }
+        }
+        
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error saving schema settings:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Save section icons
+router.post('/api/section-icons/:schemaId', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const { icons } = req.body;
+        
+        if (icons && Array.isArray(icons)) {
+            for (const icon of icons) {
+                await pool.request()
+                    .input('sectionId', sql.Int, icon.sectionId)
+                    .input('icon', sql.NVarChar, icon.icon)
+                    .query(`
+                        UPDATE OHS_InspectionTemplateSections 
+                        SET SectionIcon = @icon 
+                        WHERE Id = @sectionId
+                    `);
+            }
+        }
+        
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error saving section icons:', error);
+        res.json({ success: false, error: error.message });
     }
 });
 

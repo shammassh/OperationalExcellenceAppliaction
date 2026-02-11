@@ -403,10 +403,11 @@ router.get('/api/templates/schemas', async (req, res) => {
                 t.Id as schemaId,
                 t.TemplateName as schemaName,
                 t.Description as description,
-                t.CreatedBy as createdBy,
+                ISNULL(u.DisplayName, 'Unknown') as createdBy,
                 t.CreatedAt as createdDate,
                 (SELECT COUNT(*) FROM OE_InspectionTemplateSections ts WHERE ts.TemplateId = t.Id AND ts.IsActive = 1) as sectionCount
             FROM OE_InspectionTemplates t
+            LEFT JOIN Users u ON t.CreatedBy = u.Id
             WHERE t.IsActive = 1
             ORDER BY t.TemplateName
         `);
