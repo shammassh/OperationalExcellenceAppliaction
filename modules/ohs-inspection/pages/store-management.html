@@ -3,90 +3,142 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OHS Inspection - Store Management</title>
+    <title>Store Management - OHS Inspection System</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
             min-height: 100vh;
-            color: #1e293b;
         }
 
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
         .header {
-            background: rgba(255, 255, 255, 0.95);
-            border-bottom: 1px solid rgba(225, 112, 85, 0.3);
-            padding: 1rem 2rem;
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            background: white;
+            border-radius: 15px;
+            padding: 25px 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
 
-        .header-left { display: flex; align-items: center; gap: 1rem; }
+        .header h1 {
+            font-size: 28px;
+            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
 
         .back-btn {
-            background: linear-gradient(135deg, #475569 0%, #334155 100%);
+            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
             color: white;
             border: none;
-            padding: 0.5rem 1rem;
+            padding: 12px 24px;
             border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.3s ease;
             text-decoration: none;
-        }
-
-        .header-title {
-            font-size: 1.5rem;
             font-weight: 600;
-            background: linear-gradient(135deg, #e17055, #d63031);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            cursor: pointer;
         }
 
-        .main-container { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; }
-
-        .toolbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
+        .back-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(225, 112, 85, 0.4);
         }
 
-        .search-box {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+        /* Main Content */
+        .main-content {
             background: white;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
-            width: 300px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+            padding: 30px;
         }
 
-        .search-input {
-            border: none;
+        /* Form Section */
+        .form-section {
+            background: linear-gradient(135deg, #ffeee9 0%, #ffd9d1 100%);
+            border: 2px dashed #e17055;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .form-section h3 {
+            color: #d63031;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
             outline: none;
-            flex: 1;
-            font-size: 0.95rem;
+            border-color: #e17055;
+            box-shadow: 0 0 0 3px rgba(225, 112, 85, 0.2);
         }
 
+        .required {
+            color: #ef4444;
+        }
+
+        /* Buttons */
         .btn {
-            padding: 0.75rem 1.5rem;
+            padding: 12px 24px;
             border: none;
             border-radius: 8px;
-            font-size: 0.95rem;
+            font-size: 14px;
             font-weight: 600;
             cursor: pointer;
-            display: flex;
+            transition: all 0.3s;
+            display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            transition: all 0.3s ease;
+            gap: 8px;
         }
 
         .btn-primary {
@@ -96,387 +148,912 @@
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(225, 112, 85, 0.4);
+            box-shadow: 0 5px 20px rgba(225, 112, 85, 0.4);
         }
 
-        .btn-secondary { background: #f1f5f9; color: #475569; }
-        .btn-danger { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; }
-        .btn-sm { padding: 0.5rem 0.75rem; font-size: 0.85rem; }
+        .btn-success {
+            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+            color: white;
+        }
 
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+
+        /* Table */
         .stores-table {
-            background: white;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            border: 1px solid rgba(225, 112, 85, 0.2);
-        }
-
-        table {
             width: 100%;
             border-collapse: collapse;
+            margin-top: 20px;
         }
 
-        th, td {
-            padding: 1rem;
+        .stores-table th,
+        .stores-table td {
+            padding: 15px;
             text-align: left;
-            border-bottom: 1px solid #f1f5f9;
+            border-bottom: 1px solid #e0e0e0;
         }
 
-        th {
-            background: rgba(225, 112, 85, 0.1);
+        .stores-table th {
+            background: #f8f9fa;
             font-weight: 600;
-            color: #475569;
-            font-size: 0.9rem;
+            color: #555;
+            font-size: 13px;
+            text-transform: uppercase;
         }
 
-        tr:hover { background: rgba(225, 112, 85, 0.05); }
+        .stores-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .template-badge {
+            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
 
         .status-active {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            color: white;
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
+            background: #d1fae5;
+            color: #059669;
         }
 
         .status-inactive {
-            background: #94a3b8;
-            color: white;
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
+            background: #fee2e2;
+            color: #dc2626;
         }
 
-        .action-btns { display: flex; gap: 0.5rem; }
-
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            display: none;
-            justify-content: center;
+        /* Manager badges */
+        .manager-badge {
+            display: inline-flex;
             align-items: center;
-            z-index: 1000;
+            gap: 5px;
+            background: #e0f2fe;
+            color: #0369a1;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 11px;
+            margin: 2px;
         }
 
-        .modal-overlay.show { display: flex; }
-
-        .modal {
-            background: white;
-            padding: 2rem;
-            border-radius: 16px;
-            width: 500px;
-            max-width: 90%;
+        .manager-badge.primary {
+            background: #ffeee9;
+            color: #d63031;
         }
 
-        .modal-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-bottom: 1.5rem;
-            color: #1e293b;
+        .managers-cell {
+            max-width: 300px;
         }
 
-        .form-group { margin-bottom: 1rem; }
-        .form-label { display: block; font-size: 0.9rem; color: #64748b; margin-bottom: 0.5rem; }
-
-        .form-input, .form-select {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            font-size: 0.95rem;
-        }
-
-        .form-input:focus, .form-select:focus {
-            outline: none;
-            border-color: #e17055;
-        }
-
-        .modal-actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem; }
-
-        .empty-state {
-            text-align: center;
-            padding: 4rem;
-            color: #64748b;
-        }
-
-        .empty-icon { font-size: 4rem; margin-bottom: 1rem; }
-
-        .toast {
-            position: fixed;
-            bottom: 2rem;
-            right: 2rem;
-            background: #10b981;
+        .assign-btn {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
             color: white;
-            padding: 1rem 2rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-            transform: translateY(100px);
-            opacity: 0;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
             transition: all 0.3s;
         }
 
-        .toast.show { transform: translateY(0); opacity: 1; }
+        .assign-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(59, 130, 246, 0.3);
+        }
+
+        /* Multi-select dropdown */
+        .multi-select-container {
+            position: relative;
+        }
+
+        .multi-select-dropdown {
+            width: 100%;
+            min-height: 44px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 8px;
+            cursor: pointer;
+            background: white;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .multi-select-dropdown:focus-within {
+            border-color: #e17055;
+            box-shadow: 0 0 0 3px rgba(225, 112, 85, 0.2);
+        }
+
+        .multi-select-options {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+        }
+
+        .multi-select-options.show {
+            display: block;
+        }
+
+        .multi-select-option {
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .multi-select-option:hover {
+            background: #f8f9fa;
+        }
+
+        .multi-select-option.selected {
+            background: #ffeee9;
+        }
+
+        .multi-select-option input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+        }
+
+        .selected-tag {
+            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .selected-tag .remove {
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .placeholder-text {
+            color: #999;
+            font-size: 14px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .empty-state h3 {
+            font-size: 20px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #e17055;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            display: none;
+            align-items: center;
+            gap: 10px;
+            z-index: 1000;
+            animation: slideIn 0.3s;
+        }
+
+        .toast.show {
+            display: flex;
+        }
+
+        .toast.success {
+            border-left: 4px solid #e17055;
+        }
+
+        .toast.error {
+            border-left: 4px solid #ef4444;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .modal-header h3 {
+            font-size: 22px;
+            color: #333;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #666;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 5px;
+        }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="header-left">
-            <a href="/ohs-inspection" class="back-btn">← Back</a>
-            <span class="header-title">🏪 Store Management</span>
-        </div>
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+        <span id="toastMessage"></span>
     </div>
 
-    <div class="main-container">
-        <div class="toolbar">
-            <div class="search-box">
-                <span>🔍</span>
-                <input type="text" class="search-input" id="searchInput" placeholder="Search stores..." oninput="filterStores()">
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🏪 Store Management</h1>
+            <a href="/ohs-inspection" class="back-btn">← Back to Dashboard</a>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Create Store Form -->
+            <div class="form-section">
+                <h3>➕ Add New Store</h3>
+                <form id="createStoreForm" onsubmit="createStore(event)">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Store Code <span class="required">*</span></label>
+                            <input type="text" id="storeCode" placeholder="e.g., THS-001" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Store Name <span class="required">*</span></label>
+                            <input type="text" id="storeName" placeholder="e.g., Store Name - Location" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Location</label>
+                            <input type="text" id="storeLocation" placeholder="e.g., Downtown Mall, Floor 2">
+                        </div>
+                        <div class="form-group">
+                            <label>Inspection Template <span class="required">*</span></label>
+                            <select id="storeTemplate" required>
+                                <option value="">Select a template...</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="justify-content: flex-end;">
+                            <button type="submit" class="btn btn-primary">➕ Add Store</button>
+                        </div>
+                    </div>
+                </form>
             </div>
-            <button class="btn btn-primary" onclick="openAddModal()">+ Add Store</button>
-        </div>
 
-        <div class="stores-table">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Store Name</th>
-                        <th>Code</th>
-                        <th>Location</th>
-                        <th>Manager</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="storesTableBody">
-                    <tr>
-                        <td colspan="6" class="empty-state">
-                            <div class="empty-icon">🏪</div>
-                            <p>Loading stores...</p>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <!-- Stores List -->
+            <h3 style="margin-bottom: 20px;">📋 Registered Stores</h3>
+            <div id="storesList">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading stores...
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="modal-overlay" id="storeModal">
+    <!-- Edit Store Modal -->
+    <div id="editStoreModal" class="modal-overlay">
         <div class="modal">
-            <h3 class="modal-title" id="modalTitle">Add Store</h3>
-            <input type="hidden" id="storeId">
-
-            <div class="form-group">
-                <label class="form-label">Store Name *</label>
-                <input type="text" class="form-input" id="storeName" placeholder="Enter store name">
+            <div class="modal-header">
+                <h3>✏️ Edit Store</h3>
+                <button class="modal-close" onclick="closeEditModal()">&times;</button>
             </div>
-
-            <div class="form-group">
-                <label class="form-label">Store Code</label>
-                <input type="text" class="form-input" id="storeCode" placeholder="e.g., STR-001">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Location</label>
-                <input type="text" class="form-input" id="storeLocation" placeholder="Address or location">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Manager</label>
-                <input type="text" class="form-input" id="storeManager" placeholder="Manager name">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Status</label>
-                <select class="form-select" id="storeStatus">
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                </select>
-            </div>
-
-            <div class="modal-actions">
-                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="saveStore()">Save</button>
-            </div>
+            <form id="editStoreForm" onsubmit="saveStoreEdit(event)">
+                <input type="hidden" id="editStoreId">
+                <div class="form-group">
+                    <label>Store Code <span class="required">*</span></label>
+                    <input type="text" id="editStoreCode" required>
+                </div>
+                <div class="form-group">
+                    <label>Store Name <span class="required">*</span></label>
+                    <input type="text" id="editStoreName" required>
+                </div>
+                <div class="form-group">
+                    <label>Location</label>
+                    <input type="text" id="editStoreLocation">
+                </div>
+                <div class="form-group">
+                    <label>Inspection Template <span class="required">*</span></label>
+                    <select id="editStoreTemplate" required>
+                        <option value="">Select a template...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="editStoreActive">
+                        <option value="true">Active</option>
+                        <option value="false">Inactive</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Store Managers (max 2)</label>
+                    <div class="multi-select-container">
+                        <div class="multi-select-dropdown" id="editManagersDropdown" onclick="toggleManagersDropdown()">
+                            <span class="placeholder-text">Click to select managers...</span>
+                        </div>
+                        <div class="multi-select-options" id="editManagersOptions"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeEditModal()" style="background: #6b7280; color: white;">Cancel</button>
+                    <button type="submit" class="btn btn-success">💾 Save Changes</button>
+                </div>
+            </form>
         </div>
     </div>
 
-    <div class="toast" id="toast"></div>
+    <!-- Assign Managers Modal -->
+    <div id="assignManagersModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>👥 Assign Store Managers</h3>
+                <button class="modal-close" onclick="closeAssignModal()">&times;</button>
+            </div>
+            <div id="assignManagersContent">
+                <input type="hidden" id="assignStoreId">
+                <p id="assignStoreName" style="font-weight: 600; margin-bottom: 15px;"></p>
+                <div class="form-group">
+                    <label>Select Store Managers (max 2)</label>
+                    <div class="multi-select-container">
+                        <div class="multi-select-dropdown" id="assignManagersDropdown" onclick="toggleAssignDropdown()">
+                            <span class="placeholder-text">Click to select managers...</span>
+                        </div>
+                        <div class="multi-select-options" id="assignManagersOptions"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeAssignModal()" style="background: #6b7280; color: white;">Cancel</button>
+                    <button type="button" class="btn btn-success" onclick="saveManagerAssignments()">💾 Save Assignments</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
+        const API_BASE = '/ohs-inspection/api/stores';
         let stores = [];
-        let filteredStores = [];
+        let templates = [];
+        let availableManagers = [];
+        let managerAssignments = {};
+        let selectedEditManagers = [];
+        let selectedAssignManagers = [];
 
-        async function loadStores() {
-            try {
-                const response = await fetch('/ohs-inspection/api/stores');
-                const result = await response.json();
-                if (result.success) {
-                    stores = result.data || [];
-                    filteredStores = [...stores];
-                    renderStores();
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTemplates();
+            loadAvailableManagers();
+            loadStores();
+            
+            // Close dropdowns when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.multi-select-container')) {
+                    document.querySelectorAll('.multi-select-options').forEach(el => el.classList.remove('show'));
                 }
+            });
+        });
+
+        // Load available managers (users with Store Manager role)
+        async function loadAvailableManagers() {
+            try {
+                const response = await fetch(`${API_BASE}/available-managers`);
+                const result = await response.json();
+                availableManagers = result.data || [];
             } catch (error) {
-                console.error('Error loading stores:', error);
-                document.getElementById('storesTableBody').innerHTML = `
-                    <tr>
-                        <td colspan="6" class="empty-state">
-                            <div class="empty-icon">❌</div>
-                            <p>Error loading stores</p>
-                        </td>
-                    </tr>
-                `;
+                console.error('Error loading available managers:', error);
             }
         }
 
-        function renderStores() {
-            const tbody = document.getElementById('storesTableBody');
-
-            if (filteredStores.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="6" class="empty-state">
-                            <div class="empty-icon">🏪</div>
-                            <p>No stores found. Add your first store!</p>
-                        </td>
-                    </tr>
-                `;
-                return;
+        // Load manager assignments
+        async function loadManagerAssignments() {
+            try {
+                const response = await fetch(`${API_BASE}/manager-assignments`);
+                const result = await response.json();
+                managerAssignments = result.data || {};
+            } catch (error) {
+                console.error('Error loading manager assignments:', error);
             }
+        }
 
-            tbody.innerHTML = filteredStores.map(store => `
-                <tr>
-                    <td><strong>${store.name}</strong></td>
-                    <td>${store.code || '-'}</td>
-                    <td>${store.location || '-'}</td>
-                    <td>${store.manager || '-'}</td>
-                    <td>
-                        <span class="${store.status === 'Active' ? 'status-active' : 'status-inactive'}">
-                            ${store.status || 'Active'}
-                        </span>
-                    </td>
-                    <td>
-                        <div class="action-btns">
-                            <button class="btn btn-secondary btn-sm" onclick="editStore(${store.id})">✏️ Edit</button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteStore(${store.id})">🗑️</button>
+        // Toast notification
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            toastMessage.textContent = message;
+            toast.className = `toast ${type} show`;
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Load templates for dropdowns
+        async function loadTemplates() {
+            try {
+                const response = await fetch('/ohs-inspection/api/templates/schemas');
+                const result = await response.json();
+                templates = result.data || [];
+
+                const select = document.getElementById('storeTemplate');
+                const editSelect = document.getElementById('editStoreTemplate');
+
+                templates.forEach(template => {
+                    const option = `<option value="${template.schemaId}">${template.schemaName}</option>`;
+                    select.innerHTML += option;
+                    editSelect.innerHTML += option;
+                });
+            } catch (error) {
+                console.error('Error loading templates:', error);
+            }
+        }
+
+        // Load stores
+        async function loadStores() {
+            const container = document.getElementById('storesList');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading stores...</div>';
+
+            try {
+                // Load stores and manager assignments in parallel
+                const [storesResponse, assignmentsResponse] = await Promise.all([
+                    fetch(API_BASE),
+                    fetch(`${API_BASE}/manager-assignments`)
+                ]);
+                
+                const storesResult = await storesResponse.json();
+                const assignmentsResult = await assignmentsResponse.json();
+                
+                stores = storesResult.data || [];
+                managerAssignments = assignmentsResult.data || {};
+
+                if (stores.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🏪</div>
+                            <h3>No stores yet</h3>
+                            <p>Add your first store above</p>
                         </div>
-                    </td>
-                </tr>
-            `).join('');
-        }
+                    `;
+                    return;
+                }
 
-        function filterStores() {
-            const query = document.getElementById('searchInput').value.toLowerCase();
-            filteredStores = stores.filter(s => 
-                s.name.toLowerCase().includes(query) ||
-                (s.code && s.code.toLowerCase().includes(query)) ||
-                (s.location && s.location.toLowerCase().includes(query))
-            );
-            renderStores();
-        }
-
-        function openAddModal() {
-            document.getElementById('modalTitle').textContent = 'Add Store';
-            document.getElementById('storeId').value = '';
-            document.getElementById('storeName').value = '';
-            document.getElementById('storeCode').value = '';
-            document.getElementById('storeLocation').value = '';
-            document.getElementById('storeManager').value = '';
-            document.getElementById('storeStatus').value = 'Active';
-            document.getElementById('storeModal').classList.add('show');
-        }
-
-        function editStore(id) {
-            const store = stores.find(s => s.id === id);
-            if (!store) return;
-
-            document.getElementById('modalTitle').textContent = 'Edit Store';
-            document.getElementById('storeId').value = store.id;
-            document.getElementById('storeName').value = store.name;
-            document.getElementById('storeCode').value = store.code || '';
-            document.getElementById('storeLocation').value = store.location || '';
-            document.getElementById('storeManager').value = store.manager || '';
-            document.getElementById('storeStatus').value = store.status || 'Active';
-            document.getElementById('storeModal').classList.add('show');
-        }
-
-        function closeModal() {
-            document.getElementById('storeModal').classList.remove('show');
-        }
-
-        async function saveStore() {
-            const id = document.getElementById('storeId').value;
-            const name = document.getElementById('storeName').value.trim();
-
-            if (!name) {
-                alert('Please enter a store name');
-                return;
+                container.innerHTML = `
+                    <table class="stores-table">
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Store Name</th>
+                                <th>Location</th>
+                                <th>Template</th>
+                                <th>Store Managers</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${stores.map(store => {
+                                const managers = managerAssignments[store.storeId] || [];
+                                return `
+                                <tr>
+                                    <td><strong>${store.storeCode || '-'}</strong></td>
+                                    <td>${store.storeName}</td>
+                                    <td>${store.location || '-'}</td>
+                                    <td><span class="template-badge">${store.templateName || 'Not set'}</span></td>
+                                    <td class="managers-cell">
+                                        ${managers.length > 0 ? managers.map(m => `
+                                            <span class="manager-badge ${m.isPrimary ? 'primary' : ''}">
+                                                ${m.displayName || m.email}
+                                                ${m.isPrimary ? '⭐' : ''}
+                                            </span>
+                                        `).join('') : '<span style="color: #999;">Not assigned</span>'}
+                                        <br style="margin-bottom: 5px;">
+                                        <button class="assign-btn" onclick="openAssignModal(${store.storeId})">👥 Assign</button>
+                                    </td>
+                                    <td>
+                                        <span class="status-badge ${store.isActive ? 'status-active' : 'status-inactive'}">
+                                            ${store.isActive ? '✅ Active' : '❌ Inactive'}
+                                        </span>
+                                    </td>
+                                    <td class="action-btns">
+                                        <button class="btn btn-warning btn-sm" onclick="editStore(${store.storeId})" title="Edit">✏️</button>
+                                        <button class="btn btn-danger btn-sm" onclick="deleteStore(${store.storeId})" title="Delete">🗑️</button>
+                                    </td>
+                                </tr>
+                            `}).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                container.innerHTML = `<div class="empty-state"><p>Error loading stores: ${error.message}</p></div>`;
             }
+        }
+
+        // Create store
+        async function createStore(e) {
+            e.preventDefault();
 
             const storeData = {
-                name,
-                code: document.getElementById('storeCode').value.trim(),
-                location: document.getElementById('storeLocation').value.trim(),
-                manager: document.getElementById('storeManager').value.trim(),
-                status: document.getElementById('storeStatus').value
+                storeCode: document.getElementById('storeCode').value,
+                storeName: document.getElementById('storeName').value,
+                location: document.getElementById('storeLocation').value,
+                templateId: parseInt(document.getElementById('storeTemplate').value)
             };
 
             try {
-                const url = id ? `/ohs-inspection/api/stores/${id}` : '/ohs-inspection/api/stores';
-                const method = id ? 'PUT' : 'POST';
-
-                const response = await fetch(url, {
-                    method,
+                const response = await fetch(API_BASE, {
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(storeData)
                 });
 
-                const result = await response.json();
-                if (result.success) {
-                    closeModal();
-                    showToast(id ? 'Store updated!' : 'Store added!');
-                    loadStores();
-                } else {
-                    alert('Error: ' + result.error);
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to create store');
                 }
+
+                showToast('Store created successfully!', 'success');
+                document.getElementById('createStoreForm').reset();
+                loadStores();
             } catch (error) {
-                console.error('Error saving store:', error);
-                alert('Error saving store');
+                showToast('Error: ' + error.message, 'error');
             }
         }
 
-        async function deleteStore(id) {
+        // Edit store
+        function editStore(storeId) {
+            const store = stores.find(s => s.storeId === storeId);
+            if (!store) {
+                showToast('Store not found', 'error');
+                return;
+            }
+
+            document.getElementById('editStoreId').value = storeId;
+            document.getElementById('editStoreCode').value = store.storeCode || '';
+            document.getElementById('editStoreName').value = store.storeName;
+            document.getElementById('editStoreLocation').value = store.location || '';
+            document.getElementById('editStoreTemplate').value = store.templateId || '';
+            document.getElementById('editStoreActive').value = store.isActive ? 'true' : 'false';
+
+            // Load current managers for this store
+            selectedEditManagers = (managerAssignments[storeId] || []).map(m => m.userId);
+            renderEditManagersDropdown();
+
+            document.getElementById('editStoreModal').classList.add('active');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editStoreModal').classList.remove('active');
+            selectedEditManagers = [];
+        }
+
+        // Render managers dropdown in edit modal
+        function renderEditManagersDropdown() {
+            const dropdown = document.getElementById('editManagersDropdown');
+            const options = document.getElementById('editManagersOptions');
+            
+            // Render selected tags
+            if (selectedEditManagers.length === 0) {
+                dropdown.innerHTML = '<span class="placeholder-text">Click to select managers...</span>';
+            } else {
+                dropdown.innerHTML = selectedEditManagers.map(userId => {
+                    const manager = availableManagers.find(m => m.userId === userId);
+                    return `<span class="selected-tag">${manager?.displayName || manager?.email || userId} <span class="remove" onclick="event.stopPropagation(); removeEditManager(${userId})">×</span></span>`;
+                }).join('');
+            }
+            
+            // Render options
+            options.innerHTML = availableManagers.map(m => `
+                <div class="multi-select-option ${selectedEditManagers.includes(m.userId) ? 'selected' : ''}" 
+                     onclick="event.stopPropagation(); toggleEditManager(${m.userId})">
+                    <input type="checkbox" ${selectedEditManagers.includes(m.userId) ? 'checked' : ''} onclick="event.stopPropagation();">
+                    <span>${m.displayName || m.email} <small style="color: #999;">(${m.role})</small></span>
+                </div>
+            `).join('');
+        }
+
+        function toggleManagersDropdown() {
+            document.getElementById('editManagersOptions').classList.toggle('show');
+        }
+
+        function toggleEditManager(userId) {
+            const index = selectedEditManagers.indexOf(userId);
+            if (index > -1) {
+                selectedEditManagers.splice(index, 1);
+            } else if (selectedEditManagers.length < 2) {
+                selectedEditManagers.push(userId);
+            } else {
+                showToast('Maximum 2 managers allowed', 'error');
+                return;
+            }
+            renderEditManagersDropdown();
+        }
+
+        function removeEditManager(userId) {
+            selectedEditManagers = selectedEditManagers.filter(id => id !== userId);
+            renderEditManagersDropdown();
+        }
+
+        // Assign Managers Modal
+        function openAssignModal(storeId) {
+            const store = stores.find(s => s.storeId === storeId);
+            if (!store) {
+                showToast('Store not found', 'error');
+                return;
+            }
+
+            document.getElementById('assignStoreId').value = storeId;
+            document.getElementById('assignStoreName').textContent = `Store: ${store.storeName}`;
+            
+            // Load current managers
+            selectedAssignManagers = (managerAssignments[storeId] || []).map(m => m.userId);
+            renderAssignManagersDropdown();
+
+            document.getElementById('assignManagersModal').classList.add('active');
+        }
+
+        function closeAssignModal() {
+            document.getElementById('assignManagersModal').classList.remove('active');
+            selectedAssignManagers = [];
+        }
+
+        function renderAssignManagersDropdown() {
+            const dropdown = document.getElementById('assignManagersDropdown');
+            const options = document.getElementById('assignManagersOptions');
+            
+            if (selectedAssignManagers.length === 0) {
+                dropdown.innerHTML = '<span class="placeholder-text">Click to select managers...</span>';
+            } else {
+                dropdown.innerHTML = selectedAssignManagers.map(userId => {
+                    const manager = availableManagers.find(m => m.userId === userId);
+                    return `<span class="selected-tag">${manager?.displayName || manager?.email || userId} <span class="remove" onclick="event.stopPropagation(); removeAssignManager(${userId})">×</span></span>`;
+                }).join('');
+            }
+            
+            options.innerHTML = availableManagers.map(m => `
+                <div class="multi-select-option ${selectedAssignManagers.includes(m.userId) ? 'selected' : ''}" 
+                     onclick="event.stopPropagation(); toggleAssignManager(${m.userId})">
+                    <input type="checkbox" ${selectedAssignManagers.includes(m.userId) ? 'checked' : ''} onclick="event.stopPropagation();">
+                    <span>${m.displayName || m.email} <small style="color: #999;">(${m.role})</small></span>
+                </div>
+            `).join('');
+        }
+
+        function toggleAssignDropdown() {
+            document.getElementById('assignManagersOptions').classList.toggle('show');
+        }
+
+        function toggleAssignManager(userId) {
+            const index = selectedAssignManagers.indexOf(userId);
+            if (index > -1) {
+                selectedAssignManagers.splice(index, 1);
+            } else if (selectedAssignManagers.length < 2) {
+                selectedAssignManagers.push(userId);
+            } else {
+                showToast('Maximum 2 managers allowed', 'error');
+                return;
+            }
+            renderAssignManagersDropdown();
+        }
+
+        function removeAssignManager(userId) {
+            selectedAssignManagers = selectedAssignManagers.filter(id => id !== userId);
+            renderAssignManagersDropdown();
+        }
+
+        async function saveManagerAssignments() {
+            const storeId = document.getElementById('assignStoreId').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/${storeId}/managers`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userIds: selectedAssignManagers })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to assign managers');
+                }
+
+                showToast('Store managers assigned successfully!', 'success');
+                closeAssignModal();
+                loadStores();
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error');
+            }
+        }
+
+        // Save store edit
+        async function saveStoreEdit(e) {
+            e.preventDefault();
+
+            const storeId = document.getElementById('editStoreId').value;
+            const storeData = {
+                storeCode: document.getElementById('editStoreCode').value,
+                storeName: document.getElementById('editStoreName').value,
+                location: document.getElementById('editStoreLocation').value,
+                templateId: parseInt(document.getElementById('editStoreTemplate').value) || null,
+                isActive: document.getElementById('editStoreActive').value === 'true'
+            };
+
+            try {
+                // Update store details
+                const response = await fetch(`${API_BASE}/${storeId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(storeData)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to update store');
+                }
+
+                // Update manager assignments
+                const managersResponse = await fetch(`${API_BASE}/${storeId}/managers`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userIds: selectedEditManagers })
+                });
+
+                if (!managersResponse.ok) {
+                    console.warn('Manager assignment failed, but store was updated');
+                }
+
+                showToast('Store updated successfully!', 'success');
+                closeEditModal();
+                loadStores();
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error');
+            }
+        }
+
+        // Delete store
+        async function deleteStore(storeId) {
             if (!confirm('Are you sure you want to delete this store?')) return;
 
             try {
-                const response = await fetch(`/ohs-inspection/api/stores/${id}`, {
+                const response = await fetch(`${API_BASE}/${storeId}`, {
                     method: 'DELETE'
                 });
 
-                const result = await response.json();
-                if (result.success) {
-                    showToast('Store deleted');
-                    loadStores();
-                } else {
-                    alert('Error: ' + result.error);
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to delete store');
                 }
+
+                showToast('Store deleted successfully!', 'success');
+                loadStores();
             } catch (error) {
-                console.error('Error deleting store:', error);
+                showToast('Error: ' + error.message, 'error');
             }
         }
 
-        function showToast(message) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 3000);
-        }
+        // Close modal on outside click
+        document.getElementById('editStoreModal')?.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeEditModal();
+            }
+        });
 
-        loadStores();
+        document.getElementById('assignManagersModal')?.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeAssignModal();
+            }
+        });
     </script>
 </body>
 </html>

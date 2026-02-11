@@ -22,6 +22,14 @@ const dbConfig = {
     }
 };
 
+// Middleware to prevent caching on API routes
+router.use('/api', (req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    next();
+});
+
 // ==========================================
 // Page Routes
 // ==========================================
@@ -265,6 +273,9 @@ router.get('/template-builder', (req, res) => {
 
 // Store Management Page
 router.get('/store-management', (req, res) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.sendFile(path.join(__dirname, 'pages', 'store-management.html'));
 });
 

@@ -22,6 +22,14 @@ const dbConfig = {
     }
 };
 
+// Middleware to prevent caching on API routes
+router.use('/api', (req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    next();
+});
+
 // ==========================================
 // Page Routes
 // ==========================================
@@ -265,6 +273,9 @@ router.get('/template-builder', (req, res) => {
 
 // Store Management Page
 router.get('/store-management', (req, res) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.sendFile(path.join(__dirname, 'pages', 'store-management.html'));
 });
 
@@ -698,6 +709,162 @@ router.get('/api/stores', async (req, res) => {
         res.json({ success: true, data: result.recordset });
     } catch (error) {
         console.error('Error fetching stores:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Create store
+router.post('/api/stores', async (req, res) => {
+    try {
+        const { storeCode, storeName, location, templateId } = req.body;
+        const pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('storeCode', sql.NVarChar, storeCode)
+            .input('storeName', sql.NVarChar, storeName)
+            .input('location', sql.NVarChar, location || null)
+            .input('templateId', sql.Int, templateId || null)
+            .query(`
+                INSERT INTO Stores (StoreCode, StoreName, Location, TemplateId, IsActive, CreatedDate, CreatedBy)
+                VALUES (@storeCode, @storeName, @location, @templateId, 1, GETDATE(), 'System')
+            `);
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error creating store:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Update store
+router.put('/api/stores/:storeId', async (req, res) => {
+    try {
+        const { storeCode, storeName, location, templateId, isActive } = req.body;
+        const storeId = parseInt(req.params.storeId);
+        const pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('storeId', sql.Int, storeId)
+            .input('storeCode', sql.NVarChar, storeCode)
+            .input('storeName', sql.NVarChar, storeName)
+            .input('location', sql.NVarChar, location || null)
+            .input('templateId', sql.Int, templateId || null)
+            .input('isActive', sql.Bit, isActive)
+            .query(`
+                UPDATE Stores 
+                SET StoreCode = @storeCode, StoreName = @storeName, Location = @location, 
+                    TemplateId = @templateId, IsActive = @isActive
+                WHERE Id = @storeId
+            `);
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating store:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Delete store
+router.delete('/api/stores/:storeId', async (req, res) => {
+    try {
+        const storeId = parseInt(req.params.storeId);
+        const pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('storeId', sql.Int, storeId)
+            .query('DELETE FROM Stores WHERE Id = @storeId');
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting store:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Get available managers (users with Store Manager role)
+router.get('/api/stores/available-managers', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request().query(`
+            SELECT DISTINCT u.Id as userId, u.Email as email, u.DisplayName as displayName, r.RoleName as role
+            FROM Users u
+            JOIN UserRoles ur ON u.Id = ur.UserId
+            JOIN Roles r ON ur.RoleId = r.Id
+            WHERE r.RoleName IN ('Store Manager', 'System Administrator', 'Senior Inspector')
+            ORDER BY u.DisplayName
+        `);
+        await pool.close();
+        res.json({ success: true, data: result.recordset });
+    } catch (error) {
+        console.error('Error fetching available managers:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Get manager assignments (grouped by store)
+router.get('/api/stores/manager-assignments', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request().query(`
+            SELECT 
+                sma.StoreId as storeId,
+                sma.UserId as userId,
+                sma.IsPrimary as isPrimary,
+                u.Email as email,
+                u.DisplayName as displayName
+            FROM StoreManagerAssignments sma
+            JOIN Users u ON sma.UserId = u.Id
+            ORDER BY sma.StoreId, sma.IsPrimary DESC
+        `);
+        await pool.close();
+        
+        // Group by storeId
+        const assignments = {};
+        result.recordset.forEach(row => {
+            if (!assignments[row.storeId]) {
+                assignments[row.storeId] = [];
+            }
+            assignments[row.storeId].push({
+                userId: row.userId,
+                email: row.email,
+                displayName: row.displayName,
+                isPrimary: row.isPrimary
+            });
+        });
+        
+        res.json({ success: true, data: assignments });
+    } catch (error) {
+        console.error('Error fetching manager assignments:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Assign managers to store
+router.post('/api/stores/:storeId/managers', async (req, res) => {
+    try {
+        const { userIds } = req.body;
+        const storeId = parseInt(req.params.storeId);
+        const pool = await sql.connect(dbConfig);
+        
+        // Delete existing assignments
+        await pool.request()
+            .input('storeId', sql.Int, storeId)
+            .query('DELETE FROM StoreManagerAssignments WHERE StoreId = @storeId');
+        
+        // Insert new assignments
+        for (let i = 0; i < userIds.length; i++) {
+            await pool.request()
+                .input('storeId', sql.Int, storeId)
+                .input('userId', sql.Int, userIds[i])
+                .input('isPrimary', sql.Bit, i === 0)
+                .input('assignedBy', sql.Int, req.session?.user?.id || 1)
+                .query(`
+                    INSERT INTO StoreManagerAssignments (StoreId, UserId, IsPrimary, AssignedAt, AssignedBy)
+                    VALUES (@storeId, @userId, @isPrimary, GETDATE(), @assignedBy)
+                `);
+        }
+        
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error assigning managers:', error);
         res.json({ success: false, error: error.message });
     }
 });
