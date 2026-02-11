@@ -794,7 +794,7 @@ router.post('/api/submit', async (req, res) => {
             .input('totalCost', sql.Decimal(10, 2), totalCost)
             .input('approver1Email', sql.NVarChar, approver1Email)
             .input('approver2Email', sql.NVarChar, approver2Email)
-            .input('createdBy', sql.NVarChar, req.session?.user?.name || 'Unknown')
+            .input('createdBy', sql.NVarChar, req.currentUser?.displayName || req.currentUser?.name || 'Unknown')
             .query(`INSERT INTO ProductionExtrasRequests 
                     (OutletId, SchemeId, LocationId, CategoryId, ThirdPartyId, ShiftId,
                      NumberOfAgents, Description, StartDateTime, EndDateTime,
