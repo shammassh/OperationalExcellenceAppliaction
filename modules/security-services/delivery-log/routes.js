@@ -741,12 +741,24 @@ router.get('/:id', async (req, res) => {
         const items = itemsResult.recordset;
         const logDateFormatted = new Date(log.LogDate).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         
+        // Helper function to format time correctly
+        const formatTime = (timeValue) => {
+            if (!timeValue) return '-';
+            if (timeValue instanceof Date) {
+                return timeValue.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+            }
+            // If it's a string, try to extract HH:MM
+            const timeStr = timeValue.toString();
+            const match = timeStr.match(/(\d{2}:\d{2})/);
+            return match ? match[1] : timeStr.substring(0, 5);
+        };
+        
         let itemRows = items.map((item, index) => `
             <tr>
                 <td>${index + 1}</td>
                 <td>${item.EmployeeName}</td>
                 <td>${item.ReceivedFrom || '-'}</td>
-                <td>${item.DeliveryTime ? item.DeliveryTime.toString().substring(0, 5) : '-'}</td>
+                <td>${formatTime(item.DeliveryTime)}</td>
                 <td>${item.Notes || '-'}</td>
             </tr>
         `).join('');
