@@ -14,6 +14,7 @@ const attendanceReportRoutes = require('./attendance-report/routes');
 const visitorCarsRoutes = require('./visitor-cars/routes');
 const parkingViolationRoutes = require('./parking-violation/routes');
 const securityChecklistRoutes = require('./security-checklist/routes');
+const cleaningChecklistRoutes = require('./cleaning-checklist/routes');
 
 // Mount sub-routes
 router.use('/delivery-log', deliveryLogRoutes);
@@ -23,6 +24,7 @@ router.use('/attendance-report', attendanceReportRoutes); // Form accessible via
 router.use('/visitor-cars', visitorCarsRoutes); // Form accessible via direct URL only
 router.use('/parking-violation', parkingViolationRoutes); // Form accessible via direct URL only
 router.use('/security-checklist', securityChecklistRoutes);
+router.use('/cleaning-checklist', cleaningChecklistRoutes);
 
 // Landing Page
 router.get('/', async (req, res) => {
@@ -158,7 +160,7 @@ router.get('/', async (req, res) => {
         </head>
         <body>
             <div class="header">
-                <h1>🛡️ Security Services</h1>
+                <h1>🏢 Facility Management</h1>
                 <div class="header-nav">
                     <a href="/dashboard">← Dashboard</a>
                 </div>
@@ -167,7 +169,7 @@ router.get('/', async (req, res) => {
             <div class="container">
                 <div class="welcome-card">
                     <h2>Welcome, ${user.displayName}</h2>
-                    <p>Manage Internal Security and Third Party Security operations</p>
+                    <p>Manage Facility and Third Party operations</p>
                 </div>
                 
                 <h3 class="section-title">👮 Internal Security</h3>
@@ -212,6 +214,12 @@ router.get('/', async (req, res) => {
                         <div class="card-icon">📋</div>
                         <div class="card-title">Security Checklist</div>
                         <div class="card-desc">Weekly security checklist for each location and shift</div>
+                        <span class="card-badge internal">Internal</span>
+                    </a>
+                    <a href="/security-services/cleaning-checklist" class="menu-card internal">
+                        <div class="card-icon">🧹</div>
+                        <div class="card-title">Cleaning Checklist</div>
+                        <div class="card-desc">Weekly cleaning checklist for toilets and canteens - قائمة التنظيف</div>
                         <span class="card-badge internal">Internal</span>
                     </a>
                 </div>

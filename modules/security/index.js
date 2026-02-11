@@ -9,9 +9,11 @@ const sql = require('mssql');
 
 // Import sub-routes
 const checklistReferenceRoutes = require('./checklist-reference/routes');
+const cleaningReferenceRoutes = require('./cleaning-reference/routes');
 
 // Mount sub-routes
 router.use('/checklist-reference', checklistReferenceRoutes);
+router.use('/cleaning-reference', cleaningReferenceRoutes);
 
 // Database config
 const dbConfig = {
@@ -264,13 +266,24 @@ router.get('/', async (req, res) => {
                         background: #e0f2f1;
                         color: #00897b;
                     }
+                    .dashboard-card.cleaning {
+                        border-bottom: 5px solid #8e24aa;
+                    }
+                    .dashboard-card.cleaning:hover {
+                        border-color: #8e24aa;
+                    }
+                    .stat-number.cleaning { color: #8e24aa; }
+                    .view-btn.cleaning {
+                        background: #f3e5f5;
+                        color: #8e24aa;
+                    }
                 </style>
             </head>
             <body>
                 <div class="header">
-                    <h1>&#128274; Security Department</h1>
+                    <h1>&#128274; Facility Management Department</h1>
                     <div class="header-nav">
-                        <a href="/security-services">Security Services</a>
+                        <a href="/security-services">Facility Management</a>
                         <a href="/dashboard">&#8592; Dashboard</a>
                     </div>
                 </div>
@@ -278,7 +291,7 @@ router.get('/', async (req, res) => {
                 <div class="container">
                     <div class="welcome-card">
                         <h2>Welcome, ${user.displayName}</h2>
-                        <p>Security Department Dashboard - View and manage security logs</p>
+                        <p>Facility Management Dashboard - View and manage facility logs</p>
                     </div>
                     
                     <div class="cards-grid">
@@ -395,6 +408,19 @@ router.get('/', async (req, res) => {
                                 </div>
                             </div>
                             <div class="view-btn checklist">Manage &#8594;</div>
+                        </a>
+                        
+                        <a href="/security/cleaning-reference" class="dashboard-card cleaning">
+                            <div class="card-icon">&#129529;</div>
+                            <div class="card-title">Cleaning Reference</div>
+                            <div class="card-desc">Configure locations, categories, and cleaning items for facility checklist</div>
+                            <div class="card-stats">
+                                <div class="stat-item">
+                                    <div class="stat-number cleaning">Setup</div>
+                                    <div class="stat-label">Admin</div>
+                                </div>
+                            </div>
+                            <div class="view-btn cleaning">Manage &#8594;</div>
                         </a>
                     </div>
                 </div>
