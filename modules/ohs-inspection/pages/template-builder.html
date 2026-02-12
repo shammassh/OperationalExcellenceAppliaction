@@ -573,6 +573,23 @@
         </div>
     </div>
 
+    <!-- Template Preview Modal -->
+    <div id="templatePreviewModal" class="modal-overlay">
+        <div class="modal" style="max-width: 900px; max-height: 85vh;">
+            <div class="modal-header">
+                <h3>👁️ Template Preview</h3>
+                <button class="modal-close" onclick="closeModal('templatePreviewModal')">&times;</button>
+            </div>
+            <div id="templatePreviewContent" style="max-height: 65vh; overflow-y: auto; padding: 10px;">
+                <div class="loading"><div class="spinner"></div>Loading...</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('templatePreviewModal')">Close</button>
+                <button type="button" class="btn btn-primary" onclick="closeModal('templatePreviewModal'); selectTemplate(window.previewTemplateId);">🏬 Open Template</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Edit Template Modal -->
     <div id="editTemplateModal" class="modal-overlay">
         <div class="modal">
@@ -927,6 +944,7 @@
                             <div class="card-meta">${template.description || 'No description'}</div>
                             <span class="card-badge">${template.sectionCount || 0} sections</span>
                             <div class="card-actions">
+                                <button class="btn btn-view btn-sm" onclick="event.stopPropagation(); viewTemplatePreview(${template.schemaId});">👁️ View</button>
                                 <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); selectTemplate(${template.schemaId});">🏬 Departments</button>
                                 <button class="btn btn-warning btn-sm" onclick="event.stopPropagation(); openEditTemplate(${template.schemaId});">✏️</button>
                                 <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deleteTemplate(${template.schemaId});">🗑️</button>
@@ -994,6 +1012,91 @@
                 loadTemplates();
             } catch (error) {
                 showToast('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function viewTemplatePreview(templateId) {
+            window.previewTemplateId = templateId;
+            document.getElementById('templatePreviewModal').classList.add('active');
+            document.getElementById('templatePreviewContent').innerHTML = '<div class="loading"><div class="spinner"></div>Loading template structure...</div>';
+            
+            try {
+                const result = await apiCall(`/schemas/${templateId}`);
+                const template = result.data;
+                
+                let html = `
+                    <div style="margin-bottom: 20px;">
+                        <h2 style="color: #e17055; margin-bottom: 5px;">📋 ${template.schemaName}</h2>
+                        <p style="color: #666;">${template.description || 'No description'}</p>
+                    </div>
+                `;
+                
+                if (!template.departments || template.departments.length === 0) {
+                    html += '<div class="empty-state"><p>No departments configured yet</p></div>';
+                } else {
+                    let totalSections = 0;
+                    let totalItems = 0;
+                    
+                    html += '<div style="display: flex; flex-direction: column; gap: 15px;">';
+                    
+                    for (const dept of template.departments) {
+                        const sectionCount = dept.sections?.length || 0;
+                        const itemCount = dept.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0;
+                        totalSections += sectionCount;
+                        totalItems += itemCount;
+                        
+                        html += `
+                            <div style="border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden;">
+                                <div style="background: linear-gradient(135deg, rgba(225, 112, 85, 0.15) 0%, rgba(214, 48, 49, 0.1) 100%); padding: 12px 15px; display: flex; align-items: center; gap: 10px;">
+                                    <span style="font-size: 1.5rem;">${dept.departmentIcon || '🏬'}</span>
+                                    <span style="font-weight: 700; flex: 1;">${dept.departmentName}</span>
+                                    <span style="background: #e17055; color: white; padding: 3px 10px; border-radius: 12px; font-size: 12px;">${sectionCount} sections</span>
+                                    <span style="background: #3b82f6; color: white; padding: 3px 10px; border-radius: 12px; font-size: 12px;">${itemCount} items</span>
+                                    <span style="color: #666; font-size: 12px;">Pass: ${dept.passingGrade || 80}%</span>
+                                </div>
+                        `;
+                        
+                        if (dept.sections && dept.sections.length > 0) {
+                            html += '<div style="padding: 10px 15px;">';
+                            for (const section of dept.sections) {
+                                html += `
+                                    <div style="display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px dashed #eee;">
+                                        <span>${section.sectionIcon || '📋'}</span>
+                                        <span style="flex: 1; font-weight: 500;">${section.sectionName}</span>
+                                        <span style="color: #666; font-size: 12px;">${section.items?.length || 0} items</span>
+                                    </div>
+                                `;
+                            }
+                            html += '</div>';
+                        }
+                        
+                        html += '</div>';
+                    }
+                    
+                    html += '</div>';
+                    
+                    // Summary
+                    html += `
+                        <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px; display: flex; gap: 30px; justify-content: center;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 24px; font-weight: 700; color: #e17055;">${template.departments.length}</div>
+                                <div style="font-size: 12px; color: #666;">Departments</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 24px; font-weight: 700; color: #3b82f6;">${totalSections}</div>
+                                <div style="font-size: 12px; color: #666;">Sections</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 24px; font-weight: 700; color: #10b981;">${totalItems}</div>
+                                <div style="font-size: 12px; color: #666;">Items</div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                document.getElementById('templatePreviewContent').innerHTML = html;
+            } catch (error) {
+                document.getElementById('templatePreviewContent').innerHTML = `<div class="empty-state"><p style="color: #ef4444;">Error loading template: ${error.message}</p></div>`;
             }
         }
 
