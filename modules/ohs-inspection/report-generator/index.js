@@ -49,8 +49,18 @@ class OHSReportGenerator {
     calculateOverallScore(auditData) {
         let totalEarned = 0;
         let totalMax = 0;
+        
+        // Get list of NA department names
+        const naDepartments = (auditData.departments || [])
+            .filter(d => d.isNA)
+            .map(d => d.departmentName);
 
         for (const section of auditData.sections || []) {
+            // Skip sections in NA departments
+            if (section.departmentName && naDepartments.includes(section.departmentName)) {
+                continue;
+            }
+            
             for (const item of section.items || []) {
                 if (item.selectedChoice && item.selectedChoice !== 'NA') {
                     const coeff = parseFloat(item.coeff) || 1;
@@ -66,6 +76,30 @@ class OHSReportGenerator {
         }
 
         return totalMax > 0 ? (totalEarned / totalMax) * 100 : 0;
+    }
+    
+    calculateDepartmentScore(auditData, departmentName) {
+        let earned = 0;
+        let max = 0;
+        
+        for (const section of auditData.sections || []) {
+            if (section.departmentName !== departmentName) continue;
+            
+            for (const item of section.items || []) {
+                if (item.selectedChoice && item.selectedChoice !== 'NA') {
+                    const coeff = parseFloat(item.coeff) || 1;
+                    max += coeff;
+                    
+                    if (item.selectedChoice === 'Yes') {
+                        earned += coeff;
+                    } else if (item.selectedChoice === 'Partially') {
+                        earned += coeff * 0.5;
+                    }
+                }
+            }
+        }
+        
+        return max > 0 ? (earned / max) * 100 : 0;
     }
 
     calculateSectionScore(section) {
@@ -92,12 +126,23 @@ class OHSReportGenerator {
         const scoreClass = overallScore >= 80 ? 'score-pass' : overallScore >= 60 ? 'score-warning' : 'score-fail';
         const scoreStatus = overallScore >= 80 ? 'PASS' : 'FAIL';
         
+        // Get list of NA department names
+        const naDepartments = (auditData.departments || [])
+            .filter(d => d.isNA)
+            .map(d => d.departmentName);
+        
         const findings = [];
         for (const section of auditData.sections || []) {
+            // Skip findings from NA departments
+            if (section.departmentName && naDepartments.includes(section.departmentName)) {
+                continue;
+            }
+            
             for (const item of section.items || []) {
                 if (item.finding && (item.selectedChoice === 'No' || item.selectedChoice === 'Partially')) {
                     findings.push({
                         section: section.sectionName,
+                        department: section.departmentName,
                         reference: item.referenceValue,
                         question: item.title,
                         answer: item.selectedChoice,
@@ -367,47 +412,7 @@ class OHSReportGenerator {
             </div>
         </div>
         
-        ${(auditData.sections || []).map(section => {
-            const sectionScore = this.calculateSectionScore(section);
-            const sectionScoreClass = sectionScore >= 80 ? 'score-pass' : sectionScore >= 60 ? 'score-warning' : 'score-fail';
-            
-            return `
-            <div class="section-block">
-                <div class="section-header">
-                    <div class="section-title">
-                        <span>${section.sectionIcon || '📋'}</span>
-                        <span>${section.sectionName}</span>
-                    </div>
-                    <div class="section-score ${sectionScoreClass}">${Math.round(sectionScore)}%</div>
-                </div>
-                <table class="items-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 60px;">Ref</th>
-                            <th>Question</th>
-                            <th style="width: 80px;">Answer</th>
-                            <th style="width: 50px;">Coeff</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${(section.items || []).map(item => {
-                            const answerClass = item.selectedChoice === 'Yes' ? 'answer-yes' :
-                                               item.selectedChoice === 'Partially' ? 'answer-partial' :
-                                               item.selectedChoice === 'No' ? 'answer-no' : 'answer-na';
-                            return `
-                            <tr>
-                                <td>${item.referenceValue || '-'}</td>
-                                <td>${item.title || '-'}</td>
-                                <td class="${answerClass}">${item.selectedChoice || '-'}</td>
-                                <td>${item.coeff || 1}</td>
-                            </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            </div>
-            `;
-        }).join('')}
+        ${this.renderSectionsGroupedByDepartment(auditData)}
         
         ${findings.length > 0 ? `
         <div class="findings-section">
@@ -431,6 +436,182 @@ class OHSReportGenerator {
     </div>
 </body>
 </html>`;
+    }
+    
+    renderSectionsGroupedByDepartment(auditData) {
+        const hasDepartments = auditData.departments && auditData.departments.length > 0;
+        
+        if (hasDepartments) {
+            // Group by department
+            let html = '';
+            
+            for (const dept of auditData.departments) {
+                const deptSections = (auditData.sections || []).filter(s => s.departmentName === dept.departmentName);
+                const deptScore = this.calculateDepartmentScore(auditData, dept.departmentName);
+                const deptScoreClass = dept.isNA ? 'score-na' : (deptScore >= 80 ? 'score-pass' : deptScore >= 60 ? 'score-warning' : 'score-fail');
+                const passingGrade = dept.passingGrade || 80;
+                
+                // Department header
+                html += `
+                <div style="margin-bottom: 2rem;">
+                    <div style="background: linear-gradient(135deg, rgba(225, 112, 85, 0.15) 0%, rgba(214, 48, 49, 0.1) 100%); 
+                                border: 1px solid rgba(225, 112, 85, 0.3); border-radius: 12px; padding: 1rem 1.5rem; margin-bottom: 1rem;
+                                display: flex; justify-content: space-between; align-items: center; ${dept.isNA ? 'opacity: 0.5;' : ''}">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <span style="font-size: 1.5rem;">${dept.departmentIcon || '🏬'}</span>
+                            <span style="font-weight: 700; font-size: 1.1rem;">${dept.departmentName}</span>
+                            ${dept.isNA ? '<span style="background: #fee2e2; color: #dc2626; padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; margin-left: 10px;">N/A - Excluded</span>' : ''}
+                        </div>
+                        ${!dept.isNA ? `
+                        <div style="text-align: center;">
+                            <div class="${deptScoreClass}" style="font-size: 1.5rem; font-weight: 700;">${Math.round(deptScore)}%</div>
+                            <div style="font-size: 0.75rem; color: #64748b;">Pass: ${passingGrade}%</div>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+                
+                // Sections within this department
+                for (const section of deptSections) {
+                    const sectionScore = this.calculateSectionScore(section);
+                    const sectionScoreClass = sectionScore >= 80 ? 'score-pass' : sectionScore >= 60 ? 'score-warning' : 'score-fail';
+                    
+                    html += `
+                    <div class="section-block" style="${dept.isNA ? 'opacity: 0.5;' : ''}">
+                        <div class="section-header">
+                            <div class="section-title">
+                                <span>${section.sectionIcon || '📋'}</span>
+                                <span>${section.sectionName}</span>
+                            </div>
+                            <div class="section-score ${sectionScoreClass}">${Math.round(sectionScore)}%</div>
+                        </div>
+                        <table class="items-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 60px;">Ref</th>
+                                    <th>Question</th>
+                                    <th style="width: 80px;">Answer</th>
+                                    <th style="width: 50px;">Coeff</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${(section.items || []).map(item => {
+                                    const answerClass = item.selectedChoice === 'Yes' ? 'answer-yes' :
+                                                       item.selectedChoice === 'Partially' ? 'answer-partial' :
+                                                       item.selectedChoice === 'No' ? 'answer-no' : 'answer-na';
+                                    return `
+                                    <tr>
+                                        <td>${item.referenceValue || '-'}</td>
+                                        <td>${item.title || '-'}</td>
+                                        <td class="${answerClass}">${item.selectedChoice || '-'}</td>
+                                        <td>${item.coeff || 1}</td>
+                                    </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    `;
+                }
+                
+                html += '</div>';
+            }
+            
+            // Also render sections without department (legacy)
+            const orphanSections = (auditData.sections || []).filter(s => !s.departmentName);
+            if (orphanSections.length > 0) {
+                html += '<div style="margin-top: 2rem; padding-top: 1rem; border-top: 2px dashed #ccc;"><h3 style="color: #64748b; margin-bottom: 1rem;">Other Sections</h3>';
+                
+                for (const section of orphanSections) {
+                    const sectionScore = this.calculateSectionScore(section);
+                    const sectionScoreClass = sectionScore >= 80 ? 'score-pass' : sectionScore >= 60 ? 'score-warning' : 'score-fail';
+                    
+                    html += `
+                    <div class="section-block">
+                        <div class="section-header">
+                            <div class="section-title">
+                                <span>${section.sectionIcon || '📋'}</span>
+                                <span>${section.sectionName}</span>
+                            </div>
+                            <div class="section-score ${sectionScoreClass}">${Math.round(sectionScore)}%</div>
+                        </div>
+                        <table class="items-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 60px;">Ref</th>
+                                    <th>Question</th>
+                                    <th style="width: 80px;">Answer</th>
+                                    <th style="width: 50px;">Coeff</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${(section.items || []).map(item => {
+                                    const answerClass = item.selectedChoice === 'Yes' ? 'answer-yes' :
+                                                       item.selectedChoice === 'Partially' ? 'answer-partial' :
+                                                       item.selectedChoice === 'No' ? 'answer-no' : 'answer-na';
+                                    return `
+                                    <tr>
+                                        <td>${item.referenceValue || '-'}</td>
+                                        <td>${item.title || '-'}</td>
+                                        <td class="${answerClass}">${item.selectedChoice || '-'}</td>
+                                        <td>${item.coeff || 1}</td>
+                                    </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    `;
+                }
+                
+                html += '</div>';
+            }
+            
+            return html;
+        } else {
+            // No departments - legacy behavior
+            return (auditData.sections || []).map(section => {
+                const sectionScore = this.calculateSectionScore(section);
+                const sectionScoreClass = sectionScore >= 80 ? 'score-pass' : sectionScore >= 60 ? 'score-warning' : 'score-fail';
+                
+                return `
+                <div class="section-block">
+                    <div class="section-header">
+                        <div class="section-title">
+                            <span>${section.sectionIcon || '📋'}</span>
+                            <span>${section.sectionName}</span>
+                        </div>
+                        <div class="section-score ${sectionScoreClass}">${Math.round(sectionScore)}%</div>
+                    </div>
+                    <table class="items-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 60px;">Ref</th>
+                                <th>Question</th>
+                                <th style="width: 80px;">Answer</th>
+                                <th style="width: 50px;">Coeff</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${(section.items || []).map(item => {
+                                const answerClass = item.selectedChoice === 'Yes' ? 'answer-yes' :
+                                                   item.selectedChoice === 'Partially' ? 'answer-partial' :
+                                                   item.selectedChoice === 'No' ? 'answer-no' : 'answer-na';
+                                return `
+                                <tr>
+                                    <td>${item.referenceValue || '-'}</td>
+                                    <td>${item.title || '-'}</td>
+                                    <td class="${answerClass}">${item.selectedChoice || '-'}</td>
+                                    <td>${item.coeff || 1}</td>
+                                </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                `;
+            }).join('');
+        }
     }
 }
 

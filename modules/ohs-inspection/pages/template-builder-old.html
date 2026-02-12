@@ -1,0 +1,1750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Template Builder - OHS Inspection System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 25px 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        /* Navigation Tabs */
+        .nav-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .nav-tab {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-tab:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .nav-tab.active {
+            background: white;
+            color: #e17055;
+        }
+
+        /* Main Content */
+        .main-content {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .content-section {
+            display: none;
+            padding: 30px;
+        }
+
+        .content-section.active {
+            display: block;
+        }
+
+        /* Cards */
+        .card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .card-badge {
+            background: #e17055;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        /* Form Styles */
+        .form-section {
+            background: linear-gradient(135deg, #fff5f3 0%, #ffe8e4 100%);
+            border: 2px dashed #e17055;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .form-section h3 {
+            color: #e17055;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 5px;
+        }
+
+        .form-group label .required {
+            color: #ef4444;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #e17055;
+            box-shadow: 0 0 0 3px rgba(225, 112, 85, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(225, 112, 85, 0.4);
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid #e17055;
+            color: #e17055;
+        }
+
+        .btn-outline:hover {
+            background: #e17055;
+            color: white;
+        }
+
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal.modal-large {
+            max-width: 1000px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .modal-header h3 {
+            font-size: 22px;
+            color: #333;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #666;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        /* Schema List */
+        .schema-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .schema-card:hover {
+            border-color: #e17055;
+            box-shadow: 0 5px 20px rgba(225, 112, 85, 0.2);
+        }
+
+        .schema-card.selected {
+            border-color: #e17055;
+            background: linear-gradient(135deg, #fff5f3 0%, #ffe8e4 100%);
+        }
+
+        .schema-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .schema-name {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .schema-meta {
+            color: #666;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        .schema-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        /* Section List */
+        .section-item {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 15px 20px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .section-icon {
+            font-size: 24px;
+            width: 40px;
+            height: 40px;
+            background: #fff5f3;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .section-number {
+            background: #e17055;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .section-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .section-count {
+            color: #666;
+            font-size: 13px;
+        }
+
+        /* Items Table */
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .items-table th,
+        .items-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .items-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+
+        .items-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .ref-badge {
+            background: #e17055;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 5px;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .coeff-badge {
+            background: #fbbf24;
+            color: #333;
+            padding: 4px 10px;
+            border-radius: 5px;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .empty-state h3 {
+            font-size: 20px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #e17055;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            display: none;
+            align-items: center;
+            gap: 10px;
+            z-index: 1000;
+            animation: slideIn 0.3s;
+        }
+
+        .toast.show {
+            display: flex;
+        }
+
+        .toast.success {
+            border-left: 4px solid #10b981;
+        }
+
+        .toast.error {
+            border-left: 4px solid #ef4444;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Breadcrumb */
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .breadcrumb a {
+            color: #e17055;
+            text-decoration: none;
+        }
+
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+
+        /* Back button */
+        .back-btn {
+            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .back-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(225, 112, 85, 0.4);
+        }
+
+        .confirm-delete {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+
+        .confirm-delete p {
+            color: #991b1b;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .btn-view {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+        }
+
+        .btn-view:hover {
+            background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+        }
+
+        .btn-download {
+            background: #06b6d4;
+            color: white;
+        }
+
+        .btn-download:hover {
+            background: #0891b2;
+        }
+
+        /* Template View */
+        .template-view-section {
+            margin-bottom: 25px;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .template-view-section-header {
+            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .template-view-section-header h4 {
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .template-view-items {
+            padding: 0;
+        }
+
+        .template-view-item {
+            padding: 12px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: grid;
+            grid-template-columns: 60px 1fr 60px 120px;
+            gap: 15px;
+            align-items: center;
+            font-size: 14px;
+        }
+
+        .template-view-item:last-child {
+            border-bottom: none;
+        }
+
+        .template-view-item:hover {
+            background: #f8f9fa;
+        }
+
+        .template-view-item .ref {
+            background: #e17055;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-weight: 600;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .template-view-item .coeff {
+            background: #fbbf24;
+            color: #333;
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-weight: 600;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .template-view-item .answer {
+            color: #666;
+            font-size: 12px;
+        }
+
+        .template-view-no-items {
+            padding: 20px;
+            text-align: center;
+            color: #999;
+            font-style: italic;
+        }
+
+        .template-summary {
+            background: linear-gradient(135deg, #fff5f3 0%, #ffe8e4 100%);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .template-summary-item {
+            text-align: center;
+        }
+
+        .template-summary-item .value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #e17055;
+        }
+
+        .template-summary-item .label {
+            font-size: 13px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+        <span id="toastMessage"></span>
+    </div>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🛡️ OHS Inspection Template Builder</h1>
+            <div class="header-actions">
+                <a href="/ohs-inspection/settings" class="back-btn" style="background: #6366f1;">⚙️ Settings</a>
+                <a href="/ohs-inspection" class="back-btn">← Back to Dashboard</a>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="switchTab('schemas')">
+                🗂️ Templates
+            </button>
+            <button class="nav-tab" onclick="switchTab('builder')" id="builderTab" style="display: none;">
+                🔧 Build Template
+            </button>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Schemas Section -->
+            <div class="content-section active" id="schemasSection">
+                <!-- Create Schema Form -->
+                <div class="form-section">
+                    <h3>➕ Create New Template</h3>
+                    <form id="createSchemaForm" onsubmit="createSchema(event)">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Template Name <span class="required">*</span></label>
+                                <input type="text" id="schemaName" placeholder="e.g., Safety Inspection" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Description</label>
+                                <input type="text" id="schemaDescription" placeholder="Brief description...">
+                            </div>
+                            <div class="form-group" style="justify-content: flex-end;">
+                                <button type="submit" class="btn btn-primary">➕ Create Template</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Schema List -->
+                <h3 style="margin-bottom: 20px;">📁 Available Templates</h3>
+                
+                <div id="schemasList">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Loading templates...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Builder Section -->
+            <div class="content-section" id="builderSection">
+                <!-- Breadcrumb -->
+                <div class="breadcrumb" id="breadcrumb">
+                    <a href="#" onclick="switchTab('schemas'); return false;">Templates</a>
+                    <span>→</span>
+                    <span id="currentSchemaName">Template Name</span>
+                </div>
+
+                <!-- Section Form -->
+                <div class="form-section">
+                    <h3>➕ Add Section</h3>
+                    <form id="createSectionForm" onsubmit="createSection(event)">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Section Number <span class="required">*</span></label>
+                                <input type="number" id="sectionNumber" placeholder="e.g., 1" min="1" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Section Name <span class="required">*</span></label>
+                                <input type="text" id="sectionName" placeholder="e.g., Fire Safety" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Icon</label>
+                                <select id="sectionIcon">
+                                    <option value="📋">📋 Default</option>
+                                    <option value="🔥">🔥 Fire</option>
+                                    <option value="⚡">⚡ Electrical</option>
+                                    <option value="🦺">🦺 PPE</option>
+                                    <option value="🚨">🚨 Emergency</option>
+                                    <option value="🧯">🧯 Fire Extinguisher</option>
+                                    <option value="🚪">🚪 Exit</option>
+                                    <option value="⚠️">⚠️ Hazard</option>
+                                    <option value="🛠️">🛠️ Equipment</option>
+                                    <option value="🧹">🧹 Housekeeping</option>
+                                    <option value="💊">💊 First Aid</option>
+                                    <option value="🔒">🔒 Security</option>
+                                    <option value="📝">📝 Documentation</option>
+                                    <option value="✅">✅ Compliance</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="justify-content: flex-end;">
+                                <button type="submit" class="btn btn-primary">➕ Add Section</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Sections List -->
+                <h3 style="margin-bottom: 20px;">📑 Sections</h3>
+                <div id="sectionsList">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📑</div>
+                        <h3>No sections yet</h3>
+                        <p>Add your first section above</p>
+                    </div>
+                </div>
+
+                <!-- Items Section (shown when a section is selected) -->
+                <div id="itemsSection" style="display: none; margin-top: 30px;">
+                    <hr style="margin: 30px 0; border: none; border-top: 2px solid #e0e0e0;">
+                    
+                    <!-- Item Form -->
+                    <div class="form-section">
+                        <h3>➕ Add Item to <span id="currentSectionName"></span></h3>
+                        <form id="createItemForm" onsubmit="createItem(event)">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Reference Value <span class="required">*</span></label>
+                                    <input type="text" id="itemRefValue" placeholder="e.g., 1.1" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Coefficient <span class="required">*</span></label>
+                                    <input type="number" id="itemCoeff" placeholder="e.g., 2" min="1" value="2" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Answer Options</label>
+                                    <input type="text" id="itemAnswer" value="Yes,Partially,No,NA">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group" style="flex: 2;">
+                                    <label>Title (Question) <span class="required">*</span></label>
+                                    <textarea id="itemTitle" placeholder="Enter the question..." required></textarea>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group" style="flex: 2;">
+                                    <label>CR (Criterion)</label>
+                                    <textarea id="itemCR" placeholder="Enter the criterion/requirement..."></textarea>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-success">➕ Add Item</button>
+                        </form>
+                    </div>
+
+                    <!-- Bulk Upload Section -->
+                    <div class="form-section" style="background: linear-gradient(135deg, #fff5f3 0%, #ffe8e4 100%); border: 2px dashed #e17055;">
+                        <h3 style="color: #d63031;">📤 Bulk Upload Items</h3>
+                        <p style="color: #d63031; margin-bottom: 15px; font-size: 14px;">
+                            Download the template, fill it with your items, then upload to add multiple items at once.
+                        </p>
+                        <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center;">
+                            <button class="btn btn-outline" onclick="downloadItemTemplate()" style="border-color: #e17055; color: #e17055;">
+                                📥 Download Template (CSV)
+                            </button>
+                            <div style="position: relative;">
+                                <input type="file" id="bulkUploadInput" accept=".csv" onchange="handleBulkUpload(event)" style="display: none;">
+                                <button class="btn btn-primary" onclick="document.getElementById('bulkUploadInput').click()">
+                                    📤 Upload CSV File
+                                </button>
+                            </div>
+                            <select id="duplicateAction" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #d1d5db;">
+                                <option value="skip">Skip duplicates</option>
+                                <option value="update">Update duplicates</option>
+                            </select>
+                        </div>
+                        <div id="bulkUploadStatus" style="margin-top: 15px; display: none;"></div>
+                    </div>
+
+                    <!-- Items Table -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="margin: 0;">📝 Items</h3>
+                        <button class="btn btn-danger btn-sm" onclick="deleteAllItems()" id="deleteAllItemsBtn" style="display: none;">
+                            🗑️ Delete All Items
+                        </button>
+                    </div>
+                    <div id="itemsList">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📝</div>
+                            <h3>No items yet</h3>
+                            <p>Add your first item above</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let currentSchemaId = null;
+        let currentSectionId = null;
+        let schemas = [];
+        let sections = [];
+        let items = [];
+
+        // API Base URL - Updated for OHS Inspection module
+        const API_BASE = '/ohs-inspection/api/templates';
+
+        // Sort items by reference value
+        function sortByReferenceValue(items) {
+            return [...items].sort((a, b) => {
+                const refA = (a.referenceValue || '').toString();
+                const refB = (b.referenceValue || '').toString();
+                const partsA = refA.split('.');
+                const partsB = refB.split('.');
+                for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+                    const numA = parseFloat(partsA[i]) || 0;
+                    const numB = parseFloat(partsB[i]) || 0;
+                    if (numA !== numB) return numA - numB;
+                }
+                return 0;
+            });
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSchemas();
+        });
+
+        // Tab switching
+        function switchTab(tab) {
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+
+            if (tab === 'schemas') {
+                document.querySelector('.nav-tab').classList.add('active');
+                document.getElementById('schemasSection').classList.add('active');
+                document.getElementById('builderTab').style.display = 'none';
+                currentSchemaId = null;
+                currentSectionId = null;
+            } else if (tab === 'builder') {
+                document.getElementById('builderTab').classList.add('active');
+                document.getElementById('builderSection').classList.add('active');
+            }
+        }
+
+        // Toast notification
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            toastMessage.textContent = message;
+            toast.className = `toast ${type} show`;
+            setTimeout(() => { toast.classList.remove('show'); }, 3000);
+        }
+
+        // API Call helper
+        async function apiCall(endpoint, options = {}) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    ...options,
+                    headers: { 'Content-Type': 'application/json', ...options.headers }
+                });
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'API request failed');
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('API Error:', error);
+                throw error;
+            }
+        }
+
+        // ==========================================
+        // SCHEMA OPERATIONS
+        // ==========================================
+
+        async function loadSchemas() {
+            const container = document.getElementById('schemasList');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading templates...</div>';
+
+            try {
+                const result = await apiCall('/schemas');
+                schemas = result.data || [];
+
+                if (schemas.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🗂️</div>
+                            <h3>No templates yet</h3>
+                            <p>Create your first inspection template above</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = schemas.map(schema => `
+                    <div class="schema-card" id="schema-card-${schema.schemaId}">
+                        <div class="schema-header" onclick="selectSchema(${schema.schemaId})">
+                            <span class="schema-name">📋 ${schema.schemaName}</span>
+                            <span class="card-badge">${schema.sectionCount || 0} sections</span>
+                        </div>
+                        <div class="schema-meta" onclick="selectSchema(${schema.schemaId})">
+                            ${schema.description || 'No description'} • Created by ${schema.createdBy || 'Unknown'}
+                        </div>
+                        <div class="schema-actions">
+                            <button class="btn btn-view btn-sm" onclick="event.stopPropagation(); viewFullTemplate(${schema.schemaId});">👁️ View</button>
+                            <button class="btn btn-download btn-sm" onclick="event.stopPropagation(); downloadSchema(${schema.schemaId});">📥 Backup</button>
+                            <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); selectSchema(${schema.schemaId});">📝 Edit</button>
+                            <button class="btn btn-warning btn-sm" onclick="event.stopPropagation(); openEditSchemaModal(${schema.schemaId});">✏️ Rename</button>
+                            <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); confirmDeleteSchema(${schema.schemaId});">🗑️ Delete</button>
+                        </div>
+                        <div id="delete-confirm-${schema.schemaId}" class="confirm-delete" style="display: none;">
+                            <p>⚠️ Are you sure you want to delete "${schema.schemaName}"? This will remove all sections and items.</p>
+                            <div style="display: flex; gap: 10px;">
+                                <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deleteSchema(${schema.schemaId});">Yes, Delete</button>
+                                <button class="btn btn-sm" onclick="event.stopPropagation(); cancelDeleteSchema(${schema.schemaId});" style="background: #6b7280; color: white;">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                container.innerHTML = `<div class="empty-state"><p>Error loading templates: ${error.message}</p></div>`;
+            }
+        }
+
+        async function createSchema(e) {
+            e.preventDefault();
+            const name = document.getElementById('schemaName').value;
+            const description = document.getElementById('schemaDescription').value;
+
+            try {
+                await apiCall('/schemas', {
+                    method: 'POST',
+                    body: JSON.stringify({ schemaName: name, description })
+                });
+                showToast('Template created successfully!', 'success');
+                document.getElementById('createSchemaForm').reset();
+                loadSchemas();
+            } catch (error) {
+                showToast('Error creating template: ' + error.message, 'error');
+            }
+        }
+
+        async function selectSchema(schemaId) {
+            currentSchemaId = schemaId;
+            const schema = schemas.find(s => s.schemaId === schemaId);
+            document.getElementById('currentSchemaName').textContent = schema.schemaName;
+            document.getElementById('builderTab').style.display = 'flex';
+            switchTab('builder');
+            loadSections();
+        }
+
+        function openEditSchemaModal(schemaId) {
+            const schema = schemas.find(s => s.schemaId === schemaId);
+            if (!schema) return;
+            document.getElementById('editSchemaId').value = schemaId;
+            document.getElementById('editSchemaName').value = schema.schemaName;
+            document.getElementById('editSchemaDescription').value = schema.description || '';
+            document.getElementById('editSchemaModal').classList.add('active');
+        }
+
+        function closeEditSchemaModal() {
+            document.getElementById('editSchemaModal').classList.remove('active');
+        }
+
+        async function saveSchemaEdit(e) {
+            e.preventDefault();
+            const schemaId = document.getElementById('editSchemaId').value;
+            const schemaName = document.getElementById('editSchemaName').value.trim();
+            const description = document.getElementById('editSchemaDescription').value.trim();
+
+            try {
+                await apiCall(`/schemas/${schemaId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ schemaName, description })
+                });
+                showToast('Template updated successfully!', 'success');
+                closeEditSchemaModal();
+                loadSchemas();
+            } catch (error) {
+                showToast('Error updating template: ' + error.message, 'error');
+            }
+        }
+
+        function confirmDeleteSchema(schemaId) {
+            document.querySelectorAll('.confirm-delete').forEach(el => el.style.display = 'none');
+            document.getElementById(`delete-confirm-${schemaId}`).style.display = 'block';
+        }
+
+        function cancelDeleteSchema(schemaId) {
+            document.getElementById(`delete-confirm-${schemaId}`).style.display = 'none';
+        }
+
+        async function deleteSchema(schemaId) {
+            try {
+                await apiCall(`/schemas/${schemaId}`, { method: 'DELETE' });
+                showToast('Template deleted successfully!', 'success');
+                loadSchemas();
+            } catch (error) {
+                showToast('Error deleting template: ' + error.message, 'error');
+            }
+        }
+
+        async function downloadSchema(schemaId) {
+            try {
+                showToast('Preparing download...', 'success');
+                const result = await apiCall(`/schemas/${schemaId}`);
+                const schema = result.data;
+
+                const backup = {
+                    exportDate: new Date().toISOString(),
+                    exportedBy: 'OHS Inspection Template Builder',
+                    version: '1.0',
+                    schema: {
+                        schemaName: schema.schemaName,
+                        description: schema.description,
+                        sections: schema.sections.map(section => ({
+                            sectionNumber: section.sectionNumber,
+                            sectionName: section.sectionName,
+                            sectionIcon: section.sectionIcon,
+                            items: section.items.map(item => ({
+                                referenceValue: item.referenceValue,
+                                title: item.title,
+                                coeff: item.coeff,
+                                answer: item.answer,
+                                cr: item.cr
+                            }))
+                        }))
+                    }
+                };
+
+                const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                const safeName = schema.schemaName.replace(/[^a-z0-9]/gi, '_').substring(0, 50);
+                link.download = `${safeName}_backup_${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+
+                const totalItems = schema.sections.reduce((sum, s) => sum + s.items.length, 0);
+                showToast(`Downloaded: ${schema.sections.length} sections, ${totalItems} items`, 'success');
+            } catch (error) {
+                showToast('Error downloading template: ' + error.message, 'error');
+            }
+        }
+
+        async function viewFullTemplate(schemaId) {
+            const modal = document.getElementById('viewTemplateModal');
+            const content = document.getElementById('templateViewContent');
+            modal.classList.add('active');
+            content.innerHTML = '<div class="loading"><div class="spinner"></div>Loading template...</div>';
+
+            try {
+                const result = await apiCall(`/schemas/${schemaId}`);
+                const template = result.data;
+
+                const totalSections = template.sections?.length || 0;
+                const totalItems = template.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0;
+                const totalCoeff = template.sections?.reduce((sum, s) => 
+                    sum + (s.items?.reduce((itemSum, item) => itemSum + (item.coeff || 0), 0) || 0), 0) || 0;
+
+                let html = `
+                    <div class="template-summary">
+                        <div class="template-summary-item"><div class="value">${totalSections}</div><div class="label">Sections</div></div>
+                        <div class="template-summary-item"><div class="value">${totalItems}</div><div class="label">Total Items</div></div>
+                        <div class="template-summary-item"><div class="value">${totalCoeff}</div><div class="label">Total Coefficient</div></div>
+                    </div>
+                `;
+
+                if (totalSections === 0) {
+                    html += '<div class="empty-state"><div class="empty-state-icon">📑</div><h3>No sections defined</h3></div>';
+                } else {
+                    template.sections.forEach(section => {
+                        const itemCount = section.items?.length || 0;
+                        const sectionCoeff = section.items?.reduce((sum, item) => sum + (item.coeff || 0), 0) || 0;
+
+                        html += `
+                            <div class="template-view-section">
+                                <div class="template-view-section-header">
+                                    <h4>${section.sectionIcon || '📋'} ${section.sectionNumber}. ${section.sectionName}</h4>
+                                    <span>${itemCount} items • Coeff: ${sectionCoeff}</span>
+                                </div>
+                                <div class="template-view-items">
+                        `;
+
+                        if (itemCount === 0) {
+                            html += '<div class="template-view-no-items">No items in this section</div>';
+                        } else {
+                            sortByReferenceValue(section.items).forEach(item => {
+                                html += `
+                                    <div class="template-view-item">
+                                        <span class="ref">${item.referenceValue || '-'}</span>
+                                        <span class="title">${item.title}</span>
+                                        <span class="coeff">${item.coeff}</span>
+                                        <span class="answer">${item.answer || 'Yes,Partially,No,NA'}</span>
+                                    </div>
+                                `;
+                            });
+                        }
+                        html += '</div></div>';
+                    });
+                }
+
+                document.getElementById('templateViewTitle').textContent = template.schemaName;
+                content.innerHTML = html;
+            } catch (error) {
+                content.innerHTML = `<div class="empty-state"><p>Error: ${error.message}</p></div>`;
+            }
+        }
+
+        function closeViewModal() {
+            document.getElementById('viewTemplateModal').classList.remove('active');
+        }
+
+        // ==========================================
+        // SECTION OPERATIONS
+        // ==========================================
+
+        async function loadSections() {
+            const container = document.getElementById('sectionsList');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading sections...</div>';
+
+            try {
+                const result = await apiCall(`/schemas/${currentSchemaId}/sections`);
+                sections = result.data || [];
+
+                if (sections.length === 0) {
+                    container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📑</div><h3>No sections yet</h3><p>Add your first section above</p></div>`;
+                    document.getElementById('itemsSection').style.display = 'none';
+                    return;
+                }
+
+                container.innerHTML = sections.map(section => `
+                    <div class="section-item" style="cursor: pointer; ${currentSectionId === section.sectionId ? 'border-color: #e17055; background: #fff5f3;' : ''}">
+                        <div class="section-info" onclick="selectSection(${section.sectionId})">
+                            <div class="section-number">${section.sectionNumber}</div>
+                            <div class="section-icon">${section.sectionIcon || '📋'}</div>
+                            <div>
+                                <div class="section-name">${section.sectionName}</div>
+                                <div class="section-count">${section.itemCount || 0} items</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-warning btn-sm" onclick="event.stopPropagation(); openEditSectionModal(${section.sectionId})" title="Edit Section">✏️</button>
+                            <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deleteSection(${section.sectionId})" title="Delete Section">🗑️</button>
+                            <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); selectSection(${section.sectionId})">📝 Items</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                container.innerHTML = `<div class="empty-state"><p>Error: ${error.message}</p></div>`;
+            }
+        }
+
+        async function createSection(e) {
+            e.preventDefault();
+            const sectionNumber = parseInt(document.getElementById('sectionNumber').value);
+            const sectionName = document.getElementById('sectionName').value;
+            const sectionIcon = document.getElementById('sectionIcon').value;
+
+            try {
+                await apiCall(`/schemas/${currentSchemaId}/sections`, {
+                    method: 'POST',
+                    body: JSON.stringify({ sectionNumber, sectionName, sectionIcon })
+                });
+                showToast('Section created successfully!', 'success');
+                document.getElementById('createSectionForm').reset();
+                loadSections();
+            } catch (error) {
+                showToast('Error creating section: ' + error.message, 'error');
+            }
+        }
+
+        async function selectSection(sectionId) {
+            currentSectionId = sectionId;
+            const section = sections.find(s => s.sectionId === sectionId);
+            document.getElementById('currentSectionName').textContent = section.sectionName;
+            document.getElementById('itemsSection').style.display = 'block';
+            loadSections(); // Refresh to highlight selected
+            loadItems();
+        }
+
+        function openEditSectionModal(sectionId) {
+            const section = sections.find(s => s.sectionId === sectionId);
+            if (!section) return;
+            document.getElementById('editSectionId').value = sectionId;
+            document.getElementById('editSectionNumber').value = section.sectionNumber || '';
+            document.getElementById('editSectionName').value = section.sectionName || '';
+            document.getElementById('editSectionIcon').value = section.sectionIcon || '📋';
+            document.getElementById('editSectionModal').classList.add('active');
+        }
+
+        function closeEditSectionModal() {
+            document.getElementById('editSectionModal').classList.remove('active');
+        }
+
+        async function saveSectionEdit(e) {
+            e.preventDefault();
+            const sectionId = document.getElementById('editSectionId').value;
+            const sectionNumber = parseInt(document.getElementById('editSectionNumber').value);
+            const sectionName = document.getElementById('editSectionName').value.trim();
+            const sectionIcon = document.getElementById('editSectionIcon').value;
+
+            try {
+                await apiCall(`/sections/${sectionId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ sectionNumber, sectionName, sectionIcon })
+                });
+                showToast('Section updated successfully!', 'success');
+                closeEditSectionModal();
+                loadSections();
+            } catch (error) {
+                showToast('Error updating section: ' + error.message, 'error');
+            }
+        }
+
+        async function deleteSection(sectionId) {
+            const section = sections.find(s => s.sectionId === sectionId);
+            if (!section) return;
+            
+            if (!confirm(`Delete section "${section.sectionName}"?\n\nThis will also delete all ${section.itemCount || 0} items in this section.`)) return;
+
+            try {
+                await apiCall(`/sections/${sectionId}`, { method: 'DELETE' });
+                showToast('Section deleted successfully!', 'success');
+                if (currentSectionId === sectionId) {
+                    currentSectionId = null;
+                    document.getElementById('itemsSection').style.display = 'none';
+                }
+                loadSections();
+            } catch (error) {
+                showToast('Error deleting section: ' + error.message, 'error');
+            }
+        }
+
+        // ==========================================
+        // ITEM OPERATIONS
+        // ==========================================
+
+        async function loadItems() {
+            const container = document.getElementById('itemsList');
+            const deleteAllBtn = document.getElementById('deleteAllItemsBtn');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading items...</div>';
+
+            try {
+                const result = await apiCall(`/sections/${currentSectionId}/items`);
+                items = result.data || [];
+
+                if (items.length === 0) {
+                    deleteAllBtn.style.display = 'none';
+                    container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📝</div><h3>No items yet</h3><p>Add your first item above</p></div>`;
+                    return;
+                }
+
+                deleteAllBtn.style.display = 'inline-flex';
+                const sortedItems = sortByReferenceValue(items);
+
+                container.innerHTML = `
+                    <table class="items-table">
+                        <thead><tr><th>Ref</th><th>Title</th><th>Coeff</th><th>Answer</th><th>CR</th><th>Actions</th></tr></thead>
+                        <tbody>
+                            ${sortedItems.map(item => `
+                                <tr>
+                                    <td><span class="ref-badge">${item.referenceValue}</span></td>
+                                    <td>${item.title}</td>
+                                    <td><span class="coeff-badge">${item.coeff}</span></td>
+                                    <td>${item.answer}</td>
+                                    <td>${item.cr || '-'}</td>
+                                    <td style="display: flex; gap: 5px;">
+                                        <button class="btn btn-warning btn-sm" onclick="editItem(${item.itemId})" title="Edit">✏️</button>
+                                        <button class="btn btn-danger btn-sm" onclick="deleteItem(${item.itemId})" title="Delete">🗑️</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                container.innerHTML = `<div class="empty-state"><p>Error: ${error.message}</p></div>`;
+            }
+        }
+
+        async function createItem(e) {
+            e.preventDefault();
+            const itemData = {
+                referenceValue: document.getElementById('itemRefValue').value,
+                title: document.getElementById('itemTitle').value,
+                coeff: parseInt(document.getElementById('itemCoeff').value),
+                answer: document.getElementById('itemAnswer').value,
+                cr: document.getElementById('itemCR').value
+            };
+
+            try {
+                await apiCall(`/sections/${currentSectionId}/items`, {
+                    method: 'POST',
+                    body: JSON.stringify(itemData)
+                });
+                showToast('Item created successfully!', 'success');
+                document.getElementById('createItemForm').reset();
+                document.getElementById('itemCoeff').value = '2';
+                document.getElementById('itemAnswer').value = 'Yes,Partially,No,NA';
+                loadItems();
+                loadSections();
+            } catch (error) {
+                showToast('Error creating item: ' + error.message, 'error');
+            }
+        }
+
+        async function deleteItem(itemId) {
+            if (!confirm('Are you sure you want to delete this item?')) return;
+
+            try {
+                await apiCall(`/items/${itemId}`, { method: 'DELETE' });
+                showToast('Item deleted successfully!', 'success');
+                loadItems();
+                loadSections();
+            } catch (error) {
+                showToast('Error deleting item: ' + error.message, 'error');
+            }
+        }
+
+        async function deleteAllItems() {
+            if (items.length === 0) return;
+            if (!confirm(`Delete ALL ${items.length} items in this section?`)) return;
+            if (prompt('Type "DELETE" to confirm:') !== 'DELETE') return;
+
+            try {
+                const response = await apiCall(`/sections/${currentSectionId}/items/all`, { method: 'DELETE' });
+                showToast(`Deleted ${response.data.deleted} items!`, 'success');
+                loadItems();
+                loadSections();
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error');
+            }
+        }
+
+        let editingItemId = null;
+
+        function editItem(itemId) {
+            const item = items.find(i => i.itemId === itemId);
+            if (!item) return;
+            editingItemId = itemId;
+            document.getElementById('editItemRefValue').value = item.referenceValue || '';
+            document.getElementById('editItemTitle').value = item.title || '';
+            document.getElementById('editItemCoeff').value = item.coeff || 2;
+            document.getElementById('editItemAnswer').value = item.answer || 'Yes,Partially,No,NA';
+            document.getElementById('editItemCR').value = item.cr || '';
+            document.getElementById('editItemModal').classList.add('active');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editItemModal').classList.remove('active');
+            editingItemId = null;
+        }
+
+        async function saveItemEdit(e) {
+            e.preventDefault();
+            if (!editingItemId) return;
+
+            const itemData = {
+                referenceValue: document.getElementById('editItemRefValue').value,
+                title: document.getElementById('editItemTitle').value,
+                coeff: parseInt(document.getElementById('editItemCoeff').value),
+                answer: document.getElementById('editItemAnswer').value,
+                cr: document.getElementById('editItemCR').value
+            };
+
+            try {
+                await apiCall(`/items/${editingItemId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(itemData)
+                });
+                showToast('Item updated successfully!', 'success');
+                closeEditModal();
+                loadItems();
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error');
+            }
+        }
+
+        // ==========================================
+        // BULK UPLOAD
+        // ==========================================
+
+        function downloadItemTemplate() {
+            const headers = ['ReferenceValue', 'Title', 'Coeff', 'Answer', 'CR'];
+            const examples = [
+                ['1.1', 'Example question 1', '2', 'Yes,Partially,No,NA', 'Criterion 1'],
+                ['1.2', 'Example question 2', '2', 'Yes,Partially,No,NA', 'Criterion 2']
+            ];
+            const csv = [headers.join(','), ...examples.map(r => r.map(f => `"${f}"`).join(','))].join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'items_template.csv';
+            link.click();
+            showToast('Template downloaded!', 'success');
+        }
+
+        async function handleBulkUpload(event) {
+            const file = event.target.files[0];
+            if (!file || !currentSectionId) return;
+
+            const statusDiv = document.getElementById('bulkUploadStatus');
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<div class="loading"><div class="spinner"></div>Processing...</div>';
+
+            try {
+                const text = await file.text();
+                const items = parseCSV(text);
+
+                if (items.length === 0) {
+                    statusDiv.innerHTML = '<div style="color: #ef4444; padding: 10px; background: #fef2f2; border-radius: 8px;">❌ No valid items found</div>';
+                    return;
+                }
+
+                window.pendingBulkItems = items;
+                statusDiv.innerHTML = `
+                    <div style="background: #fff5f3; padding: 15px; border-radius: 8px; border: 1px solid #e17055;">
+                        <h4 style="color: #d63031;">📋 ${items.length} items found</h4>
+                        <button class="btn btn-success" onclick="confirmBulkUpload()">✅ Confirm Upload</button>
+                        <button class="btn btn-outline" onclick="cancelBulkUpload()" style="margin-left: 10px;">❌ Cancel</button>
+                    </div>
+                `;
+            } catch (error) {
+                statusDiv.innerHTML = `<div style="color: #ef4444;">${error.message}</div>`;
+            }
+            event.target.value = '';
+        }
+
+        function parseCSV(text) {
+            const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+            const items = [];
+            for (let i = 1; i < lines.length; i++) {
+                const values = parseCSVLine(lines[i]);
+                if (values.length >= 2 && values[0] && values[1]) {
+                    items.push({
+                        referenceValue: values[0].trim(),
+                        title: values[1].trim(),
+                        coeff: parseInt(values[2]) || 2,
+                        answer: values[3]?.trim() || 'Yes,Partially,No,NA',
+                        cr: values[4]?.trim() || ''
+                    });
+                }
+            }
+            return items;
+        }
+
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '', inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+                const c = line[i];
+                if (c === '"') { if (inQuotes && line[i+1] === '"') { current += '"'; i++; } else { inQuotes = !inQuotes; } }
+                else if (c === ',' && !inQuotes) { result.push(current); current = ''; }
+                else { current += c; }
+            }
+            result.push(current);
+            return result;
+        }
+
+        async function confirmBulkUpload() {
+            const items = window.pendingBulkItems;
+            if (!items) return;
+
+            const statusDiv = document.getElementById('bulkUploadStatus');
+            statusDiv.innerHTML = '<div class="loading"><div class="spinner"></div>Uploading...</div>';
+
+            try {
+                const response = await apiCall(`/sections/${currentSectionId}/items/bulk`, {
+                    method: 'POST',
+                    body: JSON.stringify({ items, duplicateAction: document.getElementById('duplicateAction').value })
+                });
+                const { created = 0, skipped = 0 } = response.data;
+                statusDiv.innerHTML = `<div style="color: #d63031; padding: 10px; background: #fff5f3; border-radius: 8px;">✅ ${created} created, ${skipped} skipped</div>`;
+                window.pendingBulkItems = null;
+                loadItems();
+                loadSections();
+                setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
+            } catch (error) {
+                statusDiv.innerHTML = `<div style="color: #ef4444;">${error.message}</div>`;
+            }
+        }
+
+        function cancelBulkUpload() {
+            window.pendingBulkItems = null;
+            document.getElementById('bulkUploadStatus').style.display = 'none';
+        }
+    </script>
+
+    <!-- Edit Schema Modal -->
+    <div id="editSchemaModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>✏️ Rename Template</h3>
+                <button class="modal-close" onclick="closeEditSchemaModal()">&times;</button>
+            </div>
+            <form id="editSchemaForm" onsubmit="saveSchemaEdit(event)">
+                <input type="hidden" id="editSchemaId">
+                <div class="form-group">
+                    <label>Template Name <span class="required">*</span></label>
+                    <input type="text" id="editSchemaName" required>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="editSchemaDescription" rows="3"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeEditSchemaModal()" style="background: #6b7280;">Cancel</button>
+                    <button type="submit" class="btn btn-success">💾 Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Section Modal -->
+    <div id="editSectionModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>✏️ Edit Section</h3>
+                <button class="modal-close" onclick="closeEditSectionModal()">&times;</button>
+            </div>
+            <form id="editSectionForm" onsubmit="saveSectionEdit(event)">
+                <input type="hidden" id="editSectionId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Section Number <span class="required">*</span></label>
+                        <input type="number" id="editSectionNumber" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Icon</label>
+                        <select id="editSectionIcon">
+                            <option value="📋">📋 Default</option>
+                            <option value="🔥">🔥 Fire</option>
+                            <option value="⚡">⚡ Electrical</option>
+                            <option value="🦺">🦺 PPE</option>
+                            <option value="🚨">🚨 Emergency</option>
+                            <option value="🧯">🧯 Fire Extinguisher</option>
+                            <option value="🚪">🚪 Exit</option>
+                            <option value="⚠️">⚠️ Hazard</option>
+                            <option value="🛠️">🛠️ Equipment</option>
+                            <option value="🧹">🧹 Housekeeping</option>
+                            <option value="💊">💊 First Aid</option>
+                            <option value="🔒">🔒 Security</option>
+                            <option value="📝">📝 Documentation</option>
+                            <option value="✅">✅ Compliance</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Section Name <span class="required">*</span></label>
+                    <input type="text" id="editSectionName" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeEditSectionModal()" style="background: #6b7280;">Cancel</button>
+                    <button type="submit" class="btn btn-success">💾 Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- View Template Modal -->
+    <div id="viewTemplateModal" class="modal-overlay">
+        <div class="modal modal-large">
+            <div class="modal-header">
+                <h3>👁️ <span id="templateViewTitle">Template</span></h3>
+                <button class="modal-close" onclick="closeViewModal()">&times;</button>
+            </div>
+            <div id="templateViewContent"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeViewModal()" style="background: #6b7280;">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Item Modal -->
+    <div id="editItemModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>✏️ Edit Item</h3>
+                <button class="modal-close" onclick="closeEditModal()">&times;</button>
+            </div>
+            <form id="editItemForm" onsubmit="saveItemEdit(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Reference Value *</label>
+                        <input type="text" id="editItemRefValue" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Coefficient *</label>
+                        <select id="editItemCoeff" required>
+                            <option value="1">1</option>
+                            <option value="2" selected>2</option>
+                            <option value="4">4</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Title *</label>
+                    <input type="text" id="editItemTitle" required>
+                </div>
+                <div class="form-group">
+                    <label>Answer Options</label>
+                    <input type="text" id="editItemAnswer" value="Yes,Partially,No,NA">
+                </div>
+                <div class="form-group">
+                    <label>Criterion</label>
+                    <textarea id="editItemCR" rows="3"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeEditModal()" style="background: #6b7280;">Cancel</button>
+                    <button type="submit" class="btn btn-success">💾 Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

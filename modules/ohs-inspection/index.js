@@ -378,7 +378,7 @@ router.post('/api/templates/schemas', async (req, res) => {
     }
 });
 
-// Get full template with sections and items
+// Get full template with departments, sections and items
 router.get('/api/templates/schemas/:schemaId', async (req, res) => {
     try {
         const schemaId = parseInt(req.params.schemaId);
@@ -395,17 +395,57 @@ router.get('/api/templates/schemas/:schemaId', async (req, res) => {
         
         const template = templateResult.recordset[0];
         
-        const sectionsResult = await pool.request()
+        // Get departments
+        const departmentsResult = await pool.request()
+            .input('templateId', sql.Int, schemaId)
+            .query(`
+                SELECT Id as departmentId, DepartmentName as departmentName, DepartmentIcon as departmentIcon, 
+                       DepartmentOrder as departmentOrder, PassingGrade as passingGrade
+                FROM OHS_InspectionTemplateDepartments 
+                WHERE TemplateId = @templateId AND IsActive = 1
+                ORDER BY DepartmentOrder
+            `);
+        
+        template.departments = [];
+        for (const department of departmentsResult.recordset) {
+            // Get sections for this department
+            const sectionsResult = await pool.request()
+                .input('departmentId', sql.Int, department.departmentId)
+                .query(`
+                    SELECT Id as sectionId, SectionName as sectionName, SectionIcon as sectionIcon, SectionOrder as sectionNumber, DepartmentId as departmentId
+                    FROM OHS_InspectionTemplateSections 
+                    WHERE DepartmentId = @departmentId AND IsActive = 1
+                    ORDER BY SectionOrder
+                `);
+            
+            department.sections = [];
+            for (const section of sectionsResult.recordset) {
+                const itemsResult = await pool.request()
+                    .input('sectionId', sql.Int, section.sectionId)
+                    .query(`
+                        SELECT Id as itemId, ReferenceValue as referenceValue, Question as title, Coefficient as coeff, AnswerOptions as answer, Criteria as cr
+                        FROM OHS_InspectionTemplateItems
+                        WHERE SectionId = @sectionId AND IsActive = 1
+                        ORDER BY ReferenceValue
+                    `);
+                section.items = itemsResult.recordset;
+                department.sections.push(section);
+            }
+            template.departments.push(department);
+        }
+        
+        // Also get sections without department (legacy support)
+        const orphanSectionsResult = await pool.request()
             .input('templateId', sql.Int, schemaId)
             .query(`
                 SELECT Id as sectionId, SectionName as sectionName, SectionIcon as sectionIcon, SectionOrder as sectionNumber
                 FROM OHS_InspectionTemplateSections 
-                WHERE TemplateId = @templateId AND IsActive = 1
+                WHERE TemplateId = @templateId AND DepartmentId IS NULL AND IsActive = 1
                 ORDER BY SectionOrder
             `);
         
         template.sections = [];
-        for (const section of sectionsResult.recordset) {
+        for (const section of orphanSectionsResult.recordset) {
             const itemsResult = await pool.request()
                 .input('sectionId', sql.Int, section.sectionId)
                 .query(`
@@ -455,6 +495,149 @@ router.delete('/api/templates/schemas/:schemaId', async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Error deleting template:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// ==========================================
+// Department API Routes
+// ==========================================
+
+// Get all departments for a template
+router.get('/api/templates/schemas/:schemaId/departments', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request()
+            .input('templateId', sql.Int, req.params.schemaId)
+            .query(`
+                SELECT 
+                    d.Id as departmentId, 
+                    d.DepartmentName as departmentName, 
+                    d.DepartmentIcon as departmentIcon, 
+                    d.DepartmentOrder as departmentOrder,
+                    d.PassingGrade as passingGrade,
+                    (SELECT COUNT(*) FROM OHS_InspectionTemplateSections s WHERE s.DepartmentId = d.Id AND s.IsActive = 1) as sectionCount
+                FROM OHS_InspectionTemplateDepartments d
+                WHERE d.TemplateId = @templateId AND d.IsActive = 1
+                ORDER BY d.DepartmentOrder
+            `);
+        await pool.close();
+        res.json({ success: true, data: result.recordset });
+    } catch (error) {
+        console.error('Error fetching departments:', error);
+        res.json({ success: true, data: [] });
+    }
+});
+
+// Create department
+router.post('/api/templates/schemas/:schemaId/departments', async (req, res) => {
+    try {
+        const { departmentName, departmentIcon, departmentOrder, passingGrade } = req.body;
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request()
+            .input('templateId', sql.Int, req.params.schemaId)
+            .input('name', sql.NVarChar, departmentName)
+            .input('icon', sql.NVarChar, departmentIcon || '🏬')
+            .input('order', sql.Int, departmentOrder || 1)
+            .input('grade', sql.Int, passingGrade || 80)
+            .query(`
+                INSERT INTO OHS_InspectionTemplateDepartments (TemplateId, DepartmentName, DepartmentIcon, DepartmentOrder, PassingGrade, IsActive)
+                OUTPUT INSERTED.Id as departmentId
+                VALUES (@templateId, @name, @icon, @order, @grade, 1)
+            `);
+        await pool.close();
+        res.json({ success: true, data: { departmentId: result.recordset[0].departmentId } });
+    } catch (error) {
+        console.error('Error creating department:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Update department
+router.put('/api/templates/departments/:departmentId', async (req, res) => {
+    try {
+        const { departmentName, departmentIcon, departmentOrder, passingGrade } = req.body;
+        const pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('id', sql.Int, req.params.departmentId)
+            .input('name', sql.NVarChar, departmentName)
+            .input('icon', sql.NVarChar, departmentIcon || '🏬')
+            .input('order', sql.Int, departmentOrder || 1)
+            .input('grade', sql.Int, passingGrade || 80)
+            .query(`UPDATE OHS_InspectionTemplateDepartments SET DepartmentName = @name, DepartmentIcon = @icon, DepartmentOrder = @order, PassingGrade = @grade, UpdatedAt = GETDATE() WHERE Id = @id`);
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating department:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Delete department
+router.delete('/api/templates/departments/:departmentId', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        // Soft delete department and its sections
+        await pool.request()
+            .input('id', sql.Int, req.params.departmentId)
+            .query(`
+                UPDATE OHS_InspectionTemplateDepartments SET IsActive = 0 WHERE Id = @id;
+                UPDATE OHS_InspectionTemplateSections SET IsActive = 0 WHERE DepartmentId = @id;
+            `);
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting department:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Get sections for a department
+router.get('/api/templates/departments/:departmentId/sections', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request()
+            .input('departmentId', sql.Int, req.params.departmentId)
+            .query(`
+                SELECT 
+                    s.Id as sectionId, 
+                    s.SectionName as sectionName, 
+                    s.SectionIcon as sectionIcon, 
+                    s.SectionOrder as sectionNumber,
+                    s.DepartmentId as departmentId,
+                    (SELECT COUNT(*) FROM OHS_InspectionTemplateItems i WHERE i.SectionId = s.Id AND i.IsActive = 1) as itemCount
+                FROM OHS_InspectionTemplateSections s
+                WHERE s.DepartmentId = @departmentId AND s.IsActive = 1
+                ORDER BY s.SectionOrder
+            `);
+        await pool.close();
+        res.json({ success: true, data: result.recordset });
+    } catch (error) {
+        console.error('Error fetching sections for department:', error);
+        res.json({ success: true, data: [] });
+    }
+});
+
+// Create section under department
+router.post('/api/templates/departments/:departmentId/sections', async (req, res) => {
+    try {
+        const { sectionNumber, sectionName, sectionIcon, templateId } = req.body;
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request()
+            .input('templateId', sql.Int, templateId)
+            .input('departmentId', sql.Int, req.params.departmentId)
+            .input('name', sql.NVarChar, sectionName)
+            .input('icon', sql.NVarChar, sectionIcon || '📋')
+            .input('order', sql.Int, sectionNumber)
+            .query(`
+                INSERT INTO OHS_InspectionTemplateSections (TemplateId, DepartmentId, SectionName, SectionIcon, SectionOrder, IsActive)
+                OUTPUT INSERTED.Id as sectionId
+                VALUES (@templateId, @departmentId, @name, @icon, @order, 1)
+            `);
+        await pool.close();
+        res.json({ success: true, data: { sectionId: result.recordset[0].sectionId } });
+    } catch (error) {
+        console.error('Error creating section:', error);
         res.json({ success: false, error: error.message });
     }
 });
@@ -1007,18 +1190,101 @@ router.post('/api/inspections', async (req, res) => {
         }
         
         if (useTemplateId) {
-            // Copy sections from template
-            const templateSections = await pool.request()
+            // Copy departments from template
+            const templateDepartments = await pool.request()
                 .input('templateId', sql.Int, useTemplateId)
                 .query(`
-                    SELECT Id, SectionName, SectionIcon, SectionOrder, PassingGrade
-                    FROM OHS_InspectionTemplateSections
+                    SELECT Id, DepartmentName, DepartmentIcon, DepartmentOrder, PassingGrade
+                    FROM OHS_InspectionTemplateDepartments
                     WHERE TemplateId = @templateId AND IsActive = 1
+                    ORDER BY DepartmentOrder
+                `);
+            
+            for (const dept of templateDepartments.recordset) {
+                // Insert department
+                const deptResult = await pool.request()
+                    .input('inspectionId', sql.Int, inspectionId)
+                    .input('departmentName', sql.NVarChar, dept.DepartmentName)
+                    .input('departmentIcon', sql.NVarChar, dept.DepartmentIcon || '🏬')
+                    .input('departmentOrder', sql.Int, dept.DepartmentOrder)
+                    .input('passingGrade', sql.Int, dept.PassingGrade || 80)
+                    .query(`
+                        INSERT INTO OHS_InspectionDepartments (InspectionId, DepartmentName, DepartmentIcon, DepartmentOrder, PassingGrade, IsNA)
+                        OUTPUT INSERTED.Id
+                        VALUES (@inspectionId, @departmentName, @departmentIcon, @departmentOrder, @passingGrade, 0)
+                    `);
+                
+                const newDeptId = deptResult.recordset[0].Id;
+                
+                // Copy sections for this department
+                const templateSections = await pool.request()
+                    .input('departmentId', sql.Int, dept.Id)
+                    .query(`
+                        SELECT Id, SectionName, SectionIcon, SectionOrder
+                        FROM OHS_InspectionTemplateSections
+                        WHERE DepartmentId = @departmentId AND IsActive = 1
+                        ORDER BY SectionOrder
+                    `);
+                
+                for (const section of templateSections.recordset) {
+                    // Insert section with department info
+                    await pool.request()
+                        .input('inspectionId', sql.Int, inspectionId)
+                        .input('sectionName', sql.NVarChar, section.SectionName)
+                        .input('sectionIcon', sql.NVarChar, section.SectionIcon)
+                        .input('sectionOrder', sql.Int, section.SectionOrder)
+                        .input('departmentName', sql.NVarChar, dept.DepartmentName)
+                        .input('departmentOrder', sql.Int, dept.DepartmentOrder)
+                        .query(`
+                            INSERT INTO OHS_InspectionSections (InspectionId, SectionName, SectionIcon, SectionOrder, DepartmentName, DepartmentOrder, DepartmentIsNA)
+                            VALUES (@inspectionId, @sectionName, @sectionIcon, @sectionOrder, @departmentName, @departmentOrder, 0)
+                        `);
+                    
+                    // Copy items for this section
+                    const templateItems = await pool.request()
+                        .input('sectionId', sql.Int, section.Id)
+                        .query(`
+                            SELECT ReferenceValue, Question, Coefficient, AnswerOptions, Criteria, ISNULL(ItemOrder, 0) as ItemOrder
+                            FROM OHS_InspectionTemplateItems
+                            WHERE SectionId = @sectionId AND IsActive = 1
+                            ORDER BY ISNULL(ItemOrder, 0), ReferenceValue
+                        `);
+                    
+                    for (const item of templateItems.recordset) {
+                        await pool.request()
+                            .input('inspectionId', sql.Int, inspectionId)
+                            .input('sectionName', sql.NVarChar, section.SectionName)
+                            .input('sectionOrder', sql.Int, section.SectionOrder)
+                            .input('itemOrder', sql.Int, item.ItemOrder || 0)
+                            .input('referenceValue', sql.NVarChar, item.ReferenceValue)
+                            .input('question', sql.NVarChar, item.Question)
+                            .input('coefficient', sql.Decimal(5,2), item.Coefficient || 1)
+                            .input('answerOptions', sql.NVarChar, item.AnswerOptions || 'Yes,Partially,No,NA')
+                            .input('criteria', sql.NVarChar, item.Criteria)
+                            .input('departmentName', sql.NVarChar, dept.DepartmentName)
+                            .input('departmentOrder', sql.Int, dept.DepartmentOrder)
+                            .query(`
+                                INSERT INTO OHS_InspectionItems 
+                                    (InspectionId, SectionName, SectionOrder, ItemOrder, ReferenceValue, Question, Coefficient, AnswerOptions, Criteria, DepartmentName, DepartmentOrder, DepartmentIsNA)
+                                VALUES 
+                                    (@inspectionId, @sectionName, @sectionOrder, @itemOrder, @referenceValue, @question, @coefficient, @answerOptions, @criteria, @departmentName, @departmentOrder, 0)
+                            `);
+                    }
+                }
+            }
+            
+            // Also handle sections without departments (legacy templates)
+            const orphanSections = await pool.request()
+                .input('templateId', sql.Int, useTemplateId)
+                .query(`
+                    SELECT Id, SectionName, SectionIcon, SectionOrder
+                    FROM OHS_InspectionTemplateSections
+                    WHERE TemplateId = @templateId AND DepartmentId IS NULL AND IsActive = 1
                     ORDER BY SectionOrder
                 `);
             
-            for (const section of templateSections.recordset) {
-                // Insert section
+            for (const section of orphanSections.recordset) {
+                // Insert section without department
                 await pool.request()
                     .input('inspectionId', sql.Int, inspectionId)
                     .input('sectionName', sql.NVarChar, section.SectionName)
@@ -1161,6 +1427,27 @@ router.get('/api/audits/:auditId', async (req, res) => {
         
         const audit = auditResult.recordset[0];
         
+        // Get departments for this inspection
+        const departmentsResult = await pool.request()
+            .input('inspectionId', sql.Int, auditId)
+            .query(`
+                SELECT 
+                    Id as departmentId,
+                    DepartmentName as departmentName,
+                    DepartmentIcon as departmentIcon,
+                    DepartmentOrder as departmentOrder,
+                    PassingGrade as passingGrade,
+                    IsNA as isNA,
+                    Score as score,
+                    TotalPoints as totalPoints,
+                    MaxPoints as maxPoints
+                FROM OHS_InspectionDepartments
+                WHERE InspectionId = @inspectionId
+                ORDER BY DepartmentOrder
+            `);
+        
+        const departments = departmentsResult.recordset;
+        
         // Check if sections exist
         let sectionsResult = await pool.request()
             .input('inspectionId', sql.Int, auditId)
@@ -1172,10 +1459,13 @@ router.get('/api/audits/:auditId', async (req, res) => {
                     s.SectionIcon as sectionIcon,
                     s.Score as sectionScore,
                     s.TotalPoints as totalPoints,
-                    s.MaxPoints as maxPoints
+                    s.MaxPoints as maxPoints,
+                    s.DepartmentName as departmentName,
+                    s.DepartmentOrder as departmentOrder,
+                    s.DepartmentIsNA as departmentIsNA
                 FROM OHS_InspectionSections s
                 WHERE s.InspectionId = @inspectionId
-                ORDER BY s.SectionOrder
+                ORDER BY ISNULL(s.DepartmentOrder, 999), s.SectionOrder
             `);
         
         // If no sections exist, populate from template
@@ -1296,6 +1586,7 @@ router.get('/api/audits/:auditId', async (req, res) => {
                 score: audit.Score,
                 templateId: audit.TemplateId,
                 templateName: audit.TemplateName,
+                departments,
                 sections
             }
         });
@@ -1323,6 +1614,10 @@ router.delete('/api/audits/:auditId', async (req, res) => {
             .input('id', sql.Int, auditId)
             .query(`DELETE FROM OHS_InspectionSections WHERE InspectionId = @id`);
         
+        await pool.request()
+            .input('id', sql.Int, auditId)
+            .query(`DELETE FROM OHS_InspectionDepartments WHERE InspectionId = @id`);
+        
         const result = await pool.request()
             .input('id', sql.Int, auditId)
             .query(`DELETE FROM OHS_Inspections WHERE Id = @id; SELECT @@ROWCOUNT as deleted`);
@@ -1336,6 +1631,54 @@ router.delete('/api/audits/:auditId', async (req, res) => {
         res.json({ success: true, message: 'Audit deleted successfully' });
     } catch (error) {
         console.error('Error deleting audit:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Toggle department NA status (when user marks department as Not Applicable during inspection)
+router.put('/api/audits/:auditId/departments/:departmentId/toggle-na', async (req, res) => {
+    try {
+        const { auditId, departmentId } = req.params;
+        const { isNA } = req.body;
+        
+        const pool = await sql.connect(dbConfig);
+        
+        // Get department name first
+        const deptResult = await pool.request()
+            .input('id', sql.Int, departmentId)
+            .query(`SELECT DepartmentName FROM OHS_InspectionDepartments WHERE Id = @id`);
+        
+        if (deptResult.recordset.length === 0) {
+            await pool.close();
+            return res.status(404).json({ success: false, error: 'Department not found' });
+        }
+        
+        const departmentName = deptResult.recordset[0].DepartmentName;
+        
+        // Update department NA status
+        await pool.request()
+            .input('id', sql.Int, departmentId)
+            .input('isNA', sql.Bit, isNA ? 1 : 0)
+            .query(`UPDATE OHS_InspectionDepartments SET IsNA = @isNA WHERE Id = @id`);
+        
+        // Update all sections for this department
+        await pool.request()
+            .input('inspectionId', sql.Int, auditId)
+            .input('departmentName', sql.NVarChar, departmentName)
+            .input('isNA', sql.Bit, isNA ? 1 : 0)
+            .query(`UPDATE OHS_InspectionSections SET DepartmentIsNA = @isNA WHERE InspectionId = @inspectionId AND DepartmentName = @departmentName`);
+        
+        // Update all items for this department
+        await pool.request()
+            .input('inspectionId', sql.Int, auditId)
+            .input('departmentName', sql.NVarChar, departmentName)
+            .input('isNA', sql.Bit, isNA ? 1 : 0)
+            .query(`UPDATE OHS_InspectionItems SET DepartmentIsNA = @isNA WHERE InspectionId = @inspectionId AND DepartmentName = @departmentName`);
+        
+        await pool.close();
+        res.json({ success: true, message: `Department ${isNA ? 'marked as N/A' : 'restored'}` });
+    } catch (error) {
+        console.error('Error toggling department NA:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
