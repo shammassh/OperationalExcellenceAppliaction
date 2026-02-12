@@ -6,7 +6,38 @@
 const express = require('express');
 const router = express.Router();
 const sql = require('mssql');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { markFeedbackNotificationsRead } = require('../../../services/notification-scheduler');
+
+// Configure multer for image uploads
+const uploadDir = path.join(__dirname, '../../../uploads/weekly-feedback');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadDir),
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'feedback-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = /jpeg|jpg|png|gif|webp/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+        if (extname && mimetype) {
+            return cb(null, true);
+        }
+        cb(new Error('Only image files are allowed'));
+    }
+});
 
 // Database configuration
 const dbConfig = {
@@ -62,7 +93,7 @@ router.get('/', async (req, res) => {
         await pool.close();
         
         // Current user info
-        const currentUser = req.session?.user || {};
+        const currentUser = req.currentUser || {};
         
         const storeOptions = stores.map(s => 
             `<option value="${s.Id}" data-name="${s.StoreName}">${s.StoreName}</option>`
@@ -136,6 +167,13 @@ router.get('/', async (req, res) => {
                     .toast { position: fixed; top: 20px; right: 20px; padding: 15px 25px; border-radius: 8px; color: white; font-weight: 600; display: none; z-index: 1000; }
                     .toast-success { background: #00b894; }
                     .toast-error { background: #d63031; }
+                    .image-upload-area { 
+                        border: 2px dashed #ddd; border-radius: 12px; padding: 30px; text-align: center; 
+                        cursor: pointer; transition: all 0.2s; position: relative; min-height: 150px;
+                        display: flex; flex-direction: column; align-items: center; justify-content: center;
+                    }
+                    .image-upload-area:hover { border-color: #6c5ce7; background: #f8f5ff; }
+                    .image-upload-area p { margin: 10px 0 5px 0; color: #666; font-size: 14px; }
                     @media (max-width: 600px) {
                         .form-row { grid-template-columns: 1fr; }
                         .rating-group { flex-direction: column; }
@@ -272,6 +310,27 @@ router.get('/', async (req, res) => {
                                     </div>
                                 </div>
                                 
+                                <div class="form-section">
+                                    <h3>📷 Attach Image (Optional)</h3>
+                                    <div class="form-group">
+                                        <label>Upload an image to support your feedback</label>
+                                        <div class="image-upload-container">
+                                            <input type="file" name="feedbackImage" id="feedbackImage" accept="image/*" style="display: none;">
+                                            <div class="image-upload-area" onclick="document.getElementById('feedbackImage').click()">
+                                                <div id="imagePreviewContainer" style="display: none;">
+                                                    <img id="imagePreview" src="" alt="Preview" style="max-width: 100%; max-height: 200px; border-radius: 8px;">
+                                                    <button type="button" onclick="event.stopPropagation(); removeImage();" style="position: absolute; top: 5px; right: 5px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 25px; height: 25px; cursor: pointer;">×</button>
+                                                </div>
+                                                <div id="uploadPlaceholder">
+                                                    <span style="font-size: 40px;">📷</span>
+                                                    <p>Click to upload an image</p>
+                                                    <small style="color: #999;">Max size: 10MB (JPG, PNG, GIF, WebP)</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
                                 <button type="submit" class="btn-submit" id="submitBtn">
                                     <span>📤</span> Submit Weekly Feedback
                                 </button>
@@ -291,6 +350,31 @@ router.get('/', async (req, res) => {
                         setTimeout(() => { toast.style.display = 'none'; }, 4000);
                     }
                     
+                    // Image preview functionality
+                    document.getElementById('feedbackImage').addEventListener('change', function(e) {
+                        const file = e.target.files[0];
+                        if (file) {
+                            if (file.size > 10 * 1024 * 1024) {
+                                showToast('Image size must be less than 10MB', 'error');
+                                e.target.value = '';
+                                return;
+                            }
+                            const reader = new FileReader();
+                            reader.onload = function(e) {
+                                document.getElementById('imagePreview').src = e.target.result;
+                                document.getElementById('imagePreviewContainer').style.display = 'block';
+                                document.getElementById('uploadPlaceholder').style.display = 'none';
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    });
+                    
+                    function removeImage() {
+                        document.getElementById('feedbackImage').value = '';
+                        document.getElementById('imagePreviewContainer').style.display = 'none';
+                        document.getElementById('uploadPlaceholder').style.display = 'block';
+                    }
+                    
                     document.getElementById('feedbackForm').addEventListener('submit', async function(e) {
                         e.preventDefault();
                         
@@ -299,24 +383,22 @@ router.get('/', async (req, res) => {
                         btn.innerHTML = '<span class="spinner"></span> Submitting...';
                         
                         const formData = new FormData(this);
-                        const data = Object.fromEntries(formData.entries());
                         
-                        // Get selected option names
+                        // Get selected option names and add them to formData
                         const storeSelect = document.getElementById('storeId');
                         const hoSelect = document.getElementById('headOfOpsId');
                         const amSelect = document.getElementById('areaManagerId');
                         
-                        data.storeName = storeSelect.options[storeSelect.selectedIndex]?.dataset.name || '';
-                        data.headOfOpsName = hoSelect.options[hoSelect.selectedIndex]?.dataset.name || '';
-                        data.headOfOpsEmail = hoSelect.options[hoSelect.selectedIndex]?.dataset.email || '';
-                        data.areaManagerName = amSelect.options[amSelect.selectedIndex]?.dataset.name || '';
-                        data.areaManagerEmail = amSelect.options[amSelect.selectedIndex]?.dataset.email || '';
+                        formData.append('storeName', storeSelect.options[storeSelect.selectedIndex]?.dataset.name || '');
+                        formData.append('headOfOpsName', hoSelect.options[hoSelect.selectedIndex]?.dataset.name || '');
+                        formData.append('headOfOpsEmail', hoSelect.options[hoSelect.selectedIndex]?.dataset.email || '');
+                        formData.append('areaManagerName', amSelect.options[amSelect.selectedIndex]?.dataset.name || '');
+                        formData.append('areaManagerEmail', amSelect.options[amSelect.selectedIndex]?.dataset.email || '');
                         
                         try {
                             const res = await fetch('/stores/weekly-feedback/submit', {
                                 method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(data)
+                                body: formData  // Send as FormData (no Content-Type header - browser sets it automatically with boundary)
                             });
                             
                             const result = await res.json();
@@ -348,11 +430,12 @@ router.get('/', async (req, res) => {
 });
 
 // Submit feedback
-router.post('/submit', async (req, res) => {
+router.post('/submit', upload.single('feedbackImage'), async (req, res) => {
     try {
         const pool = await sql.connect(dbConfig);
         const data = req.body;
-        const currentUser = req.session?.user || {};
+        const currentUser = req.currentUser || {};
+        const imagePath = req.file ? '/uploads/weekly-feedback/' + req.file.filename : null;
         
         // Check if feedback already submitted for this store this week
         const existingCheck = await pool.request()
@@ -388,6 +471,7 @@ router.post('/submit', async (req, res) => {
             .input('comments', sql.NVarChar(sql.MAX), data.comments || null)
             .input('issuesReported', sql.NVarChar(sql.MAX), data.issuesReported || null)
             .input('recommendations', sql.NVarChar(sql.MAX), data.recommendations || null)
+            .input('imagePath', sql.NVarChar(500), imagePath)
             .input('createdBy', sql.Int, currentUser.id || null)
             .query(`INSERT INTO WeeklyThirdPartyFeedback 
                     (StoreId, StoreName, StoreManagerId, StoreManagerName, StoreManagerEmail,
@@ -395,14 +479,14 @@ router.post('/submit', async (req, res) => {
                      HeadOfOperationsId, HeadOfOperationsName, HeadOfOperationsEmail,
                      WeekStartDate, WeekEndDate, OverallRating, CleanlinessRating, 
                      PunctualityRating, CommunicationRating, Comments, IssuesReported, 
-                     Recommendations, CreatedBy)
+                     Recommendations, ImagePath, CreatedBy)
                     OUTPUT INSERTED.Id
                     VALUES (@storeId, @storeName, @storeManagerId, @storeManagerName, @storeManagerEmail,
                             @areaManagerId, @areaManagerName, @areaManagerEmail,
                             @headOfOpsId, @headOfOpsName, @headOfOpsEmail,
                             @weekStart, @weekEnd, @overallRating, @cleanlinessRating,
                             @punctualityRating, @communicationRating, @comments, @issuesReported,
-                            @recommendations, @createdBy)`);
+                            @recommendations, @imagePath, @createdBy)`);
         
         const feedbackId = result.recordset[0].Id;
         
@@ -464,7 +548,7 @@ router.get('/success/:id', async (req, res) => {
 router.get('/history', async (req, res) => {
     try {
         const pool = await sql.connect(dbConfig);
-        const currentUser = req.session?.user || {};
+        const currentUser = req.currentUser || {};
         
         // Show all feedback records
         const result = await pool.request()
