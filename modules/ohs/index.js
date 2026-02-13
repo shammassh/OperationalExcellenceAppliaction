@@ -27,8 +27,8 @@ router.get('/', (req, res) => {
     
     // Dashboard cards
     const dashboardCards = [
-        { id: 'all-incidents', icon: '📊', title: 'All Incidents', href: '/ohs/incidents', desc: 'View and manage all reported incidents', color: '#e17055' },
-        { id: 'pending-review', icon: '⏳', title: 'Pending Review', href: '/ohs/incidents?status=pending', desc: 'Incidents awaiting review', color: '#fdcb6e' },
+        { id: 'all-incidents', icon: '📊', title: 'All Incidents', href: '/stores/ohs-incident/history', desc: 'View and manage all reported incidents', color: '#e17055' },
+        { id: 'pending-review', icon: '⏳', title: 'Pending Review', href: '/stores/ohs-incident/history?status=pending', desc: 'Incidents awaiting review', color: '#fdcb6e' },
         { id: 'reports', icon: '📈', title: 'Reports & Analytics', href: '/ohs/reports', desc: 'Generate OHS reports and statistics', color: '#00cec9' },
     ];
     

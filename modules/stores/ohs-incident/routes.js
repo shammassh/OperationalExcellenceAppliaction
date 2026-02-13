@@ -391,6 +391,7 @@ router.get('/', async (req, res) => {
                 <div class="header">
                     <h1>🦺 OHS A&I Reporting</h1>
                     <div class="header-nav">
+                        <a href="/stores/ohs-incident/history">📋 My Reports</a>
                         <a href="/stores">← Back to Stores</a>
                         <a href="/">🏠 Home</a>
                     </div>
@@ -829,6 +830,13 @@ router.post('/submit', upload.array('attachments', 10), async (req, res) => {
         // Get file paths
         const attachments = req.files ? req.files.map(f => '/uploads/ohs-incidents/' + f.filename) : [];
         
+        // Parse time - convert "HH:mm" to a proper time value
+        let incidentTimeValue = null;
+        if (req.body.incidentTime) {
+            // Append seconds to make it "HH:mm:ss" format
+            incidentTimeValue = req.body.incidentTime + ':00';
+        }
+        
         // Insert into database
         await pool.request()
             .input('incidentNumber', sql.NVarChar, incidentNumber)
@@ -838,7 +846,7 @@ router.post('/submit', upload.array('attachments', 10), async (req, res) => {
             .input('categoryId', sql.Int, req.body.categoryId || null)
             .input('subCategoryId', sql.Int, req.body.subCategoryId || null)
             .input('incidentDate', sql.Date, req.body.incidentDate)
-            .input('incidentTime', sql.Time, req.body.incidentTime || null)
+            .input('incidentTime', sql.NVarChar, incidentTimeValue)
             .input('exactLocation', sql.NVarChar, req.body.exactLocation || '')
             .input('incidentDescription', sql.NVarChar, req.body.incidentDescription || '')
             .input('injuryOccurred', sql.Bit, req.body.injuryOccurred === 'on' ? 1 : 0)
@@ -957,11 +965,614 @@ router.get('/success', (req, res) => {
                 <div class="incident-number">${incidentNumber || 'N/A'}</div>
                 <p class="success-message">Your incident report has been submitted and will be reviewed by the OHS team.</p>
                 <a href="/stores/ohs-incident" class="btn btn-primary">Submit Another Report</a>
+                <a href="/stores/ohs-incident/history" class="btn btn-secondary">📋 View My Reports</a>
                 <a href="/stores" class="btn btn-secondary">Back to Stores</a>
             </div>
         </body>
         </html>
     `);
 });
+// History Page - View submitted incident reports
+router.get('/history', async (req, res) => {
+    try {
+        const user = req.currentUser;
+        const pool = await sql.connect(dbConfig);
+        
+        // Get incidents - all incidents for OHS admin/manager, own incidents for stores
+        const incidents = await pool.request().query(`
+            SELECT i.*, 
+                   e.EventTypeName,
+                   c.CategoryName,
+                   sc.SubCategoryName,
+                   it.InjuryTypeName,
+                   bp.BodyPartName
+            FROM OHSIncidents i
+            LEFT JOIN OHSEventTypes e ON i.EventTypeId = e.Id
+            LEFT JOIN OHSEventCategories c ON i.CategoryId = c.Id
+            LEFT JOIN OHSEventSubCategories sc ON i.SubCategoryId = sc.Id
+            LEFT JOIN OHSInjuryTypes it ON i.InjuryTypeId = it.Id
+            LEFT JOIN OHSBodyParts bp ON i.BodyPartId = bp.Id
+            ORDER BY i.CreatedAt DESC
+        `);
+        
+        await pool.close();
+        
+        const statusColors = {
+            'Pending': '#fdcb6e',
+            'Under Review': '#74b9ff',
+            'Resolved': '#00b894',
+            'Closed': '#636e72'
+        };
+        
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Incident History - OHS</title>
+                <style>
+                    * { box-sizing: border-box; margin: 0; padding: 0; }
+                    body { 
+                        font-family: 'Segoe UI', Arial, sans-serif; 
+                        background: #f5f5f5;
+                        min-height: 100vh;
+                    }
+                    .header {
+                        background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+                        color: white;
+                        padding: 15px 30px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    }
+                    .header h1 { font-size: 22px; }
+                    .header-nav { display: flex; gap: 15px; }
+                    .header-nav a {
+                        color: white;
+                        text-decoration: none;
+                        padding: 8px 16px;
+                        border-radius: 5px;
+                        background: rgba(255,255,255,0.1);
+                        transition: background 0.2s;
+                    }
+                    .header-nav a:hover { background: rgba(255,255,255,0.2); }
+                    
+                    .container {
+                        max-width: 1400px;
+                        margin: 0 auto;
+                        padding: 30px;
+                    }
+                    
+                    .page-title {
+                        margin-bottom: 25px;
+                    }
+                    .page-title h2 {
+                        font-size: 24px;
+                        color: #333;
+                    }
+                    .page-title p {
+                        color: #666;
+                        margin-top: 5px;
+                    }
+                    
+                    .card {
+                        background: white;
+                        border-radius: 12px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                        overflow: hidden;
+                    }
+                    
+                    .toolbar {
+                        padding: 20px;
+                        display: flex;
+                        gap: 15px;
+                        flex-wrap: wrap;
+                        border-bottom: 1px solid #eee;
+                    }
+                    
+                    .search-box {
+                        padding: 10px 15px;
+                        border: 1px solid #ddd;
+                        border-radius: 5px;
+                        font-size: 14px;
+                        width: 300px;
+                    }
+                    
+                    .btn {
+                        padding: 10px 20px;
+                        border: none;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        text-decoration: none;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 5px;
+                    }
+                    .btn-primary { background: #e17055; color: white; }
+                    .btn-primary:hover { background: #d63031; }
+                    
+                    .table-container {
+                        overflow-x: auto;
+                    }
+                    
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                    }
+                    
+                    th, td {
+                        padding: 15px;
+                        text-align: left;
+                        border-bottom: 1px solid #eee;
+                    }
+                    
+                    th {
+                        background: #f8f9fa;
+                        font-weight: 600;
+                        color: #333;
+                        white-space: nowrap;
+                    }
+                    
+                    tr:hover {
+                        background: #f8f9fa;
+                    }
+                    
+                    .badge {
+                        padding: 5px 12px;
+                        border-radius: 20px;
+                        font-size: 12px;
+                        font-weight: 500;
+                    }
+                    
+                    .incident-number {
+                        font-family: monospace;
+                        font-weight: 600;
+                        color: #e17055;
+                    }
+                    
+                    .event-type {
+                        padding: 3px 10px;
+                        border-radius: 4px;
+                        font-size: 12px;
+                        font-weight: 500;
+                    }
+                    .event-type.accident { background: #ffe6e6; color: #dc3545; }
+                    .event-type.incident { background: #fff3cd; color: #856404; }
+                    .event-type.near-miss { background: #cce5ff; color: #004085; }
+                    
+                    .injury-badge {
+                        display: inline-block;
+                        padding: 2px 8px;
+                        border-radius: 3px;
+                        font-size: 11px;
+                    }
+                    .injury-yes { background: #ffe6e6; color: #dc3545; }
+                    .injury-no { background: #e8f5e9; color: #2e7d32; }
+                    
+                    .actions a {
+                        color: #0078d4;
+                        text-decoration: none;
+                        margin-right: 10px;
+                    }
+                    .actions a:hover {
+                        text-decoration: underline;
+                    }
+                    
+                    .empty-state {
+                        text-align: center;
+                        padding: 60px 20px;
+                        color: #666;
+                    }
+                    .empty-state .icon {
+                        font-size: 60px;
+                        margin-bottom: 20px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>📋 Incident History</h1>
+                    <div class="header-nav">
+                        <a href="/stores/ohs-incident">+ New Report</a>
+                        <a href="/stores">← Back to Stores</a>
+                        <a href="/">🏠 Home</a>
+                    </div>
+                </div>
+                
+                <div class="container">
+                    <div class="page-title">
+                        <h2>OHS Incident Reports</h2>
+                        <p>View all submitted accident and incident reports</p>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="toolbar">
+                            <input type="text" class="search-box" placeholder="Search by incident number, store, or description..." id="searchBox" onkeyup="filterTable()">
+                            <a href="/stores/ohs-incident" class="btn btn-primary">+ New Report</a>
+                        </div>
+                        
+                        <div class="table-container">
+                            ${incidents.recordset.length === 0 ? `
+                                <div class="empty-state">
+                                    <div class="icon">📭</div>
+                                    <h3>No Incidents Reported Yet</h3>
+                                    <p>When you submit incident reports, they will appear here.</p>
+                                    <br>
+                                    <a href="/stores/ohs-incident" class="btn btn-primary">Submit Your First Report</a>
+                                </div>
+                            ` : `
+                                <table id="incidentsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Incident #</th>
+                                            <th>Date</th>
+                                            <th>Store</th>
+                                            <th>Event Type</th>
+                                            <th>Category</th>
+                                            <th>Injury</th>
+                                            <th>Status</th>
+                                            <th>Reported By</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${incidents.recordset.map(inc => {
+                                            const eventClass = (inc.EventTypeName || '').toLowerCase().replace(/\s+/g, '-');
+                                            const statusColor = statusColors[inc.Status] || '#636e72';
+                                            return `
+                                                <tr data-id="${inc.Id}">
+                                                    <td class="incident-number">${inc.IncidentNumber}</td>
+                                                    <td>${new Date(inc.IncidentDate).toLocaleDateString()}</td>
+                                                    <td>${inc.StoreName || '-'}</td>
+                                                    <td><span class="event-type ${eventClass}">${inc.EventTypeName || '-'}</span></td>
+                                                    <td>${inc.CategoryName || '-'}</td>
+                                                    <td><span class="injury-badge ${inc.InjuryOccurred ? 'injury-yes' : 'injury-no'}">${inc.InjuryOccurred ? 'Yes' : 'No'}</span></td>
+                                                    <td><span class="badge" style="background: ${statusColor}; color: white;">${inc.Status || 'Pending'}</span></td>
+                                                    <td>${inc.ReportedByName || '-'}</td>
+                                                    <td class="actions">
+                                                        <a href="/stores/ohs-incident/view/${inc.Id}">View</a>
+                                                    </td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            `}
+                        </div>
+                    </div>
+                </div>
+                
+                <script>
+                    function filterTable() {
+                        const search = document.getElementById('searchBox').value.toLowerCase();
+                        document.querySelectorAll('#incidentsTable tbody tr').forEach(row => {
+                            const text = row.textContent.toLowerCase();
+                            row.style.display = text.includes(search) ? '' : 'none';
+                        });
+                    }
+                </script>
+            </body>
+            </html>
+        `);
+    } catch (error) {
+        console.error('Error loading incident history:', error);
+        res.status(500).send('Error loading incident history: ' + error.message);
+    }
+});
 
+// View single incident details
+router.get('/view/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const pool = await sql.connect(dbConfig);
+        
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .query(`
+                SELECT i.*, 
+                       e.EventTypeName,
+                       c.CategoryName,
+                       sc.SubCategoryName,
+                       it.InjuryTypeName,
+                       bp.BodyPartName
+                FROM OHSIncidents i
+                LEFT JOIN OHSEventTypes e ON i.EventTypeId = e.Id
+                LEFT JOIN OHSEventCategories c ON i.CategoryId = c.Id
+                LEFT JOIN OHSEventSubCategories sc ON i.SubCategoryId = sc.Id
+                LEFT JOIN OHSInjuryTypes it ON i.InjuryTypeId = it.Id
+                LEFT JOIN OHSBodyParts bp ON i.BodyPartId = bp.Id
+                WHERE i.Id = @id
+            `);
+        
+        await pool.close();
+        
+        if (result.recordset.length === 0) {
+            return res.status(404).send('Incident not found');
+        }
+        
+        const inc = result.recordset[0];
+        const attachments = inc.Attachments ? JSON.parse(inc.Attachments) : [];
+        
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>${inc.IncidentNumber} - OHS Incident</title>
+                <style>
+                    * { box-sizing: border-box; margin: 0; padding: 0; }
+                    body { 
+                        font-family: 'Segoe UI', Arial, sans-serif; 
+                        background: #f5f5f5;
+                        min-height: 100vh;
+                    }
+                    .header {
+                        background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+                        color: white;
+                        padding: 15px 30px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    }
+                    .header h1 { font-size: 22px; }
+                    .header-nav { display: flex; gap: 15px; }
+                    .header-nav a {
+                        color: white;
+                        text-decoration: none;
+                        padding: 8px 16px;
+                        border-radius: 5px;
+                        background: rgba(255,255,255,0.1);
+                        transition: background 0.2s;
+                    }
+                    .header-nav a:hover { background: rgba(255,255,255,0.2); }
+                    
+                    .container {
+                        max-width: 900px;
+                        margin: 0 auto;
+                        padding: 30px;
+                    }
+                    
+                    .incident-header {
+                        background: white;
+                        border-radius: 12px;
+                        padding: 25px;
+                        margin-bottom: 20px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        flex-wrap: wrap;
+                        gap: 15px;
+                    }
+                    
+                    .incident-number {
+                        font-size: 28px;
+                        font-family: monospace;
+                        color: #e17055;
+                    }
+                    
+                    .badge {
+                        padding: 8px 20px;
+                        border-radius: 20px;
+                        font-size: 14px;
+                        font-weight: 500;
+                    }
+                    
+                    .section {
+                        background: white;
+                        border-radius: 12px;
+                        padding: 25px;
+                        margin-bottom: 20px;
+                    }
+                    
+                    .section-title {
+                        font-size: 18px;
+                        color: #333;
+                        margin-bottom: 20px;
+                        padding-bottom: 10px;
+                        border-bottom: 2px solid #e17055;
+                    }
+                    
+                    .detail-grid {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                        gap: 20px;
+                    }
+                    
+                    .detail-item label {
+                        display: block;
+                        font-size: 12px;
+                        color: #666;
+                        margin-bottom: 5px;
+                        text-transform: uppercase;
+                    }
+                    
+                    .detail-item .value {
+                        font-size: 16px;
+                        color: #333;
+                    }
+                    
+                    .description-box {
+                        background: #f8f9fa;
+                        padding: 15px;
+                        border-radius: 8px;
+                        margin-top: 15px;
+                        white-space: pre-wrap;
+                    }
+                    
+                    .attachments-grid {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                        gap: 15px;
+                        margin-top: 15px;
+                    }
+                    
+                    .attachment-item {
+                        border: 1px solid #ddd;
+                        border-radius: 8px;
+                        overflow: hidden;
+                    }
+                    
+                    .attachment-item img {
+                        width: 100%;
+                        height: 120px;
+                        object-fit: cover;
+                    }
+                    
+                    .attachment-item a {
+                        display: block;
+                        padding: 10px;
+                        text-align: center;
+                        color: #0078d4;
+                        text-decoration: none;
+                        font-size: 12px;
+                    }
+                    
+                    .event-type {
+                        padding: 5px 15px;
+                        border-radius: 5px;
+                        font-weight: 500;
+                    }
+                    .event-type.accident { background: #ffe6e6; color: #dc3545; }
+                    .event-type.incident { background: #fff3cd; color: #856404; }
+                    .event-type.near-miss { background: #cce5ff; color: #004085; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>📋 Incident Details</h1>
+                    <div class="header-nav">
+                        <a href="/stores/ohs-incident/history">← Back to History</a>
+                        <a href="/stores/ohs-incident">+ New Report</a>
+                        <a href="/">🏠 Home</a>
+                    </div>
+                </div>
+                
+                <div class="container">
+                    <div class="incident-header">
+                        <div>
+                            <div class="incident-number">${inc.IncidentNumber}</div>
+                            <div style="color: #666; margin-top: 5px;">Reported on ${new Date(inc.CreatedAt).toLocaleString()}</div>
+                        </div>
+                        <div>
+                            <span class="event-type ${(inc.EventTypeName || '').toLowerCase().replace(/\s+/g, '-')}">${inc.EventTypeName || 'N/A'}</span>
+                            <span class="badge" style="background: ${inc.Status === 'Resolved' ? '#00b894' : inc.Status === 'Under Review' ? '#74b9ff' : '#fdcb6e'}; color: white; margin-left: 10px;">${inc.Status || 'Pending'}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <h3 class="section-title">📅 Event Details</h3>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <label>Date of Incident</label>
+                                <div class="value">${new Date(inc.IncidentDate).toLocaleDateString()}</div>
+                            </div>
+                            <div class="detail-item">
+                                <label>Time of Incident</label>
+                                <div class="value">${inc.IncidentTime ? inc.IncidentTime.toString().substring(0, 5) : 'N/A'}</div>
+                            </div>
+                            <div class="detail-item">
+                                <label>Store</label>
+                                <div class="value">${inc.StoreName || 'N/A'}</div>
+                            </div>
+                            <div class="detail-item">
+                                <label>Exact Location</label>
+                                <div class="value">${inc.ExactLocation || 'N/A'}</div>
+                            </div>
+                            <div class="detail-item">
+                                <label>Category</label>
+                                <div class="value">${inc.CategoryName || 'N/A'}</div>
+                            </div>
+                            <div class="detail-item">
+                                <label>Sub-Category</label>
+                                <div class="value">${inc.SubCategoryName || 'N/A'}</div>
+                            </div>
+                        </div>
+                        <div class="description-box">
+                            <strong>Description:</strong><br><br>
+                            ${inc.IncidentDescription || 'No description provided'}
+                        </div>
+                    </div>
+                    
+                    ${inc.InjuryOccurred ? `
+                        <div class="section">
+                            <h3 class="section-title">🩹 Injury Details</h3>
+                            <div class="detail-grid">
+                                <div class="detail-item">
+                                    <label>Injured Person</label>
+                                    <div class="value">${inc.InjuredPersonName || 'N/A'}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <label>Person Type</label>
+                                    <div class="value">${inc.InjuredPersonType || 'N/A'}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <label>Employee ID</label>
+                                    <div class="value">${inc.InjuredPersonEmployeeId || 'N/A'}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <label>Injury Type</label>
+                                    <div class="value">${inc.InjuryTypeName || 'N/A'}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <label>Body Part</label>
+                                    <div class="value">${inc.BodyPartName || 'N/A'}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <label>Medical Treatment</label>
+                                    <div class="value">${inc.MedicalTreatmentRequired ? 'Yes' : 'No'}</div>
+                                </div>
+                            </div>
+                            ${inc.InjuryDescription ? `
+                                <div class="description-box">
+                                    <strong>Injury Description:</strong><br><br>
+                                    ${inc.InjuryDescription}
+                                </div>
+                            ` : ''}
+                        </div>
+                    ` : ''}
+                    
+                    <div class="section">
+                        <h3 class="section-title">📝 Additional Information</h3>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <label>Witnesses</label>
+                                <div class="value">${inc.WitnessNames || 'None'}</div>
+                            </div>
+                            <div class="detail-item">
+                                <label>Reported By</label>
+                                <div class="value">${inc.ReportedByName || 'N/A'}</div>
+                            </div>
+                        </div>
+                        ${inc.ImmediateActions ? `
+                            <div class="description-box">
+                                <strong>Immediate Actions Taken:</strong><br><br>
+                                ${inc.ImmediateActions}
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    ${attachments.length > 0 ? `
+                        <div class="section">
+                            <h3 class="section-title">📎 Attachments</h3>
+                            <div class="attachments-grid">
+                                ${attachments.map(att => {
+                                    const isImage = /\.(jpg|jpeg|png|gif)$/i.test(att);
+                                    return `
+                                        <div class="attachment-item">
+                                            ${isImage ? `<img src="${att}" alt="Attachment">` : ''}
+                                            <a href="${att}" target="_blank">${isImage ? 'View Full Image' : 'Download File'}</a>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            </body>
+            </html>
+        `);
+    } catch (error) {
+        console.error('Error viewing incident:', error);
+        res.status(500).send('Error loading incident: ' + error.message);
+    }
+});
 module.exports = router;
