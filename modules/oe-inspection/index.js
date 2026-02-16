@@ -30,6 +30,16 @@ router.use('/api', (req, res, next) => {
     next();
 });
 
+// Middleware to prevent caching on HTML pages
+router.use((req, res, next) => {
+    if (req.path.endsWith('.html') || !req.path.includes('.') || req.path === '/') {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
+    }
+    next();
+});
+
 // ==========================================
 // Page Routes
 // ==========================================
@@ -591,7 +601,8 @@ router.get('/api/templates/sections/:sectionId/items', async (req, res) => {
         const result = await pool.request()
             .input('sectionId', sql.Int, req.params.sectionId)
             .query(`
-                SELECT Id as itemId, ReferenceValue as referenceValue, Question as title, Coefficient as coeff, Quantity as quantity, AnswerOptions as answer, Criteria as cr
+                SELECT Id as itemId, ReferenceValue as referenceValue, Question as title, Coefficient as coeff, Quantity as quantity, AnswerOptions as answer, Criteria as cr,
+                       IsQuantitative as isQuantitative, Range1From as range1From, Range1To as range1To, Range2From as range2From, Range2To as range2To, Range3From as range3From
                 FROM OE_InspectionTemplateItems
                 WHERE SectionId = @sectionId AND IsActive = 1
                 ORDER BY ReferenceValue
@@ -607,7 +618,7 @@ router.get('/api/templates/sections/:sectionId/items', async (req, res) => {
 // Create item
 router.post('/api/templates/sections/:sectionId/items', async (req, res) => {
     try {
-        const { referenceValue, title, coeff, quantity, answer, cr } = req.body;
+        const { referenceValue, title, coeff, quantity, answer, cr, isQuantitative, range1From, range1To, range2From, range2To, range3From } = req.body;
         const pool = await sql.connect(dbConfig);
         const result = await pool.request()
             .input('sectionId', sql.Int, req.params.sectionId)
@@ -617,10 +628,16 @@ router.post('/api/templates/sections/:sectionId/items', async (req, res) => {
             .input('quantity', sql.Int, quantity || null)
             .input('answer', sql.NVarChar, answer || 'Yes,Partially,No,NA')
             .input('criteria', sql.NVarChar, cr || '')
+            .input('isQuantitative', sql.Bit, isQuantitative ? 1 : 0)
+            .input('range1From', sql.Int, range1From || null)
+            .input('range1To', sql.Int, range1To || null)
+            .input('range2From', sql.Int, range2From || null)
+            .input('range2To', sql.Int, range2To || null)
+            .input('range3From', sql.Int, range3From || null)
             .query(`
-                INSERT INTO OE_InspectionTemplateItems (SectionId, ReferenceValue, Question, Coefficient, Quantity, AnswerOptions, Criteria, IsActive)
+                INSERT INTO OE_InspectionTemplateItems (SectionId, ReferenceValue, Question, Coefficient, Quantity, AnswerOptions, Criteria, IsActive, IsQuantitative, Range1From, Range1To, Range2From, Range2To, Range3From)
                 OUTPUT INSERTED.Id as itemId
-                VALUES (@sectionId, @ref, @question, @coeff, @quantity, @answer, @criteria, 1)
+                VALUES (@sectionId, @ref, @question, @coeff, @quantity, @answer, @criteria, 1, @isQuantitative, @range1From, @range1To, @range2From, @range2To, @range3From)
             `);
         await pool.close();
         res.json({ success: true, data: { itemId: result.recordset[0].itemId } });
@@ -681,7 +698,7 @@ router.post('/api/templates/sections/:sectionId/items/bulk', async (req, res) =>
 // Update item
 router.put('/api/templates/items/:itemId', async (req, res) => {
     try {
-        const { referenceValue, title, coeff, quantity, answer, cr } = req.body;
+        const { referenceValue, title, coeff, quantity, answer, cr, isQuantitative, range1From, range1To, range2From, range2To, range3From } = req.body;
         const pool = await sql.connect(dbConfig);
         await pool.request()
             .input('id', sql.Int, req.params.itemId)
@@ -691,7 +708,13 @@ router.put('/api/templates/items/:itemId', async (req, res) => {
             .input('quantity', sql.Int, quantity || null)
             .input('answer', sql.NVarChar, answer || 'Yes,Partially,No,NA')
             .input('criteria', sql.NVarChar, cr || '')
-            .query(`UPDATE OE_InspectionTemplateItems SET ReferenceValue = @ref, Question = @question, Coefficient = @coeff, Quantity = @quantity, AnswerOptions = @answer, Criteria = @criteria WHERE Id = @id`);
+            .input('isQuantitative', sql.Bit, isQuantitative ? 1 : 0)
+            .input('range1From', sql.Int, range1From || null)
+            .input('range1To', sql.Int, range1To || null)
+            .input('range2From', sql.Int, range2From || null)
+            .input('range2To', sql.Int, range2To || null)
+            .input('range3From', sql.Int, range3From || null)
+            .query(`UPDATE OE_InspectionTemplateItems SET ReferenceValue = @ref, Question = @question, Coefficient = @coeff, Quantity = @quantity, AnswerOptions = @answer, Criteria = @criteria, IsQuantitative = @isQuantitative, Range1From = @range1From, Range1To = @range1To, Range2From = @range2From, Range2To = @range2To, Range3From = @range3From WHERE Id = @id`);
         await pool.close();
         res.json({ success: true });
     } catch (error) {
@@ -1087,7 +1110,7 @@ router.post('/api/inspections', async (req, res) => {
                 const templateItems = await pool.request()
                     .input('sectionId', sql.Int, section.Id)
                     .query(`
-                        SELECT ReferenceValue, Question, Coefficient, Quantity, AnswerOptions, Criteria, ItemOrder
+                        SELECT ReferenceValue, Question, Coefficient, Quantity, AnswerOptions, Criteria, ItemOrder, IsQuantitative, Range1From, Range1To, Range2From, Range2To, Range3From
                         FROM OE_InspectionTemplateItems
                         WHERE SectionId = @sectionId AND IsActive = 1
                         ORDER BY ItemOrder
@@ -1105,11 +1128,17 @@ router.post('/api/inspections', async (req, res) => {
                         .input('quantity', sql.Int, item.Quantity || null)
                         .input('answerOptions', sql.NVarChar, item.AnswerOptions || 'Yes,Partially,No,NA')
                         .input('criteria', sql.NVarChar, item.Criteria)
+                        .input('isQuantitative', sql.Bit, item.IsQuantitative || 0)
+                        .input('range1From', sql.Int, item.Range1From || null)
+                        .input('range1To', sql.Int, item.Range1To || null)
+                        .input('range2From', sql.Int, item.Range2From || null)
+                        .input('range2To', sql.Int, item.Range2To || null)
+                        .input('range3From', sql.Int, item.Range3From || null)
                         .query(`
                             INSERT INTO OE_InspectionItems 
-                                (InspectionId, SectionName, SectionOrder, ItemOrder, ReferenceValue, Question, Coefficient, Quantity, AnswerOptions, Criteria)
+                                (InspectionId, SectionName, SectionOrder, ItemOrder, ReferenceValue, Question, Coefficient, Quantity, AnswerOptions, Criteria, IsQuantitative, Range1From, Range1To, Range2From, Range2To, Range3From)
                             VALUES 
-                                (@inspectionId, @sectionName, @sectionOrder, @itemOrder, @referenceValue, @question, @coefficient, @quantity, @answerOptions, @criteria)
+                                (@inspectionId, @sectionName, @sectionOrder, @itemOrder, @referenceValue, @question, @coefficient, @quantity, @answerOptions, @criteria, @isQuantitative, @range1From, @range1To, @range2From, @range2To, @range3From)
                         `);
                 }
             }
@@ -1434,7 +1463,7 @@ router.get('/api/audits/:auditId', async (req, res) => {
                 const templateItems = await pool.request()
                     .input('sectionId', sql.Int, section.Id)
                     .query(`
-                        SELECT ReferenceValue, Question, Coefficient, Quantity, AnswerOptions, Criteria, ItemOrder
+                        SELECT ReferenceValue, Question, Coefficient, Quantity, AnswerOptions, Criteria, ItemOrder, IsQuantitative, Range1From, Range1To, Range2From, Range2To, Range3From
                         FROM OE_InspectionTemplateItems
                         WHERE SectionId = @sectionId AND IsActive = 1
                         ORDER BY ItemOrder
@@ -1452,11 +1481,17 @@ router.get('/api/audits/:auditId', async (req, res) => {
                         .input('quantity', sql.Int, item.Quantity || null)
                         .input('answerOptions', sql.NVarChar, item.AnswerOptions || 'Yes,Partially,No,NA')
                         .input('criteria', sql.NVarChar, item.Criteria)
+                        .input('isQuantitative', sql.Bit, item.IsQuantitative || 0)
+                        .input('range1From', sql.Int, item.Range1From || null)
+                        .input('range1To', sql.Int, item.Range1To || null)
+                        .input('range2From', sql.Int, item.Range2From || null)
+                        .input('range2To', sql.Int, item.Range2To || null)
+                        .input('range3From', sql.Int, item.Range3From || null)
                         .query(`
                             INSERT INTO OE_InspectionItems 
-                                (InspectionId, SectionName, SectionOrder, ItemOrder, ReferenceValue, Question, Coefficient, Quantity, AnswerOptions, Criteria)
+                                (InspectionId, SectionName, SectionOrder, ItemOrder, ReferenceValue, Question, Coefficient, Quantity, AnswerOptions, Criteria, IsQuantitative, Range1From, Range1To, Range2From, Range2To, Range3From)
                             VALUES 
-                                (@inspectionId, @sectionName, @sectionOrder, @itemOrder, @referenceValue, @question, @coefficient, @quantity, @answerOptions, @criteria)
+                                (@inspectionId, @sectionName, @sectionOrder, @itemOrder, @referenceValue, @question, @coefficient, @quantity, @answerOptions, @criteria, @isQuantitative, @range1From, @range1To, @range2From, @range2To, @range3From)
                         `);
                 }
             }
@@ -1503,7 +1538,13 @@ router.get('/api/audits/:auditId', async (req, res) => {
                         HasPicture as hasPicture,
                         Escalate as escalate,
                         Department as department,
-                        Criteria as criteria
+                        Criteria as criteria,
+                        IsQuantitative as isQuantitative,
+                        Range1From as range1From,
+                        Range1To as range1To,
+                        Range2From as range2From,
+                        Range2To as range2To,
+                        Range3From as range3From
                     FROM OE_InspectionItems
                     WHERE InspectionId = @inspectionId AND SectionName = @sectionName
                     ORDER BY ItemOrder
@@ -2052,7 +2093,7 @@ router.put('/api/audits/response/:responseId', async (req, res) => {
             `);
         
         await pool.close();
-        res.json({ success: true });
+        res.json({ success: true, data: { score: value } });
     } catch (error) {
         console.error('Error updating response:', error);
         res.status(500).json({ success: false, error: error.message });

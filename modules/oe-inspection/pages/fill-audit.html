@@ -1831,8 +1831,8 @@
             const answered = section.items.filter(i => i.selectedChoice && i.selectedChoice !== 'NA');
             if (answered.length === 0) return null;
 
-            const total = answered.reduce((sum, i) => sum + i.coeff, 0);
-            const scored = answered.reduce((sum, i) => sum + (i.value || 0), 0);
+            const total = answered.reduce((sum, i) => sum + parseFloat(i.coeff || 0), 0);
+            const scored = answered.reduce((sum, i) => sum + parseFloat(i.value || 0), 0);
             return total > 0 ? parseFloat(((scored / total) * 100).toFixed(2)) : null;
         }
 
@@ -1909,15 +1909,21 @@
                         <span class="question-ref">${item.referenceValue || '-'}</span>
                         <span class="question-coeff">Coeff: ${item.coeff}</span>
                         ${item.quantity ? `<span class="question-qty" style="background: #3b82f6; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; margin-left: 8px;">Expected: ${item.quantity}</span>` : ''}
-                        ${item.quantity ? `<span class="question-qty-edit" style="margin-left: 8px; display: inline-flex; align-items: center; gap: 4px;">
+                        ${(item.quantity || item.isQuantitative) ? `<span class="question-qty-edit" style="margin-left: 8px; display: inline-flex; align-items: center; gap: 4px;">
                             <label style="font-size: 0.75rem; color: #64748b;">Found:</label>
                             <input type="number" min="0" value="${item.actualQuantity || ''}" 
                                 style="width: 60px; padding: 2px 6px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.8rem;"
                                 onchange="updateActualQuantity(${item.responseId}, this.value)"
                                 placeholder="-">
                         </span>` : ''}
+                        ${item.isQuantitative ? `<span style="background: #f0f9ff; color: #0369a1; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 8px;" title="Auto-grades: ✅${item.range1From}-${item.range1To} ⚠️${item.range2From}-${item.range2To} ❌${item.range3From}+">📊 Auto</span>` : ''}
                     </div>
                     <div class="question-title">${item.title}</div>
+                    ${item.isQuantitative ? `<div style="font-size: 0.7rem; color: #64748b; margin: 5px 0; padding: 4px 8px; background: #f8fafc; border-radius: 4px;">
+                        Ranges: <span style="color: #16a34a;">✅ Yes: ${item.range1From}-${item.range1To}</span> | 
+                        <span style="color: #ca8a04;">⚠️ Partially: ${item.range2From}-${item.range2To}</span> | 
+                        <span style="color: #dc2626;">❌ No: ${item.range3From}+</span>
+                    </div>` : ''}
                     
                     <div class="answer-options">
                         ${getAnswerButtons(item)}
@@ -2145,28 +2151,61 @@
             }
         }
 
-        // Update quantity
+        // Update quantity - with auto-grading for quantitative items
         async function updateActualQuantity(responseId, value) {
             try {
                 const item = findItem(responseId);
                 const qty = value ? parseInt(value) : null;
                 
+                // Auto-calculate answer for quantitative items
+                let autoAnswer = null;
+                if (item && item.isQuantitative && qty !== null) {
+                    const r1From = item.range1From || 0;
+                    const r1To = item.range1To || 0;
+                    const r2From = item.range2From || 0;
+                    const r2To = item.range2To || 0;
+                    const r3From = item.range3From || 0;
+                    
+                    if (qty >= r1From && qty <= r1To) {
+                        autoAnswer = 'Yes';
+                    } else if (qty >= r2From && qty <= r2To) {
+                        autoAnswer = 'Partially';
+                    } else if (qty >= r3From) {
+                        autoAnswer = 'No';
+                    }
+                }
+                
+                const bodyData = { 
+                    selectedChoice: autoAnswer || item.selectedChoice,
+                    coeff: item.coeff,
+                    actualQuantity: qty
+                };
+                
                 const response = await fetch(`/oe-inspection/api/audits/response/${responseId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        selectedChoice: item.selectedChoice,
-                        coeff: item.coeff,
-                        actualQuantity: qty
-                    })
+                    body: JSON.stringify(bodyData)
                 });
 
                 const result = await response.json();
                 if (!result.success) throw new Error(result.error);
 
                 // Update local data
-                if (item) item.actualQuantity = qty;
-                showToast('Quantity updated', 'success');
+                if (item) {
+                    item.actualQuantity = qty;
+                    if (autoAnswer) {
+                        item.selectedChoice = autoAnswer;
+                        item.value = result.data?.score;
+                    }
+                }
+                
+                // Re-render question card if auto-graded
+                if (autoAnswer) {
+                    showToast(`Auto-graded as "${autoAnswer}" based on quantity ${qty}`, 'success');
+                    renderSection(currentSectionIndex); // Re-render to show updated answer
+                } else {
+                    showToast('Quantity updated', 'success');
+                }
 
             } catch (error) {
                 console.error('Error updating quantity:', error);
