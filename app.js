@@ -19,6 +19,9 @@ const http = require('http');
 // Import auth module
 const { initializeAuth, requireAuth, requireRole } = require('./auth/auth-server');
 
+// Import dynamic form access middleware (SQL-driven permissions)
+const { requireFormAccess, clearFormMappingsCache } = require('./gmrl-auth/middleware/require-form-access');
+
 // Import modules
 const storesModule = require('./modules/stores');
 const adminModule = require('./modules/admin');
@@ -44,6 +47,17 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 initializeAuth(app);
 
 // ==========================================
+// Dynamic Form Access Middleware (SQL-Driven)
+// ==========================================
+// This middleware checks UserFormAccess table based on URL patterns from Forms table
+// Bypass: /admin (has its own check), /dashboard, /auth, /notifications
+const formAccessMiddleware = requireFormAccess({
+    bypass: ['/admin', '/dashboard', '/auth', '/api/user', '/notifications', '/public'],
+    defaultAllow: true,  // Allow if form not in registry (safe for transition period)
+    logAccess: true      // Log all access checks to console
+});
+
+// ==========================================
 // Public Email Approval Routes (no auth required)
 // ==========================================
 const publicApprovalRoutes = require('./routes/public-approval');
@@ -55,17 +69,17 @@ app.use('/public/approve', publicApprovalRoutes);
 const notificationsRoutes = require('./routes/notifications');
 app.use('/notifications', requireAuth, notificationsRoutes);
 
-// Mount Modules
-app.use('/stores', requireAuth, storesModule);
-app.use('/admin', requireAuth, adminModule);
-app.use('/operational-excellence', requireAuth, operationalExcellenceModule);
-app.use('/oe-inspection', requireAuth, oeInspectionModule);
-app.use('/hr', requireAuth, hrModule);
-app.use('/personnel', requireAuth, personnelModule);
-app.use('/ohs', requireAuth, ohsModule);
-app.use('/ohs-inspection', requireAuth, ohsInspectionModule);
-app.use('/security-services', requireAuth, securityServicesModule);
-app.use('/security', requireAuth, securityModule);
+// Mount Modules (with form access enforcement)
+app.use('/stores', requireAuth, formAccessMiddleware, storesModule);
+app.use('/admin', requireAuth, adminModule);  // Admin has its own requireSysAdmin check
+app.use('/operational-excellence', requireAuth, formAccessMiddleware, operationalExcellenceModule);
+app.use('/oe-inspection', requireAuth, formAccessMiddleware, oeInspectionModule);
+app.use('/hr', requireAuth, formAccessMiddleware, hrModule);
+app.use('/personnel', requireAuth, formAccessMiddleware, personnelModule);
+app.use('/ohs', requireAuth, formAccessMiddleware, ohsModule);
+app.use('/ohs-inspection', requireAuth, formAccessMiddleware, ohsInspectionModule);
+app.use('/security-services', requireAuth, formAccessMiddleware, securityServicesModule);
+app.use('/security', requireAuth, formAccessMiddleware, securityModule);
 
 // ==========================================
 // Routes

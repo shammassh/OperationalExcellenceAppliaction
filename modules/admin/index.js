@@ -1678,6 +1678,14 @@ router.post('/users/:id/forms', async (req, res) => {
         }
         
         await pool.close();
+        
+        // Clear form access cache so changes take effect immediately
+        // (User will need to re-login for session permissions to update, but this helps for testing)
+        try {
+            const { clearFormMappingsCache } = require('../../gmrl-auth/middleware/require-form-access');
+            clearFormMappingsCache();
+        } catch (e) { /* ignore */ }
+        
         res.redirect('/admin/users');
     } catch (err) {
         console.error('Error saving form access:', err);
@@ -1817,28 +1825,37 @@ router.get('/roles', async (req, res) => {
         const pool = await sql.connect(dbConfig);
         const roles = await pool.request().query(`
             SELECT r.*, rc.CategoryName,
-                   (SELECT COUNT(*) FROM Users WHERE RoleId = r.Id) as UserCount,
+                   (SELECT COUNT(*) FROM UserRoleAssignments WHERE RoleId = r.Id) as UserCount,
                    (SELECT COUNT(*) FROM RoleFormAccess WHERE RoleId = r.Id) as FormCount
             FROM UserRoles r
             LEFT JOIN RoleCategories rc ON r.CategoryId = rc.Id
             ORDER BY rc.CategoryName, r.RoleName
         `);
+        
+        const categories = await pool.request().query('SELECT Id, CategoryName FROM RoleCategories ORDER BY Id');
         await pool.close();
         
-        const successMsg = req.query.success ? '<div class="alert alert-success">✅ Role permissions saved successfully!</div>' : '';
+        const successMsg = req.query.success ? '<div class="alert alert-success">✅ ' + (req.query.msg || 'Operation completed successfully!') + '</div>' : '';
+        const errorMsg = req.query.error ? '<div class="alert alert-error">❌ ' + req.query.error + '</div>' : '';
         
         let roleRows = roles.recordset.map(r => `
-            <tr>
+            <tr data-role-id="${r.Id}">
                 <td>${r.Id}</td>
                 <td><strong>${r.RoleName}</strong></td>
                 <td><span class="category-badge">${r.CategoryName || 'Uncategorized'}</span></td>
                 <td><span class="form-count">${r.FormCount} forms</span></td>
                 <td><span class="user-count">${r.UserCount} users</span></td>
-                <td>
-                    <a href="/admin/roles/${r.Id}/permissions" class="btn btn-primary btn-sm">✏️ Edit Permissions</a>
+                <td class="actions-cell">
+                    <a href="/admin/roles/${r.Id}/permissions" class="btn btn-primary btn-sm">✏️ Permissions</a>
+                    <button class="btn btn-secondary btn-sm" onclick="editRole(${r.Id}, '${r.RoleName.replace(/'/g, "\\'")}', ${r.CategoryId || 'null'})">📝 Edit</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteRole(${r.Id}, '${r.RoleName.replace(/'/g, "\\'")}', ${r.UserCount})" ${r.UserCount > 0 ? 'disabled title=\"Cannot delete: role has users assigned\"' : ''}>🗑️</button>
                 </td>
             </tr>
         `).join('');
+        
+        let categoryOptions = categories.recordset.map(c => 
+            `<option value="${c.Id}">${c.CategoryName}</option>`
+        ).join('');
         
         res.send(`
             <!DOCTYPE html>
@@ -1857,14 +1874,20 @@ router.get('/roles', async (req, res) => {
                         align-items: center;
                     }
                     .header h1 { font-size: 24px; }
-                    .header-nav a {
+                    .header-nav a, .header-nav button {
                         color: white;
                         text-decoration: none;
-                        margin-left: 20px;
-                        opacity: 0.8;
+                        margin-left: 15px;
+                        opacity: 0.9;
+                        background: rgba(255,255,255,0.15);
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-size: 14px;
                     }
-                    .header-nav a:hover { opacity: 1; }
-                    .container { max-width: 1200px; margin: 0 auto; padding: 30px 20px; }
+                    .header-nav a:hover, .header-nav button:hover { opacity: 1; background: rgba(255,255,255,0.25); }
+                    .container { max-width: 1400px; margin: 0 auto; padding: 30px 20px; }
                     .card {
                         background: white;
                         border-radius: 15px;
@@ -1872,6 +1895,9 @@ router.get('/roles', async (req, res) => {
                         box-shadow: 0 4px 15px rgba(0,0,0,0.08);
                     }
                     .card-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
                         margin-bottom: 20px;
                         padding-bottom: 15px;
                         border-bottom: 1px solid #eee;
@@ -1909,28 +1935,96 @@ router.get('/roles', async (req, res) => {
                         cursor: pointer;
                         text-decoration: none;
                         font-size: 13px;
+                        display: inline-block;
                     }
                     .btn-sm { padding: 6px 12px; font-size: 12px; }
                     .btn-primary { background: #6f42c1; color: white; }
                     .btn-primary:hover { background: #5a32a3; }
+                    .btn-secondary { background: #6c757d; color: white; }
+                    .btn-secondary:hover { background: #545b62; }
+                    .btn-success { background: #28a745; color: white; }
+                    .btn-success:hover { background: #218838; }
+                    .btn-danger { background: #dc3545; color: white; }
+                    .btn-danger:hover { background: #c82333; }
+                    .btn-danger:disabled { background: #e9a3a9; cursor: not-allowed; }
                     .alert { padding: 15px; border-radius: 8px; margin-bottom: 20px; }
                     .alert-success { background: #d4edda; color: #155724; }
+                    .alert-error { background: #f8d7da; color: #721c24; }
+                    .actions-cell { white-space: nowrap; }
+                    .actions-cell .btn { margin-right: 5px; }
+                    
+                    /* Modal Styles */
+                    .modal {
+                        display: none;
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0,0,0,0.5);
+                        justify-content: center;
+                        align-items: center;
+                        z-index: 1000;
+                    }
+                    .modal.show { display: flex; }
+                    .modal-content {
+                        background: white;
+                        padding: 30px;
+                        border-radius: 15px;
+                        width: 500px;
+                        max-width: 90%;
+                    }
+                    .modal-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 25px;
+                    }
+                    .modal-title { font-size: 20px; font-weight: 600; }
+                    .modal-close {
+                        background: none;
+                        border: none;
+                        font-size: 24px;
+                        cursor: pointer;
+                        color: #666;
+                    }
+                    .form-group { margin-bottom: 20px; }
+                    .form-group label { display: block; margin-bottom: 8px; font-weight: 500; color: #333; }
+                    .form-group input, .form-group select {
+                        width: 100%;
+                        padding: 12px;
+                        border: 1px solid #ddd;
+                        border-radius: 8px;
+                        font-size: 14px;
+                    }
+                    .form-group input:focus, .form-group select:focus {
+                        outline: none;
+                        border-color: #6f42c1;
+                    }
+                    .modal-actions {
+                        display: flex;
+                        gap: 10px;
+                        justify-content: flex-end;
+                        margin-top: 25px;
+                    }
                 </style>
             </head>
             <body>
                 <div class="header">
                     <h1>🔐 Role Management</h1>
                     <div class="header-nav">
+                        <button onclick="openCreateModal()">➕ Create New Role</button>
                         <a href="/admin">← Admin Panel</a>
                         <a href="/admin/users">User Management</a>
-                        <a href="/dashboard">Dashboard</a>
                     </div>
                 </div>
                 <div class="container">
                     ${successMsg}
+                    ${errorMsg}
                     <div class="card">
                         <div class="card-header">
-                            <div class="card-title">System Roles - Click "Edit Permissions" to customize what each role can access</div>
+                            <div class="card-title">System Roles</div>
+                            <div>Total: ${roles.recordset.length} roles</div>
                         </div>
                         <table>
                             <thead>
@@ -1949,6 +2043,142 @@ router.get('/roles', async (req, res) => {
                         </table>
                     </div>
                 </div>
+                
+                <!-- Create/Edit Role Modal -->
+                <div class="modal" id="roleModal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <div class="modal-title" id="modalTitle">Create New Role</div>
+                            <button class="modal-close" onclick="closeModal()">×</button>
+                        </div>
+                        <form id="roleForm">
+                            <input type="hidden" id="roleId" name="roleId">
+                            <div class="form-group">
+                                <label for="roleName">Role Name *</label>
+                                <input type="text" id="roleName" name="roleName" required placeholder="e.g., Quality Inspector">
+                            </div>
+                            <div class="form-group">
+                                <label for="categoryId">Category *</label>
+                                <select id="categoryId" name="categoryId" required>
+                                    <option value="">-- Select Category --</option>
+                                    ${categoryOptions}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="description">Description</label>
+                                <input type="text" id="description" name="description" placeholder="Brief description of this role">
+                            </div>
+                            <div class="modal-actions">
+                                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                                <button type="submit" class="btn btn-success" id="submitBtn">💾 Create Role</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                <script>
+                    let isEditMode = false;
+                    
+                    function openCreateModal() {
+                        isEditMode = false;
+                        document.getElementById('modalTitle').textContent = 'Create New Role';
+                        document.getElementById('submitBtn').textContent = '💾 Create Role';
+                        document.getElementById('roleId').value = '';
+                        document.getElementById('roleName').value = '';
+                        document.getElementById('categoryId').value = '';
+                        document.getElementById('description').value = '';
+                        document.getElementById('roleModal').classList.add('show');
+                    }
+                    
+                    function editRole(id, name, categoryId) {
+                        isEditMode = true;
+                        document.getElementById('modalTitle').textContent = 'Edit Role';
+                        document.getElementById('submitBtn').textContent = '💾 Save Changes';
+                        document.getElementById('roleId').value = id;
+                        document.getElementById('roleName').value = name;
+                        document.getElementById('categoryId').value = categoryId || '';
+                        document.getElementById('roleModal').classList.add('show');
+                    }
+                    
+                    function closeModal() {
+                        document.getElementById('roleModal').classList.remove('show');
+                    }
+                    
+                    document.getElementById('roleForm').addEventListener('submit', async function(e) {
+                        e.preventDefault();
+                        
+                        const roleId = document.getElementById('roleId').value;
+                        const roleName = document.getElementById('roleName').value.trim();
+                        const categoryId = document.getElementById('categoryId').value;
+                        const description = document.getElementById('description').value.trim();
+                        
+                        if (!roleName || !categoryId) {
+                            alert('Please fill in all required fields');
+                            return;
+                        }
+                        
+                        const submitBtn = document.getElementById('submitBtn');
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = 'Saving...';
+                        
+                        try {
+                            const url = isEditMode ? '/admin/api/roles/' + roleId : '/admin/api/roles';
+                            const method = isEditMode ? 'PUT' : 'POST';
+                            
+                            const response = await fetch(url, {
+                                method: method,
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ roleName, categoryId, description })
+                            });
+                            
+                            const data = await response.json();
+                            
+                            if (data.success) {
+                                window.location.href = '/admin/roles?success=1&msg=' + encodeURIComponent(data.message);
+                            } else {
+                                alert('Error: ' + (data.error || 'Failed to save role'));
+                                submitBtn.disabled = false;
+                                submitBtn.textContent = isEditMode ? '💾 Save Changes' : '💾 Create Role';
+                            }
+                        } catch (err) {
+                            alert('Error: ' + err.message);
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = isEditMode ? '💾 Save Changes' : '💾 Create Role';
+                        }
+                    });
+                    
+                    async function deleteRole(id, name, userCount) {
+                        if (userCount > 0) {
+                            alert('Cannot delete role "' + name + '" because it has ' + userCount + ' users assigned.');
+                            return;
+                        }
+                        
+                        if (!confirm('Are you sure you want to delete the role "' + name + '"?\\n\\nThis will also delete all form permissions for this role.')) {
+                            return;
+                        }
+                        
+                        try {
+                            const response = await fetch('/admin/api/roles/' + id, {
+                                method: 'DELETE'
+                            });
+                            
+                            const data = await response.json();
+                            
+                            if (data.success) {
+                                window.location.href = '/admin/roles?success=1&msg=' + encodeURIComponent('Role deleted successfully');
+                            } else {
+                                alert('Error: ' + (data.error || 'Failed to delete role'));
+                            }
+                        } catch (err) {
+                            alert('Error: ' + err.message);
+                        }
+                    }
+                    
+                    // Close modal on outside click
+                    document.getElementById('roleModal').addEventListener('click', function(e) {
+                        if (e.target === this) closeModal();
+                    });
+                </script>
             </body>
             </html>
         `);
@@ -1958,4 +2188,165 @@ router.get('/roles', async (req, res) => {
     }
 });
 
+// ==========================================
+// Role API Endpoints
+// ==========================================
+
+// Create new role
+router.post('/api/roles', async (req, res) => {
+    try {
+        const { roleName, categoryId, description } = req.body;
+        
+        if (!roleName || !categoryId) {
+            return res.json({ success: false, error: 'Role name and category are required' });
+        }
+        
+        const pool = await sql.connect(dbConfig);
+        
+        // Check if role name already exists
+        const existing = await pool.request()
+            .input('roleName', sql.NVarChar, roleName)
+            .query('SELECT Id FROM UserRoles WHERE RoleName = @roleName');
+        
+        if (existing.recordset.length > 0) {
+            await pool.close();
+            return res.json({ success: false, error: 'A role with this name already exists' });
+        }
+        
+        // Insert new role
+        const result = await pool.request()
+            .input('roleName', sql.NVarChar, roleName)
+            .input('categoryId', sql.Int, categoryId)
+            .input('description', sql.NVarChar, description || null)
+            .query(`
+                INSERT INTO UserRoles (RoleName, CategoryId, Description, CreatedAt)
+                OUTPUT INSERTED.Id
+                VALUES (@roleName, @categoryId, @description, GETDATE())
+            `);
+        
+        await pool.close();
+        
+        const newId = result.recordset[0].Id;
+        console.log(`✅ Role created: ${roleName} (ID: ${newId}) by ${req.currentUser.email}`);
+        
+        res.json({ success: true, message: 'Role created successfully', roleId: newId });
+        
+    } catch (err) {
+        console.error('Error creating role:', err);
+        res.json({ success: false, error: err.message });
+    }
+});
+
+// Update existing role
+router.put('/api/roles/:id', async (req, res) => {
+    try {
+        const roleId = req.params.id;
+        const { roleName, categoryId, description } = req.body;
+        
+        if (!roleName || !categoryId) {
+            return res.json({ success: false, error: 'Role name and category are required' });
+        }
+        
+        const pool = await sql.connect(dbConfig);
+        
+        // Check if role exists
+        const existing = await pool.request()
+            .input('id', sql.Int, roleId)
+            .query('SELECT Id FROM UserRoles WHERE Id = @id');
+        
+        if (existing.recordset.length === 0) {
+            await pool.close();
+            return res.json({ success: false, error: 'Role not found' });
+        }
+        
+        // Check if new name conflicts with another role
+        const nameConflict = await pool.request()
+            .input('roleName', sql.NVarChar, roleName)
+            .input('id', sql.Int, roleId)
+            .query('SELECT Id FROM UserRoles WHERE RoleName = @roleName AND Id != @id');
+        
+        if (nameConflict.recordset.length > 0) {
+            await pool.close();
+            return res.json({ success: false, error: 'Another role with this name already exists' });
+        }
+        
+        // Update role
+        await pool.request()
+            .input('id', sql.Int, roleId)
+            .input('roleName', sql.NVarChar, roleName)
+            .input('categoryId', sql.Int, categoryId)
+            .input('description', sql.NVarChar, description || null)
+            .query(`
+                UPDATE UserRoles 
+                SET RoleName = @roleName, CategoryId = @categoryId, Description = @description
+                WHERE Id = @id
+            `);
+        
+        await pool.close();
+        
+        console.log(`✅ Role updated: ${roleName} (ID: ${roleId}) by ${req.currentUser.email}`);
+        
+        res.json({ success: true, message: 'Role updated successfully' });
+        
+    } catch (err) {
+        console.error('Error updating role:', err);
+        res.json({ success: false, error: err.message });
+    }
+});
+
+// Delete role
+router.delete('/api/roles/:id', async (req, res) => {
+    try {
+        const roleId = req.params.id;
+        
+        const pool = await sql.connect(dbConfig);
+        
+        // Check if role has users assigned
+        const userCheck = await pool.request()
+            .input('id', sql.Int, roleId)
+            .query('SELECT COUNT(*) as cnt FROM UserRoleAssignments WHERE RoleId = @id');
+        
+        if (userCheck.recordset[0].cnt > 0) {
+            await pool.close();
+            return res.json({ success: false, error: 'Cannot delete role: it has users assigned' });
+        }
+        
+        // Delete role permissions first
+        await pool.request()
+            .input('id', sql.Int, roleId)
+            .query('DELETE FROM RoleFormAccess WHERE RoleId = @id');
+        
+        // Delete the role
+        await pool.request()
+            .input('id', sql.Int, roleId)
+            .query('DELETE FROM UserRoles WHERE Id = @id');
+        
+        await pool.close();
+        
+        console.log(`✅ Role deleted (ID: ${roleId}) by ${req.currentUser.email}`);
+        
+        res.json({ success: true, message: 'Role deleted successfully' });
+        
+    } catch (err) {
+        console.error('Error deleting role:', err);
+        res.json({ success: false, error: err.message });
+    }
+});
+
+// ==========================================
+// Cache Management API
+// ==========================================
+
+// Clear form access cache (call after updating Forms table or UserFormAccess)
+router.post('/api/clear-cache', (req, res) => {
+    try {
+        const { clearFormMappingsCache } = require('../../gmrl-auth/middleware/require-form-access');
+        clearFormMappingsCache();
+        res.json({ success: true, message: 'Form access cache cleared' });
+    } catch (err) {
+        res.json({ success: false, error: err.message });
+    }
+});
+
 module.exports = router;
+

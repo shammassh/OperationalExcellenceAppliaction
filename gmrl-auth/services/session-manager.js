@@ -94,7 +94,7 @@ class SessionManager {
         session.roles = rolesResult.recordset;
         session.roleNames = rolesResult.recordset.map(r => r.RoleName);
         
-        // Get user's form permissions from UserFormAccess
+        // Get user's form permissions from UserFormAccess (user-specific overrides)
         const permissionsResult = await pool.request()
             .input('userId', sql.Int, session.user_db_id)
             .query(`
@@ -109,9 +109,40 @@ class SessionManager {
                 canView: p.CanView,
                 canCreate: p.CanCreate,
                 canEdit: p.CanEdit,
-                canDelete: p.CanDelete
+                canDelete: p.CanDelete,
+                source: 'user'  // Mark as user-specific permission
             };
         });
+        
+        // Get role-based permissions from RoleFormAccess (for all user's roles)
+        // These are merged - if any role has permission, user gets it
+        const roleIds = rolesResult.recordset.map(r => r.Id);
+        if (roleIds.length > 0) {
+            const rolePermissionsResult = await pool.request()
+                .query(`
+                    SELECT DISTINCT FormCode, 
+                           MAX(CAST(CanView AS INT)) as CanView,
+                           MAX(CAST(CanCreate AS INT)) as CanCreate,
+                           MAX(CAST(CanEdit AS INT)) as CanEdit,
+                           MAX(CAST(CanDelete AS INT)) as CanDelete
+                    FROM RoleFormAccess
+                    WHERE RoleId IN (${roleIds.join(',')})
+                    GROUP BY FormCode
+                `);
+            
+            // Add role permissions only if user doesn't have specific override
+            rolePermissionsResult.recordset.forEach(p => {
+                if (!session.permissions[p.FormCode]) {
+                    session.permissions[p.FormCode] = {
+                        canView: p.CanView === 1,
+                        canCreate: p.CanCreate === 1,
+                        canEdit: p.CanEdit === 1,
+                        canDelete: p.CanDelete === 1,
+                        source: 'role'  // Mark as role-based permission
+                    };
+                }
+            });
+        }
         
         return session;
     }
