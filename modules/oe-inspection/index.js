@@ -591,7 +591,7 @@ router.get('/api/templates/sections/:sectionId/items', async (req, res) => {
         const result = await pool.request()
             .input('sectionId', sql.Int, req.params.sectionId)
             .query(`
-                SELECT Id as itemId, ReferenceValue as referenceValue, Question as title, Coefficient as coeff, AnswerOptions as answer, Criteria as cr
+                SELECT Id as itemId, ReferenceValue as referenceValue, Question as title, Coefficient as coeff, Quantity as quantity, AnswerOptions as answer, Criteria as cr
                 FROM OE_InspectionTemplateItems
                 WHERE SectionId = @sectionId AND IsActive = 1
                 ORDER BY ReferenceValue
@@ -607,19 +607,20 @@ router.get('/api/templates/sections/:sectionId/items', async (req, res) => {
 // Create item
 router.post('/api/templates/sections/:sectionId/items', async (req, res) => {
     try {
-        const { referenceValue, title, coeff, answer, cr } = req.body;
+        const { referenceValue, title, coeff, quantity, answer, cr } = req.body;
         const pool = await sql.connect(dbConfig);
         const result = await pool.request()
             .input('sectionId', sql.Int, req.params.sectionId)
             .input('ref', sql.NVarChar, referenceValue)
             .input('question', sql.NVarChar, title)
             .input('coeff', sql.Decimal(5,2), coeff || 2)
+            .input('quantity', sql.Int, quantity || null)
             .input('answer', sql.NVarChar, answer || 'Yes,Partially,No,NA')
             .input('criteria', sql.NVarChar, cr || '')
             .query(`
-                INSERT INTO OE_InspectionTemplateItems (SectionId, ReferenceValue, Question, Coefficient, AnswerOptions, Criteria, IsActive)
+                INSERT INTO OE_InspectionTemplateItems (SectionId, ReferenceValue, Question, Coefficient, Quantity, AnswerOptions, Criteria, IsActive)
                 OUTPUT INSERTED.Id as itemId
-                VALUES (@sectionId, @ref, @question, @coeff, @answer, @criteria, 1)
+                VALUES (@sectionId, @ref, @question, @coeff, @quantity, @answer, @criteria, 1)
             `);
         await pool.close();
         res.json({ success: true, data: { itemId: result.recordset[0].itemId } });
@@ -661,9 +662,10 @@ router.post('/api/templates/sections/:sectionId/items/bulk', async (req, res) =>
                 .input('ref', sql.NVarChar, item.referenceValue)
                 .input('question', sql.NVarChar, item.title)
                 .input('coeff', sql.Int, item.coeff || 2)
+                .input('quantity', sql.Int, item.quantity || null)
                 .input('answer', sql.NVarChar, item.answer || 'Yes,Partially,No,NA')
                 .input('criteria', sql.NVarChar, item.cr || '')
-                .query(`INSERT INTO OE_InspectionTemplateItems (SectionId, ReferenceValue, Question, Coefficient, AnswerOptions, Criteria, IsActive) VALUES (@sectionId, @ref, @question, @coeff, @answer, @criteria, 1)`);
+                .query(`INSERT INTO OE_InspectionTemplateItems (SectionId, ReferenceValue, Question, Coefficient, Quantity, AnswerOptions, Criteria, IsActive) VALUES (@sectionId, @ref, @question, @coeff, @quantity, @answer, @criteria, 1)`);
             created++;
             existingRefs.add(refLower);
         }
@@ -679,16 +681,17 @@ router.post('/api/templates/sections/:sectionId/items/bulk', async (req, res) =>
 // Update item
 router.put('/api/templates/items/:itemId', async (req, res) => {
     try {
-        const { referenceValue, title, coeff, answer, cr } = req.body;
+        const { referenceValue, title, coeff, quantity, answer, cr } = req.body;
         const pool = await sql.connect(dbConfig);
         await pool.request()
             .input('id', sql.Int, req.params.itemId)
             .input('ref', sql.NVarChar, referenceValue)
             .input('question', sql.NVarChar, title)
             .input('coeff', sql.Int, coeff || 2)
+            .input('quantity', sql.Int, quantity || null)
             .input('answer', sql.NVarChar, answer || 'Yes,Partially,No,NA')
             .input('criteria', sql.NVarChar, cr || '')
-            .query(`UPDATE OE_InspectionTemplateItems SET ReferenceValue = @ref, Question = @question, Coefficient = @coeff, AnswerOptions = @answer, Criteria = @criteria WHERE Id = @id`);
+            .query(`UPDATE OE_InspectionTemplateItems SET ReferenceValue = @ref, Question = @question, Coefficient = @coeff, Quantity = @quantity, AnswerOptions = @answer, Criteria = @criteria WHERE Id = @id`);
         await pool.close();
         res.json({ success: true });
     } catch (error) {
@@ -741,6 +744,7 @@ router.get('/api/stores', async (req, res) => {
                 s.StoreCode as storeCode,
                 s.StoreName as storeName,
                 s.Location as location,
+                s.StoreSize as storeSize,
                 s.TemplateId as templateId,
                 t.TemplateName as templateName,
                 s.IsActive as isActive,
@@ -760,18 +764,19 @@ router.get('/api/stores', async (req, res) => {
 // Create store
 router.post('/api/stores', async (req, res) => {
     try {
-        const { storeCode, storeName, location, templateId } = req.body;
+        const { storeCode, storeName, location, storeSize, templateId } = req.body;
         const pool = await sql.connect(dbConfig);
         const result = await pool.request()
             .input('code', sql.NVarChar, storeCode)
             .input('name', sql.NVarChar, storeName)
             .input('location', sql.NVarChar, location || null)
+            .input('storeSize', sql.NVarChar, storeSize || null)
             .input('templateId', sql.Int, templateId || null)
             .input('createdBy', sql.NVarChar, req.currentUser?.email || 'System')
             .query(`
-                INSERT INTO Stores (StoreCode, StoreName, Location, TemplateId, IsActive, CreatedDate, CreatedBy)
+                INSERT INTO Stores (StoreCode, StoreName, Location, StoreSize, TemplateId, IsActive, CreatedDate, CreatedBy)
                 OUTPUT INSERTED.Id as storeId
-                VALUES (@code, @name, @location, @templateId, 1, GETDATE(), @createdBy)
+                VALUES (@code, @name, @location, @storeSize, @templateId, 1, GETDATE(), @createdBy)
             `);
         await pool.close();
         res.json({ success: true, data: { storeId: result.recordset[0].storeId } });
@@ -784,19 +789,20 @@ router.post('/api/stores', async (req, res) => {
 // Update store
 router.put('/api/stores/:storeId', async (req, res) => {
     try {
-        const { storeCode, storeName, location, templateId, isActive } = req.body;
+        const { storeCode, storeName, location, storeSize, templateId, isActive } = req.body;
         const pool = await sql.connect(dbConfig);
         await pool.request()
             .input('id', sql.Int, req.params.storeId)
             .input('code', sql.NVarChar, storeCode)
             .input('name', sql.NVarChar, storeName)
             .input('location', sql.NVarChar, location || null)
+            .input('storeSize', sql.NVarChar, storeSize || null)
             .input('templateId', sql.Int, templateId || null)
             .input('isActive', sql.Bit, isActive)
             .query(`
                 UPDATE Stores 
                 SET StoreCode = @code, StoreName = @name, Location = @location, 
-                    TemplateId = @templateId, IsActive = @isActive
+                    StoreSize = @storeSize, TemplateId = @templateId, IsActive = @isActive
                 WHERE Id = @id
             `);
         await pool.close();
@@ -1081,7 +1087,7 @@ router.post('/api/inspections', async (req, res) => {
                 const templateItems = await pool.request()
                     .input('sectionId', sql.Int, section.Id)
                     .query(`
-                        SELECT ReferenceValue, Question, Coefficient, AnswerOptions, Criteria, ItemOrder
+                        SELECT ReferenceValue, Question, Coefficient, Quantity, AnswerOptions, Criteria, ItemOrder
                         FROM OE_InspectionTemplateItems
                         WHERE SectionId = @sectionId AND IsActive = 1
                         ORDER BY ItemOrder
@@ -1096,13 +1102,14 @@ router.post('/api/inspections', async (req, res) => {
                         .input('referenceValue', sql.NVarChar, item.ReferenceValue)
                         .input('question', sql.NVarChar, item.Question)
                         .input('coefficient', sql.Decimal(5,2), item.Coefficient || 1)
+                        .input('quantity', sql.Int, item.Quantity || null)
                         .input('answerOptions', sql.NVarChar, item.AnswerOptions || 'Yes,Partially,No,NA')
                         .input('criteria', sql.NVarChar, item.Criteria)
                         .query(`
                             INSERT INTO OE_InspectionItems 
-                                (InspectionId, SectionName, SectionOrder, ItemOrder, ReferenceValue, Question, Coefficient, AnswerOptions, Criteria)
+                                (InspectionId, SectionName, SectionOrder, ItemOrder, ReferenceValue, Question, Coefficient, Quantity, AnswerOptions, Criteria)
                             VALUES 
-                                (@inspectionId, @sectionName, @sectionOrder, @itemOrder, @referenceValue, @question, @coefficient, @answerOptions, @criteria)
+                                (@inspectionId, @sectionName, @sectionOrder, @itemOrder, @referenceValue, @question, @coefficient, @quantity, @answerOptions, @criteria)
                         `);
                 }
             }
@@ -1427,7 +1434,7 @@ router.get('/api/audits/:auditId', async (req, res) => {
                 const templateItems = await pool.request()
                     .input('sectionId', sql.Int, section.Id)
                     .query(`
-                        SELECT ReferenceValue, Question, Coefficient, AnswerOptions, Criteria, ItemOrder
+                        SELECT ReferenceValue, Question, Coefficient, Quantity, AnswerOptions, Criteria, ItemOrder
                         FROM OE_InspectionTemplateItems
                         WHERE SectionId = @sectionId AND IsActive = 1
                         ORDER BY ItemOrder
@@ -1442,13 +1449,14 @@ router.get('/api/audits/:auditId', async (req, res) => {
                         .input('referenceValue', sql.NVarChar, item.ReferenceValue)
                         .input('question', sql.NVarChar, item.Question)
                         .input('coefficient', sql.Decimal(5,2), item.Coefficient || 1)
+                        .input('quantity', sql.Int, item.Quantity || null)
                         .input('answerOptions', sql.NVarChar, item.AnswerOptions || 'Yes,Partially,No,NA')
                         .input('criteria', sql.NVarChar, item.Criteria)
                         .query(`
                             INSERT INTO OE_InspectionItems 
-                                (InspectionId, SectionName, SectionOrder, ItemOrder, ReferenceValue, Question, Coefficient, AnswerOptions, Criteria)
+                                (InspectionId, SectionName, SectionOrder, ItemOrder, ReferenceValue, Question, Coefficient, Quantity, AnswerOptions, Criteria)
                             VALUES 
-                                (@inspectionId, @sectionName, @sectionOrder, @itemOrder, @referenceValue, @question, @coefficient, @answerOptions, @criteria)
+                                (@inspectionId, @sectionName, @sectionOrder, @itemOrder, @referenceValue, @question, @coefficient, @quantity, @answerOptions, @criteria)
                         `);
                 }
             }
@@ -1483,6 +1491,8 @@ router.get('/api/audits/:auditId', async (req, res) => {
                         ReferenceValue as referenceValue,
                         Question as title,
                         Coefficient as coeff,
+                        Quantity as quantity,
+                        ActualQuantity as actualQuantity,
                         AnswerOptions as answerOptions,
                         Answer as selectedChoice,
                         Score as value,
@@ -1985,14 +1995,14 @@ router.get('/api/audits/:auditId/department-report/:department', async (req, res
 router.put('/api/audits/response/:responseId', async (req, res) => {
     try {
         const { responseId } = req.params;
-        const { selectedChoice, coeff, finding, comment, cr, priority, escalate, department } = req.body;
+        const { selectedChoice, coeff, finding, comment, cr, priority, escalate, department, quantity, actualQuantity } = req.body;
         
         const pool = await sql.connect(dbConfig);
         
         // First get current values to preserve unset fields
         const currentResult = await pool.request()
             .input('id', sql.Int, responseId)
-            .query(`SELECT Answer, Score, Finding, Comment, CorrectedAction, Priority, Escalate, Department FROM OE_InspectionItems WHERE Id = @id`);
+            .query(`SELECT Answer, Score, Finding, Comment, CorrectedAction, Priority, Escalate, Department, Quantity, ActualQuantity FROM OE_InspectionItems WHERE Id = @id`);
         
         const current = currentResult.recordset[0] || {};
         
@@ -2011,6 +2021,8 @@ router.put('/api/audits/response/:responseId', async (req, res) => {
         const finalComment = comment !== undefined ? (comment || null) : current.Comment;
         const finalCr = cr !== undefined ? (cr || null) : current.CorrectedAction;
         const finalPriority = priority !== undefined ? (priority || null) : current.Priority;
+        const finalQuantity = quantity !== undefined ? (quantity || null) : current.Quantity;
+        const finalActualQuantity = actualQuantity !== undefined ? (actualQuantity || null) : current.ActualQuantity;
         
         await pool.request()
             .input('id', sql.Int, responseId)
@@ -2022,6 +2034,8 @@ router.put('/api/audits/response/:responseId', async (req, res) => {
             .input('priority', sql.NVarChar, finalPriority)
             .input('escalate', sql.Bit, finalEscalate)
             .input('department', sql.NVarChar, finalDepartment)
+            .input('quantity', sql.Int, finalQuantity)
+            .input('actualQuantity', sql.Int, finalActualQuantity)
             .query(`
                 UPDATE OE_InspectionItems 
                 SET Answer = @selectedChoice,
@@ -2031,7 +2045,9 @@ router.put('/api/audits/response/:responseId', async (req, res) => {
                     CorrectedAction = @cr,
                     Priority = @priority,
                     Escalate = @escalate,
-                    Department = @department
+                    Department = @department,
+                    Quantity = @quantity,
+                    ActualQuantity = @actualQuantity
                 WHERE Id = @id
             `);
         

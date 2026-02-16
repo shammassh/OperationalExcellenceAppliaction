@@ -522,6 +522,14 @@
                             <input type="text" id="storeLocation" placeholder="e.g., Downtown Mall, Floor 2">
                         </div>
                         <div class="form-group">
+                            <label>Store Size <span class="required">*</span></label>
+                            <select id="storeSize" required>
+                                <option value="">Select store size...</option>
+                                <option value="Large">Large</option>
+                                <option value="Medium">Medium</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label>Inspection Template <span class="required">*</span></label>
                             <select id="storeTemplate" required>
                                 <option value="">Select a template...</option>
@@ -565,6 +573,14 @@
                 <div class="form-group">
                     <label>Location</label>
                     <input type="text" id="editStoreLocation">
+                </div>
+                <div class="form-group">
+                    <label>Store Size <span class="required">*</span></label>
+                    <select id="editStoreSize" required>
+                        <option value="">Select store size...</option>
+                        <option value="Large">Large</option>
+                        <option value="Medium">Medium</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Inspection Template <span class="required">*</span></label>
@@ -737,6 +753,7 @@
                                 <th>Code</th>
                                 <th>Store Name</th>
                                 <th>Location</th>
+                                <th>Size</th>
                                 <th>Template</th>
                                 <th>Store Managers</th>
                                 <th>Status</th>
@@ -751,6 +768,7 @@
                                     <td><strong>${store.storeCode}</strong></td>
                                     <td>${store.storeName}</td>
                                     <td>${store.location || '-'}</td>
+                                    <td><span class="status-badge ${store.storeSize === 'Large' ? 'status-active' : 'status-inactive'}">${store.storeSize || '-'}</span></td>
                                     <td><span class="template-badge">${store.templateName || 'Not set'}</span></td>
                                     <td class="managers-cell">
                                         ${managers.length > 0 ? managers.map(m => `
@@ -789,6 +807,7 @@
                 storeCode: document.getElementById('storeCode').value,
                 storeName: document.getElementById('storeName').value,
                 location: document.getElementById('storeLocation').value,
+                storeSize: document.getElementById('storeSize').value,
                 templateId: parseInt(document.getElementById('storeTemplate').value)
             };
 
@@ -824,6 +843,7 @@
             document.getElementById('editStoreCode').value = store.storeCode;
             document.getElementById('editStoreName').value = store.storeName;
             document.getElementById('editStoreLocation').value = store.location || '';
+            document.getElementById('editStoreSize').value = store.storeSize || '';
             document.getElementById('editStoreTemplate').value = store.templateId;
             document.getElementById('editStoreActive').value = store.isActive ? 'true' : 'false';
 
@@ -985,6 +1005,7 @@
                 storeCode: document.getElementById('editStoreCode').value,
                 storeName: document.getElementById('editStoreName').value,
                 location: document.getElementById('editStoreLocation').value,
+                storeSize: document.getElementById('editStoreSize').value,
                 templateId: parseInt(document.getElementById('editStoreTemplate').value),
                 isActive: document.getElementById('editStoreActive').value === 'true'
             };

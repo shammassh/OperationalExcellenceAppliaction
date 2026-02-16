@@ -858,6 +858,10 @@
                                     <input type="number" id="itemCoeff" placeholder="e.g., 2" min="1" value="2" required>
                                 </div>
                                 <div class="form-group">
+                                    <label>Quantity</label>
+                                    <input type="number" id="itemQuantity" placeholder="e.g., 5" min="0">
+                                </div>
+                                <div class="form-group">
                                     <label>Answer Options</label>
                                     <input type="text" id="itemAnswer" value="Yes,Partially,No,NA">
                                 </div>
@@ -1341,13 +1345,14 @@
 
                 container.innerHTML = `
                     <table class="items-table">
-                        <thead><tr><th>Ref</th><th>Title</th><th>Coeff</th><th>Answer</th><th>CR</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>Ref</th><th>Title</th><th>Coeff</th><th>Qty</th><th>Answer</th><th>CR</th><th>Actions</th></tr></thead>
                         <tbody>
                             ${sortedItems.map(item => `
                                 <tr>
                                     <td><span class="ref-badge">${item.referenceValue}</span></td>
                                     <td>${item.title}</td>
                                     <td><span class="coeff-badge">${item.coeff}</span></td>
+                                    <td>${item.quantity || '-'}</td>
                                     <td>${item.answer}</td>
                                     <td>${item.cr || '-'}</td>
                                     <td style="display: flex; gap: 5px;">
@@ -1370,6 +1375,7 @@
                 referenceValue: document.getElementById('itemRefValue').value,
                 title: document.getElementById('itemTitle').value,
                 coeff: parseInt(document.getElementById('itemCoeff').value),
+                quantity: parseInt(document.getElementById('itemQuantity').value) || null,
                 answer: document.getElementById('itemAnswer').value,
                 cr: document.getElementById('itemCR').value
             };
@@ -1427,6 +1433,7 @@
             document.getElementById('editItemRefValue').value = item.referenceValue || '';
             document.getElementById('editItemTitle').value = item.title || '';
             document.getElementById('editItemCoeff').value = item.coeff || 2;
+            document.getElementById('editItemQuantity').value = item.quantity || '';
             document.getElementById('editItemAnswer').value = item.answer || 'Yes,Partially,No,NA';
             document.getElementById('editItemCR').value = item.cr || '';
             document.getElementById('editItemModal').classList.add('active');
@@ -1445,6 +1452,7 @@
                 referenceValue: document.getElementById('editItemRefValue').value,
                 title: document.getElementById('editItemTitle').value,
                 coeff: parseInt(document.getElementById('editItemCoeff').value),
+                quantity: parseInt(document.getElementById('editItemQuantity').value) || null,
                 answer: document.getElementById('editItemAnswer').value,
                 cr: document.getElementById('editItemCR').value
             };
@@ -1467,10 +1475,10 @@
         // ==========================================
 
         function downloadItemTemplate() {
-            const headers = ['ReferenceValue', 'Title', 'Coeff', 'Answer', 'CR'];
+            const headers = ['ReferenceValue', 'Title', 'Coeff', 'Quantity', 'Answer', 'CR'];
             const examples = [
-                ['1.1', 'Example question 1', '2', 'Yes,Partially,No,NA', 'Criterion 1'],
-                ['1.2', 'Example question 2', '2', 'Yes,Partially,No,NA', 'Criterion 2']
+                ['1.1', 'Example question 1', '2', '5', 'Yes,Partially,No,NA', 'Criterion 1'],
+                ['1.2', 'Example question 2', '2', '10', 'Yes,Partially,No,NA', 'Criterion 2']
             ];
             const csv = [headers.join(','), ...examples.map(r => r.map(f => `"${f}"`).join(','))].join('\n');
             const blob = new Blob([csv], { type: 'text/csv' });
@@ -1522,8 +1530,9 @@
                         referenceValue: values[0].trim(),
                         title: values[1].trim(),
                         coeff: parseInt(values[2]) || 2,
-                        answer: values[3]?.trim() || 'Yes,Partially,No,NA',
-                        cr: values[4]?.trim() || ''
+                        quantity: parseInt(values[3]) || null,
+                        answer: values[4]?.trim() || 'Yes,Partially,No,NA',
+                        cr: values[5]?.trim() || ''
                     });
                 }
             }
@@ -1631,6 +1640,10 @@
                             <option value="2" selected>2</option>
                             <option value="4">4</option>
                         </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Quantity</label>
+                        <input type="number" id="editItemQuantity" min="0">
                     </div>
                 </div>
                 <div class="form-group">

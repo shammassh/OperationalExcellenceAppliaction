@@ -1908,6 +1908,14 @@
                     <div class="question-header">
                         <span class="question-ref">${item.referenceValue || '-'}</span>
                         <span class="question-coeff">Coeff: ${item.coeff}</span>
+                        ${item.quantity ? `<span class="question-qty" style="background: #3b82f6; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; margin-left: 8px;">Expected: ${item.quantity}</span>` : ''}
+                        ${item.quantity ? `<span class="question-qty-edit" style="margin-left: 8px; display: inline-flex; align-items: center; gap: 4px;">
+                            <label style="font-size: 0.75rem; color: #64748b;">Found:</label>
+                            <input type="number" min="0" value="${item.actualQuantity || ''}" 
+                                style="width: 60px; padding: 2px 6px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.8rem;"
+                                onchange="updateActualQuantity(${item.responseId}, this.value)"
+                                placeholder="-">
+                        </span>` : ''}
                     </div>
                     <div class="question-title">${item.title}</div>
                     
@@ -2134,6 +2142,35 @@
             } catch (error) {
                 console.error('Error updating finding:', error);
                 showToast('Failed to save finding', 'error');
+            }
+        }
+
+        // Update quantity
+        async function updateActualQuantity(responseId, value) {
+            try {
+                const item = findItem(responseId);
+                const qty = value ? parseInt(value) : null;
+                
+                const response = await fetch(`/oe-inspection/api/audits/response/${responseId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        selectedChoice: item.selectedChoice,
+                        coeff: item.coeff,
+                        actualQuantity: qty
+                    })
+                });
+
+                const result = await response.json();
+                if (!result.success) throw new Error(result.error);
+
+                // Update local data
+                if (item) item.actualQuantity = qty;
+                showToast('Quantity updated', 'success');
+
+            } catch (error) {
+                console.error('Error updating quantity:', error);
+                showToast('Failed to save quantity', 'error');
             }
         }
 

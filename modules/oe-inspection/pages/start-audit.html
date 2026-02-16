@@ -497,7 +497,7 @@
                 
                 if (selectedStore) {
                     document.getElementById('storeLocation').textContent = selectedStore.location || 'N/A';
-                    document.getElementById('storeSchema').textContent = selectedStore.schemaName;
+                    document.getElementById('storeSchema').textContent = selectedStore.templateName || 'Not assigned';
                     storeInfo.classList.add('show');
                 }
             } else {
