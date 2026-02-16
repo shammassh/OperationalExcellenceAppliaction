@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const sql = require('mssql');
+const ExcelJS = require('exceljs');
 const config = require('../../config/default');
 const SharePointUsersService = require('../../gmrl-auth/admin/services/sharepoint-users-service');
 
@@ -28,6 +29,128 @@ const requireSysAdmin = (req, res, next) => {
 
 // Apply sysadmin check to all routes
 router.use(requireSysAdmin);
+
+// Download Permission Matrix as Excel
+router.get('/roles/download-matrix', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        // Get all data
+        const roles = await pool.request().query('SELECT Id, RoleName, Description FROM UserRoles ORDER BY RoleName');
+        const forms = await pool.request().query('SELECT Id, FormCode, FormName, ModuleName FROM Forms WHERE IsActive = 1 ORDER BY ModuleName, FormName');
+        const permissions = await pool.request().query('SELECT RoleId, FormCode, CanView, CanCreate, CanEdit, CanDelete FROM RoleFormAccess');
+        
+        await pool.close();
+        
+        // Build permission lookup
+        const permLookup = {};
+        permissions.recordset.forEach(p => {
+            const key = `${p.RoleId}-${p.FormCode}`;
+            permLookup[key] = p;
+        });
+        
+        // Create workbook
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = 'OE Application';
+        workbook.created = new Date();
+        
+        // Create main matrix sheet
+        const matrixSheet = workbook.addWorksheet('Permission Matrix');
+        
+        // Header row: Form Code | Form Name | Module | Role1 | Role2 | ...
+        const headerRow = ['Form Code', 'Form Name', 'Module'];
+        roles.recordset.forEach(r => headerRow.push(r.RoleName));
+        matrixSheet.addRow(headerRow);
+        
+        // Style header
+        const headerRowObj = matrixSheet.getRow(1);
+        headerRowObj.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        headerRowObj.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6f42c1' } };
+        headerRowObj.alignment = { horizontal: 'center', vertical: 'middle' };
+        headerRowObj.height = 25;
+        
+        // Data rows
+        forms.recordset.forEach(form => {
+            const row = [form.FormCode, form.FormName, form.ModuleName];
+            roles.recordset.forEach(role => {
+                const perm = permLookup[`${role.Id}-${form.FormCode}`];
+                if (perm) {
+                    const perms = [];
+                    if (perm.CanView) perms.push('V');
+                    if (perm.CanCreate) perms.push('C');
+                    if (perm.CanEdit) perms.push('E');
+                    if (perm.CanDelete) perms.push('D');
+                    row.push(perms.join(',') || '-');
+                } else {
+                    row.push('-');
+                }
+            });
+            matrixSheet.addRow(row);
+        });
+        
+        // Style data rows
+        for (let i = 2; i <= forms.recordset.length + 1; i++) {
+            const row = matrixSheet.getRow(i);
+            row.alignment = { horizontal: 'center', vertical: 'middle' };
+            
+            // Color code permissions
+            for (let j = 4; j <= roles.recordset.length + 3; j++) {
+                const cell = row.getCell(j);
+                const val = cell.value;
+                if (val && val !== '-') {
+                    if (val.includes('V') && val.includes('C') && val.includes('E') && val.includes('D')) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF28a745' } };
+                        cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+                    } else if (val.includes('E') || val.includes('D')) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFffc107' } };
+                    } else if (val.includes('V') || val.includes('C')) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFd4edda' } };
+                    }
+                } else {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFf8f9fa' } };
+                    cell.font = { color: { argb: 'FF999999' } };
+                }
+            }
+        }
+        
+        // Set column widths
+        matrixSheet.getColumn(1).width = 25;
+        matrixSheet.getColumn(2).width = 30;
+        matrixSheet.getColumn(3).width = 15;
+        for (let i = 4; i <= roles.recordset.length + 3; i++) {
+            matrixSheet.getColumn(i).width = 12;
+        }
+        
+        // Freeze panes
+        matrixSheet.views = [{ state: 'frozen', xSplit: 3, ySplit: 1 }];
+        
+        // Add legend sheet
+        const legendSheet = workbook.addWorksheet('Legend');
+        legendSheet.addRow(['Permission Legend']);
+        legendSheet.addRow(['V = View', 'C = Create', 'E = Edit', 'D = Delete']);
+        legendSheet.addRow([]);
+        legendSheet.addRow(['Color Legend']);
+        legendSheet.addRow(['Green (VCED)', 'Full Access']);
+        legendSheet.addRow(['Yellow (E or D)', 'Edit/Delete Access']);
+        legendSheet.addRow(['Light Green (V or C)', 'View/Create Only']);
+        legendSheet.addRow(['Gray (-)', 'No Access']);
+        legendSheet.getRow(1).font = { bold: true, size: 14 };
+        legendSheet.getRow(4).font = { bold: true, size: 14 };
+        
+        // Set response headers
+        const filename = `Role-Permission-Matrix-${new Date().toISOString().split('T')[0]}.xlsx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        
+        // Write to response
+        await workbook.xlsx.write(res);
+        res.end();
+        
+    } catch (err) {
+        console.error('Error generating permission matrix:', err);
+        res.status(500).send('Error generating permission matrix: ' + err.message);
+    }
+});
 
 // Admin Dashboard
 router.get('/', (req, res) => {
@@ -102,6 +225,11 @@ router.get('/', (req, res) => {
                         <div class="card-icon">🔐</div>
                         <div class="card-title">Role Management</div>
                         <div class="card-desc">View and manage user roles</div>
+                    </a>
+                    <a href="/admin/impersonate" class="admin-card">
+                        <div class="card-icon">👤</div>
+                        <div class="card-title">Impersonate User</div>
+                        <div class="card-desc">Test permissions as another user</div>
                     </a>
                 </div>
             </div>
@@ -1857,6 +1985,10 @@ router.get('/roles', async (req, res) => {
             `<option value="${c.Id}">${c.CategoryName}</option>`
         ).join('');
         
+        let categoryFilterOptions = categories.recordset.map(c => 
+            `<option value="${c.CategoryName}">${c.CategoryName}</option>`
+        ).join('');
+        
         res.send(`
             <!DOCTYPE html>
             <html>
@@ -2013,6 +2145,7 @@ router.get('/roles', async (req, res) => {
                 <div class="header">
                     <h1>🔐 Role Management</h1>
                     <div class="header-nav">
+                        <a href="/admin/roles/download-matrix" style="background:#28a745;">📥 Download Matrix</a>
                         <button onclick="openCreateModal()">➕ Create New Role</button>
                         <a href="/admin">← Admin Panel</a>
                         <a href="/admin/users">User Management</a>
@@ -2024,9 +2157,48 @@ router.get('/roles', async (req, res) => {
                     <div class="card">
                         <div class="card-header">
                             <div class="card-title">System Roles</div>
-                            <div>Total: ${roles.recordset.length} roles</div>
+                            <div>Total: <span id="roleCount">${roles.recordset.length}</span> roles</div>
                         </div>
-                        <table>
+                        
+                        <!-- Filter Section -->
+                        <div style="display:flex; gap:15px; margin-bottom:20px; padding:15px; background:#f8f9fa; border-radius:10px; flex-wrap:wrap; align-items:center;">
+                            <div style="flex:1; min-width:200px;">
+                                <input type="text" id="searchFilter" placeholder="🔍 Search role name..." 
+                                    style="width:100%; padding:10px 15px; border:1px solid #ddd; border-radius:8px; font-size:14px;"
+                                    onkeyup="filterRoles()">
+                            </div>
+                            <div style="min-width:180px;">
+                                <select id="categoryFilter" onchange="filterRoles()" 
+                                    style="width:100%; padding:10px 15px; border:1px solid #ddd; border-radius:8px; font-size:14px;">
+                                    <option value="">All Categories</option>
+                                    ${categoryFilterOptions}
+                                </select>
+                            </div>
+                            <div style="min-width:150px;">
+                                <select id="formsFilter" onchange="filterRoles()" 
+                                    style="width:100%; padding:10px 15px; border:1px solid #ddd; border-radius:8px; font-size:14px;">
+                                    <option value="">All Form Counts</option>
+                                    <option value="0">No forms (0)</option>
+                                    <option value="1-5">1-5 forms</option>
+                                    <option value="6-20">6-20 forms</option>
+                                    <option value="21+">21+ forms</option>
+                                </select>
+                            </div>
+                            <div style="min-width:150px;">
+                                <select id="usersFilter" onchange="filterRoles()" 
+                                    style="width:100%; padding:10px 15px; border:1px solid #ddd; border-radius:8px; font-size:14px;">
+                                    <option value="">All User Counts</option>
+                                    <option value="0">No users (0)</option>
+                                    <option value="1-5">1-5 users</option>
+                                    <option value="6+">6+ users</option>
+                                </select>
+                            </div>
+                            <button onclick="clearFilters()" style="padding:10px 20px; background:#6c757d; color:white; border:none; border-radius:8px; cursor:pointer;">
+                                ✖ Clear
+                            </button>
+                        </div>
+                        
+                        <table id="rolesTable">
                             <thead>
                                 <tr>
                                     <th>ID</th>
@@ -2078,6 +2250,64 @@ router.get('/roles', async (req, res) => {
                 
                 <script>
                     let isEditMode = false;
+                    
+                    // Filter functions
+                    function filterRoles() {
+                        const searchText = document.getElementById('searchFilter').value.toLowerCase();
+                        const categoryFilter = document.getElementById('categoryFilter').value;
+                        const formsFilter = document.getElementById('formsFilter').value;
+                        const usersFilter = document.getElementById('usersFilter').value;
+                        
+                        const rows = document.querySelectorAll('#rolesTable tbody tr');
+                        let visibleCount = 0;
+                        
+                        rows.forEach(row => {
+                            const roleName = row.cells[1].textContent.toLowerCase();
+                            const category = row.cells[2].textContent.trim();
+                            const formCount = parseInt(row.cells[3].textContent) || 0;
+                            const userCount = parseInt(row.cells[4].textContent) || 0;
+                            
+                            let show = true;
+                            
+                            // Search filter
+                            if (searchText && !roleName.includes(searchText)) {
+                                show = false;
+                            }
+                            
+                            // Category filter
+                            if (categoryFilter && !category.includes(categoryFilter)) {
+                                show = false;
+                            }
+                            
+                            // Forms count filter
+                            if (formsFilter) {
+                                if (formsFilter === '0' && formCount !== 0) show = false;
+                                else if (formsFilter === '1-5' && (formCount < 1 || formCount > 5)) show = false;
+                                else if (formsFilter === '6-20' && (formCount < 6 || formCount > 20)) show = false;
+                                else if (formsFilter === '21+' && formCount < 21) show = false;
+                            }
+                            
+                            // Users count filter
+                            if (usersFilter) {
+                                if (usersFilter === '0' && userCount !== 0) show = false;
+                                else if (usersFilter === '1-5' && (userCount < 1 || userCount > 5)) show = false;
+                                else if (usersFilter === '6+' && userCount < 6) show = false;
+                            }
+                            
+                            row.style.display = show ? '' : 'none';
+                            if (show) visibleCount++;
+                        });
+                        
+                        document.getElementById('roleCount').textContent = visibleCount;
+                    }
+                    
+                    function clearFilters() {
+                        document.getElementById('searchFilter').value = '';
+                        document.getElementById('categoryFilter').value = '';
+                        document.getElementById('formsFilter').value = '';
+                        document.getElementById('usersFilter').value = '';
+                        filterRoles();
+                    }
                     
                     function openCreateModal() {
                         isEditMode = false;
@@ -2348,5 +2578,300 @@ router.post('/api/clear-cache', (req, res) => {
     }
 });
 
-module.exports = router;
+// ==========================================
+// User Impersonation (Admin Only)
+// ==========================================
 
+// Impersonate user page
+router.get('/impersonate', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const users = await pool.request().query(`
+            SELECT u.Id, u.Email, u.DisplayName, u.IsActive, u.IsApproved,
+                   (SELECT STRING_AGG(r.RoleName, ', ') FROM UserRoleAssignments ura 
+                    JOIN UserRoles r ON ura.RoleId = r.Id WHERE ura.UserId = u.Id) as RoleNames
+            FROM Users u
+            WHERE u.IsActive = 1 AND u.IsApproved = 1
+            ORDER BY u.DisplayName
+        `);
+        await pool.close();
+        
+        const currentImpersonation = req.cookies.impersonate_user_id;
+        const isImpersonating = !!currentImpersonation;
+        
+        // Create JSON array for search
+        const usersJson = JSON.stringify(users.recordset.map(u => ({
+            id: u.Id,
+            name: u.DisplayName,
+            email: u.Email,
+            roles: u.RoleNames || 'No roles'
+        })));
+        
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Impersonate User - ${process.env.APP_NAME}</title>
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body { font-family: 'Segoe UI', Arial; background: #f0f2f5; min-height: 100vh; }
+                    .header {
+                        background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+                        color: white;
+                        padding: 20px 40px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    }
+                    .header h1 { font-size: 24px; }
+                    .header-nav a {
+                        color: white;
+                        text-decoration: none;
+                        margin-left: 20px;
+                        opacity: 0.8;
+                    }
+                    .header-nav a:hover { opacity: 1; }
+                    .container { max-width: 800px; margin: 0 auto; padding: 30px 20px; }
+                    .card {
+                        background: white;
+                        border-radius: 15px;
+                        padding: 30px;
+                        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+                    }
+                    .warning-box {
+                        background: #fff3cd;
+                        border: 1px solid #ffc107;
+                        border-radius: 10px;
+                        padding: 20px;
+                        margin-bottom: 25px;
+                    }
+                    .warning-box h3 { color: #856404; margin-bottom: 10px; }
+                    .warning-box p { color: #856404; font-size: 14px; }
+                    .form-group { margin-bottom: 25px; }
+                    .form-group label { display: block; margin-bottom: 10px; font-weight: 600; font-size: 16px; }
+                    .search-container { position: relative; }
+                    .search-input {
+                        width: 100%;
+                        padding: 15px;
+                        border: 2px solid #ddd;
+                        border-radius: 10px;
+                        font-size: 14px;
+                    }
+                    .search-input:focus { border-color: #e74c3c; outline: none; }
+                    .search-results {
+                        position: absolute;
+                        top: 100%;
+                        left: 0;
+                        right: 0;
+                        background: white;
+                        border: 2px solid #e74c3c;
+                        border-top: none;
+                        border-radius: 0 0 10px 10px;
+                        max-height: 300px;
+                        overflow-y: auto;
+                        display: none;
+                        z-index: 100;
+                    }
+                    .search-results.show { display: block; }
+                    .search-item {
+                        padding: 12px 15px;
+                        cursor: pointer;
+                        border-bottom: 1px solid #eee;
+                    }
+                    .search-item:hover { background: #f8f9fa; }
+                    .search-item.selected { background: #e8f4f8; }
+                    .search-item-name { font-weight: 600; color: #333; }
+                    .search-item-email { font-size: 12px; color: #666; }
+                    .search-item-roles { font-size: 11px; color: #888; margin-top: 3px; }
+                    .selected-user {
+                        background: #d4edda;
+                        border: 2px solid #28a745;
+                        border-radius: 10px;
+                        padding: 15px;
+                        margin-top: 15px;
+                        display: none;
+                    }
+                    .selected-user.show { display: block; }
+                    .selected-user strong { color: #155724; }
+                    .btn {
+                        padding: 15px 30px;
+                        border: none;
+                        border-radius: 10px;
+                        cursor: pointer;
+                        font-size: 16px;
+                        font-weight: 600;
+                        margin-right: 10px;
+                    }
+                    .btn-danger { background: #e74c3c; color: white; }
+                    .btn-danger:hover { background: #c0392b; }
+                    .btn-success { background: #27ae60; color: white; }
+                    .btn-success:hover { background: #1e8449; }
+                    .btn-secondary { background: #95a5a6; color: white; }
+                    .btn-secondary:hover { background: #7f8c8d; }
+                    .current-status {
+                        background: ${isImpersonating ? '#d4edda' : '#f8f9fa'};
+                        border-radius: 10px;
+                        padding: 20px;
+                        margin-bottom: 25px;
+                    }
+                    .current-status h4 { margin-bottom: 10px; color: ${isImpersonating ? '#155724' : '#333'}; }
+                    .user-count { font-size: 12px; color: #888; margin-top: 5px; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>🎭 User Impersonation</h1>
+                    <div class="header-nav">
+                        <a href="/admin">← Admin Panel</a>
+                        <a href="/admin/users">User Management</a>
+                        <a href="/dashboard">Dashboard</a>
+                    </div>
+                </div>
+                <div class="container">
+                    <div class="card">
+                        <div class="warning-box">
+                            <h3>⚠️ Admin Testing Feature</h3>
+                            <p>This allows you to view the app as another user to test their permissions. 
+                               Your admin session remains active - you're just seeing what they would see.</p>
+                        </div>
+                        
+                        <div class="current-status">
+                            <h4>${isImpersonating ? '🎭 Currently Impersonating' : '👤 Normal Mode'}</h4>
+                            <p>${isImpersonating ? 'You are viewing the app as another user. Click "Stop Impersonating" to return to normal.' : 'Search for a user below to test their permissions.'}</p>
+                        </div>
+                        
+                        <form action="/admin/impersonate/start" method="POST" id="impersonateForm">
+                            <div class="form-group">
+                                <label>🔍 Search User to Impersonate:</label>
+                                <div class="search-container">
+                                    <input type="text" class="search-input" id="userSearch" placeholder="Type name or email to search..." autocomplete="off">
+                                    <input type="hidden" name="userId" id="selectedUserId" required>
+                                    <div class="search-results" id="searchResults"></div>
+                                </div>
+                                <div class="user-count">${users.recordset.length} users available</div>
+                                <div class="selected-user" id="selectedUserDisplay">
+                                    <strong>Selected:</strong> <span id="selectedUserName"></span>
+                                </div>
+                            </div>
+                            <div>
+                                <button type="submit" class="btn btn-danger" id="submitBtn" disabled>🎭 Start Impersonating</button>
+                                ${isImpersonating ? '<a href="/admin/impersonate/stop" class="btn btn-success">✓ Stop Impersonating</a>' : ''}
+                                <a href="/admin" class="btn btn-secondary">Cancel</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                <script>
+                    const users = ${usersJson};
+                    const searchInput = document.getElementById('userSearch');
+                    const searchResults = document.getElementById('searchResults');
+                    const selectedUserId = document.getElementById('selectedUserId');
+                    const selectedUserDisplay = document.getElementById('selectedUserDisplay');
+                    const selectedUserName = document.getElementById('selectedUserName');
+                    const submitBtn = document.getElementById('submitBtn');
+                    
+                    searchInput.addEventListener('input', function() {
+                        const query = this.value.toLowerCase().trim();
+                        
+                        if (query.length < 2) {
+                            searchResults.classList.remove('show');
+                            return;
+                        }
+                        
+                        const filtered = users.filter(u => 
+                            u.name.toLowerCase().includes(query) || 
+                            u.email.toLowerCase().includes(query)
+                        ).slice(0, 20);
+                        
+                        if (filtered.length === 0) {
+                            searchResults.innerHTML = '<div class="search-item" style="color:#999;">No users found</div>';
+                        } else {
+                            searchResults.innerHTML = filtered.map(u => \`
+                                <div class="search-item" data-id="\${u.id}" data-name="\${u.name}" data-email="\${u.email}">
+                                    <div class="search-item-name">\${u.name}</div>
+                                    <div class="search-item-email">\${u.email}</div>
+                                    <div class="search-item-roles">\${u.roles}</div>
+                                </div>
+                            \`).join('');
+                        }
+                        
+                        searchResults.classList.add('show');
+                    });
+                    
+                    searchResults.addEventListener('click', function(e) {
+                        const item = e.target.closest('.search-item');
+                        if (item && item.dataset.id) {
+                            selectedUserId.value = item.dataset.id;
+                            searchInput.value = item.dataset.name + ' (' + item.dataset.email + ')';
+                            selectedUserName.textContent = item.dataset.name + ' (' + item.dataset.email + ')';
+                            selectedUserDisplay.classList.add('show');
+                            searchResults.classList.remove('show');
+                            submitBtn.disabled = false;
+                        }
+                    });
+                    
+                    // Close dropdown when clicking outside
+                    document.addEventListener('click', function(e) {
+                        if (!e.target.closest('.search-container')) {
+                            searchResults.classList.remove('show');
+                        }
+                    });
+                    
+                    // Show all users on focus if empty
+                    searchInput.addEventListener('focus', function() {
+                        if (this.value.length < 2) {
+                            searchResults.innerHTML = users.slice(0, 20).map(u => \`
+                                <div class="search-item" data-id="\${u.id}" data-name="\${u.name}" data-email="\${u.email}">
+                                    <div class="search-item-name">\${u.name}</div>
+                                    <div class="search-item-email">\${u.email}</div>
+                                    <div class="search-item-roles">\${u.roles}</div>
+                                </div>
+                            \`).join('') + '<div class="search-item" style="color:#999;font-size:11px;">Type to search more...</div>';
+                            searchResults.classList.add('show');
+                        }
+                    });
+                </script>
+            </body>
+            </html>
+        `);
+    } catch (err) {
+        console.error('Error loading impersonate page:', err);
+        res.status(500).send('Error: ' + err.message);
+    }
+});
+
+// Start impersonation
+router.post('/impersonate/start', async (req, res) => {
+    try {
+        const { userId } = req.body;
+        
+        if (!userId) {
+            return res.redirect('/admin/impersonate?error=No user selected');
+        }
+        
+        // Set impersonation cookie (admin session stays, but we'll load this user's permissions)
+        res.cookie('impersonate_user_id', userId, {
+            httpOnly: true,
+            secure: process.env.APP_URL?.startsWith('https'),
+            maxAge: 60 * 60 * 1000 // 1 hour
+        });
+        
+        console.log(`🎭 Admin ${req.currentUser.email} started impersonating user ID ${userId}`);
+        
+        res.redirect('/dashboard');
+        
+    } catch (err) {
+        console.error('Error starting impersonation:', err);
+        res.status(500).send('Error: ' + err.message);
+    }
+});
+
+// Stop impersonation
+router.get('/impersonate/stop', (req, res) => {
+    res.clearCookie('impersonate_user_id');
+    console.log(`🎭 Admin ${req.currentUser.email} stopped impersonating`);
+    res.redirect('/admin/impersonate');
+});
+
+module.exports = router;

@@ -81,6 +81,39 @@ async function requireAuth(req, res, next) {
         
         req.sessionToken = sessionToken;
         
+        // Check for impersonation (admin only)
+        const impersonateUserId = req.cookies.impersonate_user_id;
+        console.log(`[IMPERSONATE] Cookie check: impersonate_user_id = ${impersonateUserId}, hasRole = ${roleNames.includes('System Administrator')}`);
+        
+        if (impersonateUserId && roleNames.includes('System Administrator')) {
+            try {
+                console.log(`[IMPERSONATE] Loading permissions for user ID ${impersonateUserId}`);
+                const impersonatedUser = await SessionManager.getImpersonatedUserPermissions(parseInt(impersonateUserId));
+                console.log(`[IMPERSONATE] Result:`, impersonatedUser ? `Found ${impersonatedUser.email}` : 'NOT FOUND');
+                
+                if (impersonatedUser) {
+                    // Store original admin info
+                    req.originalUser = { ...req.currentUser };
+                    
+                    // Override permissions with impersonated user's permissions
+                    req.currentUser.permissions = impersonatedUser.permissions;
+                    req.currentUser.roles = impersonatedUser.roles;
+                    req.currentUser.roleNames = impersonatedUser.roleNames;
+                    req.currentUser.role = impersonatedUser.roleNames.join(', ');
+                    req.currentUser.isImpersonating = true;
+                    req.currentUser.impersonatedUser = {
+                        id: impersonatedUser.id,
+                        email: impersonatedUser.email,
+                        displayName: impersonatedUser.displayName
+                    };
+                    
+                    console.log(`👤 Impersonating: ${impersonatedUser.email} (as ${session.email})`);
+                }
+            } catch (err) {
+                console.error('Impersonation error:', err);
+            }
+        }
+        
         console.log(`✅ Authenticated: ${session.email} (${session.role})`);
         
         // Continue to next middleware

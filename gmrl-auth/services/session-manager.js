@@ -158,6 +158,98 @@ class SessionManager {
     }
     
     /**
+     * Get impersonated user permissions
+     * Used when admin impersonates another user for testing
+     */
+    static async getImpersonatedUserPermissions(userId) {
+        const pool = await sql.connect(config.database);
+        
+        // Get user info
+        const userResult = await pool.request()
+            .input('userId', sql.Int, userId)
+            .query(`
+                SELECT u.Id, u.Email, u.DisplayName
+                FROM Users u
+                WHERE u.Id = @userId AND u.IsActive = 1
+            `);
+        
+        if (!userResult.recordset[0]) {
+            return null;
+        }
+        
+        const user = userResult.recordset[0];
+        
+        // Get all user roles
+        const rolesResult = await pool.request()
+            .input('userId', sql.Int, userId)
+            .query(`
+                SELECT r.Id, r.RoleName, c.CategoryName
+                FROM UserRoleAssignments ura
+                JOIN UserRoles r ON ura.RoleId = r.Id
+                JOIN RoleCategories c ON r.CategoryId = c.Id
+                WHERE ura.UserId = @userId
+                ORDER BY c.Id, r.Id
+            `);
+        
+        // Get user's form permissions from UserFormAccess
+        const permissionsResult = await pool.request()
+            .input('userId', sql.Int, userId)
+            .query(`
+                SELECT FormCode, CanView, CanCreate, CanEdit, CanDelete
+                FROM UserFormAccess
+                WHERE UserId = @userId
+            `);
+        
+        const permissions = {};
+        permissionsResult.recordset.forEach(p => {
+            permissions[p.FormCode] = {
+                canView: p.CanView,
+                canCreate: p.CanCreate,
+                canEdit: p.CanEdit,
+                canDelete: p.CanDelete,
+                source: 'user'
+            };
+        });
+        
+        // Get role-based permissions
+        const roleIds = rolesResult.recordset.map(r => r.Id);
+        if (roleIds.length > 0) {
+            const rolePermissionsResult = await pool.request()
+                .query(`
+                    SELECT DISTINCT FormCode, 
+                           MAX(CAST(CanView AS INT)) as CanView,
+                           MAX(CAST(CanCreate AS INT)) as CanCreate,
+                           MAX(CAST(CanEdit AS INT)) as CanEdit,
+                           MAX(CAST(CanDelete AS INT)) as CanDelete
+                    FROM RoleFormAccess
+                    WHERE RoleId IN (${roleIds.join(',')})
+                    GROUP BY FormCode
+                `);
+            
+            rolePermissionsResult.recordset.forEach(p => {
+                if (!permissions[p.FormCode]) {
+                    permissions[p.FormCode] = {
+                        canView: p.CanView === 1,
+                        canCreate: p.CanCreate === 1,
+                        canEdit: p.CanEdit === 1,
+                        canDelete: p.CanDelete === 1,
+                        source: 'role'
+                    };
+                }
+            });
+        }
+        
+        return {
+            id: user.Id,
+            email: user.Email,
+            displayName: user.DisplayName,
+            roles: rolesResult.recordset,
+            roleNames: rolesResult.recordset.map(r => r.RoleName),
+            permissions: permissions
+        };
+    }
+    
+    /**
      * Delete session (logout)
      */
     static async deleteSession(sessionToken) {

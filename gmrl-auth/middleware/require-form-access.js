@@ -263,8 +263,9 @@ function requireFormAccess(options = {}) {
                 }
             }
             
-            // System Administrators always have access
-            if (req.currentUser.hasRole && req.currentUser.hasRole('System Administrator')) {
+            // System Administrators always have access (but NOT when impersonating another user)
+            const isImpersonating = req.currentUser.isImpersonating === true;
+            if (!isImpersonating && req.currentUser.hasRole && req.currentUser.hasRole('System Administrator')) {
                 if (logAccess) {
                     console.log(`[FORM-ACCESS] ✅ System Administrator bypass: ${req.currentUser.email}`);
                 }
@@ -276,6 +277,10 @@ function requireFormAccess(options = {}) {
             
             // Match URL to form
             const matchedForm = matchUrlToForm(url, formMappings);
+            
+            if (logAccess) {
+                console.log(`[FORM-ACCESS] Checking URL: ${url} | Method: ${req.method} | Matched: ${matchedForm ? matchedForm.FormCode : 'NONE'}`);
+            }
             
             if (!matchedForm) {
                 // Form not in registry
@@ -294,7 +299,10 @@ function requireFormAccess(options = {}) {
             const action = getRequiredAction(req.method, url);
             
             // Check permission
-            const hasAccess = req.currentUser.canAccess(matchedForm.FormCode, action);
+            const perm = req.currentUser.permissions ? req.currentUser.permissions[matchedForm.FormCode] : null;
+            console.log(`[FORM-ACCESS] Permission for ${matchedForm.FormCode}: ${JSON.stringify(perm)} | Action: ${action}`);
+            
+            const hasAccess = req.currentUser.canAccess ? req.currentUser.canAccess(matchedForm.FormCode, action) : false;
             
             if (hasAccess) {
                 if (logAccess) {

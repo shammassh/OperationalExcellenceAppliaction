@@ -259,7 +259,7 @@ function initializeAuth(app) {
 /**
  * Middleware to require authentication
  */
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
     const sessionId = req.cookies?.session_id;
     
     // Helper to check if request is an API/AJAX call
@@ -297,7 +297,101 @@ function requireAuth(req, res, next) {
     }
     
     // Attach user to request
-    req.currentUser = session;
+    req.currentUser = { ...session };
+    
+    // Re-attach helper functions (spread doesn't copy methods)
+    req.currentUser.hasRole = function(roleName) {
+        return this.roleNames?.includes(roleName) || false;
+    };
+    req.currentUser.hasAnyRole = function(...roles) {
+        return roles.some(r => this.roleNames?.includes(r)) || false;
+    };
+    req.currentUser.canAccess = function(formCode, action = 'view') {
+        const perm = this.permissions ? this.permissions[formCode] : null;
+        if (!perm) return false;
+        switch(action.toLowerCase()) {
+            case 'view': return perm.canView === true;
+            case 'create': return perm.canCreate === true;
+            case 'edit': return perm.canEdit === true;
+            case 'delete': return perm.canDelete === true;
+            default: return false;
+        }
+    };
+    
+    // Check for impersonation (System Administrator only)
+    const impersonateUserId = req.cookies?.impersonate_user_id;
+    if (impersonateUserId && session.roleNames?.includes('System Administrator')) {
+        try {
+            // Load impersonated user's permissions from database
+            const pool = await sql.connect(dbConfig);
+            
+            // Get user info
+            const userResult = await pool.request()
+                .input('userId', sql.Int, parseInt(impersonateUserId))
+                .query(`SELECT Id, Email, DisplayName FROM Users WHERE Id = @userId AND IsActive = 1`);
+            
+            if (userResult.recordset[0]) {
+                const impersonatedUser = userResult.recordset[0];
+                
+                // Get roles
+                const rolesResult = await pool.request()
+                    .input('userId', sql.Int, parseInt(impersonateUserId))
+                    .query(`
+                        SELECT r.Id, r.RoleName
+                        FROM UserRoleAssignments ura
+                        JOIN UserRoles r ON ura.RoleId = r.Id
+                        WHERE ura.UserId = @userId
+                    `);
+                
+                const roleNames = rolesResult.recordset.map(r => r.RoleName);
+                
+                // Get permissions
+                const permResult = await pool.request()
+                    .input('userId', sql.Int, parseInt(impersonateUserId))
+                    .query(`SELECT FormCode, CanView, CanCreate, CanEdit, CanDelete FROM UserFormAccess WHERE UserId = @userId`);
+                
+                const permissions = {};
+                permResult.recordset.forEach(p => {
+                    permissions[p.FormCode] = { canView: p.CanView, canCreate: p.CanCreate, canEdit: p.CanEdit, canDelete: p.CanDelete };
+                });
+                
+                // Get role permissions too
+                const roleIds = rolesResult.recordset.map(r => r.Id);
+                if (roleIds.length > 0) {
+                    const rolePermResult = await pool.request()
+                        .query(`
+                            SELECT DISTINCT FormCode, MAX(CAST(CanView AS INT)) as CanView, MAX(CAST(CanCreate AS INT)) as CanCreate,
+                                   MAX(CAST(CanEdit AS INT)) as CanEdit, MAX(CAST(CanDelete AS INT)) as CanDelete
+                            FROM RoleFormAccess WHERE RoleId IN (${roleIds.join(',')}) GROUP BY FormCode
+                        `);
+                    rolePermResult.recordset.forEach(p => {
+                        if (!permissions[p.FormCode]) {
+                            permissions[p.FormCode] = { canView: p.CanView === 1, canCreate: p.CanCreate === 1, canEdit: p.CanEdit === 1, canDelete: p.CanDelete === 1 };
+                        }
+                    });
+                }
+                
+                await pool.close();
+                
+                // Store original user and apply impersonation
+                req.originalUser = { ...session };
+                req.currentUser.roleNames = roleNames;
+                req.currentUser.role = roleNames.join(', ') || 'No Role';
+                req.currentUser.permissions = permissions;
+                req.currentUser.isImpersonating = true;
+                req.currentUser.impersonatedUser = {
+                    id: impersonatedUser.Id,
+                    email: impersonatedUser.Email,
+                    displayName: impersonatedUser.DisplayName
+                };
+                
+                console.log(`👤 Impersonating: ${impersonatedUser.Email} (as ${session.email})`);
+            }
+        } catch (err) {
+            console.error('Impersonation error:', err);
+        }
+    }
+    
     next();
 }
 

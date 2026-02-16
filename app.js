@@ -151,33 +151,42 @@ app.get('/dashboard', requireAuth, (req, res) => {
         
         // Personnel module  
         'THIRDPARTY_SCHEDULE': 'personnel', 'THIRDPARTY_ATTENDANCE': 'personnel',
+        'PERSONNEL_DASHBOARD': 'personnel',
         
-        // OHS module
-        'OHS_INSPECTION_START': 'ohs', 'OHS_INSPECTION_LIST': 'ohs',
+        // OHS module (main OHS incidents)
+        'OHS_DASHBOARD': 'ohs', 'OHS_INCIDENT': 'ohs', 'OHS_SETTINGS': 'ohs',
         
         // OHS Inspection module
+        'OHS_INSPECTION': 'ohs-inspection', 'OHS_INSPECTION_START': 'ohs-inspection', 
+        'OHS_INSPECTION_LIST': 'ohs-inspection', 'OHS_INSPECTION_VIEW': 'ohs-inspection',
         'OHS_INSPECTION_TEMPLATES': 'ohs-inspection', 'OHS_INSPECTION_STORES': 'ohs-inspection',
         'OHS_INSPECTION_ACTION_PLANS': 'ohs-inspection', 'OHS_INSPECTION_DEPT_REPORTS': 'ohs-inspection',
-        'OHS_INSPECTION_SETTINGS': 'ohs-inspection',
+        'OHS_INSPECTION_SETTINGS': 'ohs-inspection', 'OHS_INSPECTION_REPORT': 'ohs-inspection',
+        'OHS_TEMPLATE_BUILDER': 'ohs-inspection',
         
         // OE module (dashboards)
+        'OP_EXCELLENCE': 'oe', 'OP_THEFT': 'oe', 'OP_COMPLAINTS': 'oe', 'OP_EXTRA_CLEANING': 'oe',
+        'OP_FEEDBACK': 'oe', 'OP_PRODUCTION': 'oe', 'OP_FIVE_DAYS': 'oe', 'OP_ATTENDANCE': 'oe',
+        'OP_THIRDPARTY': 'oe', 'OP_SECURITY': 'oe',
         'THEFT_DASHBOARD': 'oe', 'COMPLAINTS_DASHBOARD': 'oe', 'EXTRA_CLEANING_REVIEW': 'oe',
         'FEEDBACK_DASHBOARD': 'oe', 'PRODUCTION_DASHBOARD': 'oe', 'FIVE_DAYS_DASHBOARD': 'oe',
         'ATTENDANCE_DASHBOARD': 'oe', 'THIRDPARTY_DASHBOARD': 'oe', 'SECURITY_DASHBOARD': 'oe',
         
         // OE Inspection module
-        'OE_INSPECTION_START': 'oe-inspection', 'OE_INSPECTION_LIST': 'oe-inspection',
+        'OE_INSPECTION': 'oe-inspection', 'OE_INSPECTION_START': 'oe-inspection', 
+        'OE_INSPECTION_LIST': 'oe-inspection', 'OE_INSPECTION_VIEW': 'oe-inspection',
         'OE_INSPECTION_ACTION_PLANS': 'oe-inspection', 'OE_INSPECTION_DEPT_REPORTS': 'oe-inspection',
+        'OE_INSPECTION_TEMPLATES': 'oe-inspection', 'OE_INSPECTION_STORES': 'oe-inspection',
+        'OE_INSPECTION_SETTINGS': 'oe-inspection', 'OE_INSPECTION_REPORT': 'oe-inspection',
+        'OE_TEMPLATE_BUILDER': 'oe-inspection',
         
-        // Third-Party module
-        'THIRDPARTY_SCHEDULE': 'thirdparty', 'THIRDPARTY_ATTENDANCE': 'thirdparty',
-        'THIRDPARTY_DASHBOARD': 'thirdparty',
+        // Third-Party module (also in personnel)
         
-        // Security module
-        'THEFT_DASHBOARD': 'security', 'SECURITY_DASHBOARD': 'security',
+        // Security / Facility Management module
+        'SECURITY_CLEANING': 'security',
         
-        // HR module
-        'COMPLAINT': 'hr'
+        // HR module (HR_DASHBOARD is required for HR access)
+        'HR_DASHBOARD': 'hr'
     };
     
     // Calculate which menus user can access based on their form permissions
@@ -194,28 +203,9 @@ app.get('/dashboard', requireAuth, (req, res) => {
         });
     }
     
-    // Also check role-based access (for backward compatibility and System Admin)
-    const roleBasedAccess = {
-        'System Administrator': ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Senior Inspector': ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Inspector': ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Implementation Inspector': ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Head of Operational Excellence': ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Chief People & Support Officer': ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Head of Talent Management': ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
-        'Head of Operations': ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'],
-    };
-    
-    // Add role-based access for each role the user has
-    roleNames.forEach(roleName => {
-        if (roleBasedAccess[roleName]) {
-            roleBasedAccess[roleName].forEach(m => accessibleMenus.add(m));
-        }
-    });
-    
-    // Also check primary role
-    if (roleBasedAccess[primaryRole]) {
-        roleBasedAccess[primaryRole].forEach(m => accessibleMenus.add(m));
+    // System Administrator always has full access (no SQL check needed)
+    if (roleNames.includes('System Administrator')) {
+        ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'].forEach(m => accessibleMenus.add(m));
     }
     
     // Build menu items based on permissions
@@ -354,9 +344,35 @@ app.get('/dashboard', requireAuth, (req, res) => {
                     min-width: 18px;
                     text-align: center;
                 }
+                .impersonation-banner {
+                    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+                    color: white;
+                    padding: 12px 20px;
+                    border-radius: 8px;
+                    margin-bottom: 15px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    font-weight: 600;
+                    box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+                }
+                .impersonation-banner a {
+                    background: white;
+                    color: #e74c3c;
+                    padding: 6px 15px;
+                    border-radius: 5px;
+                    text-decoration: none;
+                    font-weight: 600;
+                }
             </style>
         </head>
         <body>
+            ${req.currentUser.isImpersonating ? `
+            <div class="impersonation-banner">
+                <span>👤 Impersonating: ${req.currentUser.impersonatedUser?.displayName} (${req.currentUser.impersonatedUser?.email})</span>
+                <a href="/admin/impersonate/stop">Stop Impersonating</a>
+            </div>
+            ` : ''}
             <div class="header">
                 <h1>Operational Excellence Dashboard</h1>
                 <div style="display: flex; gap: 15px; align-items: center;">
