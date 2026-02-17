@@ -248,16 +248,25 @@ router.get('/fill/:id', (req, res) => {
 
 // View Inspections List
 router.get('/list', (req, res) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.sendFile(path.join(__dirname, 'pages', 'audit-list.html'));
 });
 
-// Action Plan Page
+// Action Plan Page (single inspection)
 router.get('/action-plan/:id', (req, res) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.sendFile(path.join(__dirname, 'pages', 'action-plan.html'));
 });
 
-// Action Plans List (redirect to list with filter)
+// Action Plans List (shows completed audits to select from)
 router.get('/action-plans', (req, res) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.sendFile(path.join(__dirname, 'pages', 'audit-list.html'));
 });
 
@@ -1852,8 +1861,57 @@ router.post('/api/audits/:auditId/complete', async (req, res) => {
                 WHERE Id = @auditId
             `);
         
+        // Generate action items from findings
+        const findingsResult = await pool.request()
+            .input('auditId', sql.Int, auditId)
+            .query(`
+                SELECT 
+                    InspectionId,
+                    ReferenceValue,
+                    SectionName,
+                    Finding,
+                    CorrectedAction as SuggestedAction,
+                    Priority,
+                    Department
+                FROM OHS_InspectionItems
+                WHERE InspectionId = @auditId
+                  AND ((Finding IS NOT NULL AND Finding != '') OR Escalate = 1)
+            `);
+        
+        let actionItemsCreated = 0;
+        for (const finding of findingsResult.recordset) {
+            // Check if action item already exists
+            const existingCheck = await pool.request()
+                .input('inspectionId', sql.Int, auditId)
+                .input('referenceValue', sql.NVarChar, finding.ReferenceValue)
+                .input('sectionName', sql.NVarChar, finding.SectionName)
+                .query(`
+                    SELECT Id FROM OHS_InspectionActionItems 
+                    WHERE InspectionId = @inspectionId 
+                      AND ReferenceValue = @referenceValue 
+                      AND SectionName = @sectionName
+                `);
+            
+            if (existingCheck.recordset.length === 0) {
+                await pool.request()
+                    .input('inspectionId', sql.Int, auditId)
+                    .input('referenceValue', sql.NVarChar, finding.ReferenceValue)
+                    .input('sectionName', sql.NVarChar, finding.SectionName)
+                    .input('finding', sql.NVarChar, finding.Finding)
+                    .input('suggestedAction', sql.NVarChar, finding.SuggestedAction)
+                    .input('priority', sql.NVarChar, finding.Priority || 'Medium')
+                    .input('department', sql.NVarChar, finding.Department)
+                    .query(`
+                        INSERT INTO OHS_InspectionActionItems 
+                        (InspectionId, ReferenceValue, SectionName, Finding, SuggestedAction, Priority, Status, Department, CreatedAt)
+                        VALUES (@inspectionId, @referenceValue, @sectionName, @finding, @suggestedAction, @priority, 'Open', @department, GETDATE())
+                    `);
+                actionItemsCreated++;
+            }
+        }
+        
         await pool.close();
-        res.json({ success: true, data: { totalScore } });
+        res.json({ success: true, data: { totalScore, actionItemsCreated } });
     } catch (error) {
         console.error('Error completing audit:', error);
         res.status(500).json({ success: false, error: error.message });
@@ -2304,6 +2362,408 @@ router.post('/api/section-icons/:schemaId', async (req, res) => {
     } catch (error) {
         console.error('Error saving section icons:', error);
         res.json({ success: false, error: error.message });
+    }
+});
+
+// ==========================================
+// ACTION ITEMS API
+// ==========================================
+
+// Get action items (for action plan page)
+router.get('/api/action-items', async (req, res) => {
+    try {
+        const { storeId, priority, status, fromDate, toDate } = req.query;
+        const pool = await sql.connect(dbConfig);
+        
+        let query = `
+            SELECT 
+                ai.Id as id,
+                ai.InspectionId as inspectionId,
+                ai.ReferenceValue as referenceValue,
+                ai.SectionName as sectionName,
+                ai.Finding as finding,
+                ai.SuggestedAction as suggestedAction,
+                ai.Action as cr,
+                ai.Responsible as assignedTo,
+                ai.Deadline as dueDate,
+                ai.Priority as priority,
+                ai.Status as status,
+                ai.Department as department,
+                ai.Notes as notes,
+                ai.CreatedAt as createdAt,
+                ai.UpdatedAt as updatedAt,
+                ai.CompletedAt as completedAt,
+                i.DocumentNumber as documentNumber,
+                i.StoreName as storeName,
+                i.StoreId as storeId,
+                i.InspectionDate as inspectionDate
+            FROM OHS_InspectionActionItems ai
+            INNER JOIN OHS_Inspections i ON ai.InspectionId = i.Id
+            WHERE 1=1
+        `;
+        
+        const request = pool.request();
+        
+        if (storeId) {
+            query += ` AND i.StoreId = @storeId`;
+            request.input('storeId', sql.Int, storeId);
+        }
+        if (priority) {
+            query += ` AND ai.Priority = @priority`;
+            request.input('priority', sql.NVarChar, priority);
+        }
+        if (status) {
+            query += ` AND ai.Status = @status`;
+            request.input('status', sql.NVarChar, status);
+        }
+        if (fromDate) {
+            query += ` AND i.InspectionDate >= @fromDate`;
+            request.input('fromDate', sql.Date, fromDate);
+        }
+        if (toDate) {
+            query += ` AND i.InspectionDate <= @toDate`;
+            request.input('toDate', sql.Date, toDate);
+        }
+        
+        query += ` ORDER BY 
+            CASE WHEN ai.Deadline < CAST(GETDATE() AS DATE) AND ai.Status != 'Closed' THEN 0 ELSE 1 END,
+            CASE ai.Priority WHEN 'High' THEN 1 WHEN 'Medium' THEN 2 WHEN 'Low' THEN 3 ELSE 4 END,
+            ai.Deadline`;
+        
+        const result = await request.query(query);
+        await pool.close();
+        
+        res.json({ success: true, data: result.recordset });
+    } catch (error) {
+        console.error('Error fetching action items:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Update action item
+router.put('/api/action-items/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { cr, assignedTo, priority, status, dueDate, notes } = req.body;
+        
+        const pool = await sql.connect(dbConfig);
+        
+        let updateFields = [];
+        const request = pool.request().input('id', sql.Int, id);
+        
+        if (cr !== undefined) {
+            updateFields.push('Action = @cr');
+            request.input('cr', sql.NVarChar, cr);
+        }
+        if (assignedTo !== undefined) {
+            updateFields.push('Responsible = @assignedTo');
+            request.input('assignedTo', sql.NVarChar, assignedTo);
+        }
+        if (priority !== undefined) {
+            updateFields.push('Priority = @priority');
+            request.input('priority', sql.NVarChar, priority);
+        }
+        if (status !== undefined) {
+            updateFields.push('Status = @status');
+            request.input('status', sql.NVarChar, status);
+            if (status === 'Closed') {
+                updateFields.push('CompletedAt = GETDATE()');
+            }
+        }
+        if (dueDate !== undefined) {
+            updateFields.push('Deadline = @dueDate');
+            request.input('dueDate', sql.Date, dueDate || null);
+        }
+        if (notes !== undefined) {
+            updateFields.push('Notes = @notes');
+            request.input('notes', sql.NVarChar, notes);
+        }
+        
+        updateFields.push('UpdatedAt = GETDATE()');
+        
+        await request.query(`
+            UPDATE OHS_InspectionActionItems 
+            SET ${updateFields.join(', ')} 
+            WHERE Id = @id
+        `);
+        
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating action item:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Create action items from inspection findings (called when inspection is completed)
+router.post('/api/action-items/generate/:inspectionId', async (req, res) => {
+    try {
+        const { inspectionId } = req.params;
+        const pool = await sql.connect(dbConfig);
+        
+        // Get inspection items that have findings or are marked for escalation
+        const findingsResult = await pool.request()
+            .input('inspectionId', sql.Int, inspectionId)
+            .query(`
+                SELECT 
+                    Id,
+                    InspectionId,
+                    ReferenceValue,
+                    SectionName,
+                    Finding,
+                    CorrectedAction as SuggestedAction,
+                    Priority,
+                    Department
+                FROM OHS_InspectionItems
+                WHERE InspectionId = @inspectionId
+                  AND ((Finding IS NOT NULL AND Finding != '') OR Escalate = 1)
+            `);
+        
+        if (findingsResult.recordset.length === 0) {
+            await pool.close();
+            return res.json({ success: true, message: 'No findings to create action items for', count: 0 });
+        }
+        
+        // Insert action items
+        let insertedCount = 0;
+        for (const finding of findingsResult.recordset) {
+            // Check if action item already exists for this inspection item
+            const existingCheck = await pool.request()
+                .input('inspectionId', sql.Int, inspectionId)
+                .input('referenceValue', sql.NVarChar, finding.ReferenceValue)
+                .input('sectionName', sql.NVarChar, finding.SectionName)
+                .query(`
+                    SELECT Id FROM OHS_InspectionActionItems 
+                    WHERE InspectionId = @inspectionId 
+                      AND ReferenceValue = @referenceValue 
+                      AND SectionName = @sectionName
+                `);
+            
+            if (existingCheck.recordset.length === 0) {
+                await pool.request()
+                    .input('inspectionId', sql.Int, finding.InspectionId)
+                    .input('referenceValue', sql.NVarChar, finding.ReferenceValue)
+                    .input('sectionName', sql.NVarChar, finding.SectionName)
+                    .input('finding', sql.NVarChar, finding.Finding)
+                    .input('suggestedAction', sql.NVarChar, finding.SuggestedAction)
+                    .input('priority', sql.NVarChar, finding.Priority || 'Medium')
+                    .input('department', sql.NVarChar, finding.Department)
+                    .query(`
+                        INSERT INTO OHS_InspectionActionItems 
+                        (InspectionId, ReferenceValue, SectionName, Finding, SuggestedAction, Priority, Status, Department, CreatedAt)
+                        VALUES (@inspectionId, @referenceValue, @sectionName, @finding, @suggestedAction, @priority, 'Open', @department, GETDATE())
+                    `);
+                insertedCount++;
+            }
+        }
+        
+        await pool.close();
+        res.json({ success: true, message: `Created ${insertedCount} action items`, count: insertedCount });
+    } catch (error) {
+        console.error('Error generating action items:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ==========================================
+// Action Plan API Routes (per inspection)
+// ==========================================
+
+// Get action plan responses for a specific document number
+router.get('/api/action-plan/:documentNumber', async (req, res) => {
+    try {
+        const { documentNumber } = req.params;
+        const pool = await sql.connect(dbConfig);
+        
+        // First try to get from OHS_ActionPlanResponses table
+        const result = await pool.request()
+            .input('documentNumber', sql.NVarChar, documentNumber)
+            .query(`
+                SELECT * FROM OHS_ActionPlanResponses
+                WHERE DocumentNumber = @documentNumber
+            `);
+        
+        await pool.close();
+        res.json({ success: true, actions: result.recordset });
+    } catch (error) {
+        // Table might not exist yet - that's ok
+        console.warn('Action plan responses not found:', error.message);
+        res.json({ success: true, actions: [] });
+    }
+});
+
+// Save action plan responses
+router.post('/api/action-plan/save', async (req, res) => {
+    try {
+        const { documentNumber, actions } = req.body;
+        const pool = await sql.connect(dbConfig);
+        
+        // Create table if not exists
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'OHS_ActionPlanResponses')
+            CREATE TABLE OHS_ActionPlanResponses (
+                Id INT IDENTITY(1,1) PRIMARY KEY,
+                DocumentNumber NVARCHAR(50),
+                ReferenceValue NVARCHAR(50),
+                SectionName NVARCHAR(255),
+                Question NVARCHAR(MAX),
+                Finding NVARCHAR(MAX),
+                SelectedChoice NVARCHAR(50),
+                Priority NVARCHAR(50),
+                ActionTaken NVARCHAR(MAX),
+                Deadline DATE,
+                PersonInCharge NVARCHAR(255),
+                Status NVARCHAR(50),
+                Pictures NVARCHAR(MAX),
+                Notes NVARCHAR(MAX),
+                CreatedAt DATETIME DEFAULT GETDATE(),
+                UpdatedAt DATETIME DEFAULT GETDATE()
+            )
+        `);
+        
+        // Delete existing responses for this document
+        await pool.request()
+            .input('documentNumber', sql.NVarChar, documentNumber)
+            .query('DELETE FROM OHS_ActionPlanResponses WHERE DocumentNumber = @documentNumber');
+        
+        // Insert new responses
+        for (const action of actions) {
+            await pool.request()
+                .input('documentNumber', sql.NVarChar, documentNumber)
+                .input('referenceValue', sql.NVarChar, action.referenceValue)
+                .input('sectionName', sql.NVarChar, action.sectionName)
+                .input('question', sql.NVarChar, action.question)
+                .input('finding', sql.NVarChar, action.finding)
+                .input('selectedChoice', sql.NVarChar, action.selectedChoice)
+                .input('priority', sql.NVarChar, action.priority)
+                .input('actionTaken', sql.NVarChar, action.actionTaken)
+                .input('deadline', sql.Date, action.deadline || null)
+                .input('personInCharge', sql.NVarChar, action.personInCharge)
+                .input('status', sql.NVarChar, action.status)
+                .input('pictures', sql.NVarChar, JSON.stringify(action.pictures || []))
+                .input('notes', sql.NVarChar, action.notes)
+                .query(`
+                    INSERT INTO OHS_ActionPlanResponses 
+                    (DocumentNumber, ReferenceValue, SectionName, Question, Finding, SelectedChoice, Priority, ActionTaken, Deadline, PersonInCharge, Status, Pictures, Notes)
+                    VALUES (@documentNumber, @referenceValue, @sectionName, @question, @finding, @selectedChoice, @priority, @actionTaken, @deadline, @personInCharge, @status, @pictures, @notes)
+                `);
+        }
+        
+        await pool.close();
+        res.json({ success: true, message: 'Action plan saved successfully' });
+    } catch (error) {
+        console.error('Error saving action plan:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Send action plan email to store manager
+router.post('/api/action-plan/send-email', async (req, res) => {
+    try {
+        const { documentNumber, storeName, auditDate, score, recipientEmail, actionItems } = req.body;
+        
+        if (!recipientEmail) {
+            return res.status(400).json({ success: false, error: 'Recipient email is required' });
+        }
+
+        // Build HTML email content
+        const emailHtml = `
+            <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 800px; margin: 0 auto;">
+                <div style="background: linear-gradient(135deg, #e17055 0%, #d63031 100%); color: white; padding: 20px; text-align: center;">
+                    <h1 style="margin: 0;">🛡️ OHS Inspection Action Plan</h1>
+                </div>
+                
+                <div style="background: #f8f9fa; padding: 20px;">
+                    <table style="width: 100%;">
+                        <tr>
+                            <td><strong>Document Number:</strong> ${documentNumber}</td>
+                            <td><strong>Store:</strong> ${storeName}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Inspection Date:</strong> ${new Date(auditDate).toLocaleDateString('en-GB')}</td>
+                            <td><strong>Score:</strong> ${score ? Math.round(score) + '%' : 'N/A'}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div style="padding: 20px;">
+                    <h2 style="color: #d63031;">Action Items (${actionItems.length})</h2>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                        <thead>
+                            <tr style="background: #d63031; color: white;">
+                                <th style="padding: 10px; text-align: left;">Ref#</th>
+                                <th style="padding: 10px; text-align: left;">Section</th>
+                                <th style="padding: 10px; text-align: left;">Finding</th>
+                                <th style="padding: 10px; text-align: left;">Priority</th>
+                                <th style="padding: 10px; text-align: left;">Action Required</th>
+                                <th style="padding: 10px; text-align: left;">Deadline</th>
+                                <th style="padding: 10px; text-align: left;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${actionItems.map((item, idx) => `
+                                <tr style="background: ${idx % 2 === 0 ? '#fff' : '#f8f9fa'}; border-bottom: 1px solid #e9ecef;">
+                                    <td style="padding: 10px;">${item.referenceValue || '-'}</td>
+                                    <td style="padding: 10px;">${item.sectionName || '-'}</td>
+                                    <td style="padding: 10px;">${item.finding || '-'}</td>
+                                    <td style="padding: 10px;">
+                                        <span style="padding: 3px 8px; border-radius: 12px; font-size: 11px; background: ${item.priority === 'High' ? '#fee2e2' : item.priority === 'Medium' ? '#fef3c7' : '#dbeafe'}; color: ${item.priority === 'High' ? '#991b1b' : item.priority === 'Medium' ? '#92400e' : '#1e40af'};">
+                                            ${item.priority || 'Medium'}
+                                        </span>
+                                    </td>
+                                    <td style="padding: 10px;">${item.actionTaken || '<em style="color:#999;">Pending response</em>'}</td>
+                                    <td style="padding: 10px;">${item.deadline ? new Date(item.deadline).toLocaleDateString('en-GB') : '-'}</td>
+                                    <td style="padding: 10px;">${item.status || 'Pending'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="background: #fff3e0; border-left: 4px solid #e17055; padding: 15px; margin: 20px;">
+                    <h3 style="color: #d63031; margin-top: 0;">📝 Instructions</h3>
+                    <ol style="margin: 0; padding-left: 20px;">
+                        <li>Review each finding and understand the corrective action needed</li>
+                        <li>Fill in the Action to be Taken for each item</li>
+                        <li>Set realistic deadlines based on priority</li>
+                        <li>Assign responsible persons for each action</li>
+                        <li>Update status as actions progress</li>
+                    </ol>
+                </div>
+
+                <div style="text-align: center; padding: 20px; color: #666; font-size: 12px;">
+                    <p>This is an automated email from the OHS Inspection System.</p>
+                    <p>Please do not reply to this email.</p>
+                </div>
+            </div>
+        `;
+
+        // Get access token from session if available
+        const accessToken = req.session?.accessToken;
+        
+        if (!accessToken) {
+            // If no access token, try to save and show message
+            return res.json({ 
+                success: false, 
+                error: 'Email sending requires authentication. Please ensure you are logged in.' 
+            });
+        }
+
+        // Use email service
+        const EmailService = require('../../services/email-service');
+        const emailService = new EmailService();
+        
+        const result = await emailService.sendEmail({
+            to: recipientEmail,
+            subject: `OHS Action Plan - ${documentNumber} - ${storeName}`,
+            body: emailHtml,
+            accessToken: accessToken
+        });
+
+        res.json(result);
+    } catch (error) {
+        console.error('Error sending action plan email:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 

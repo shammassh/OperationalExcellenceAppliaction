@@ -61,6 +61,28 @@
             border: 1px solid #dee2e6;
         }
 
+        .btn-action-plan {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 12px;
+        }
+
+        .btn-action-plan:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-report {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            font-size: 12px;
+        }
+
+        .btn-report:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+
         .container {
             max-width: 1400px;
             margin: 30px auto;
@@ -466,6 +488,13 @@
                                 <button class="btn btn-primary" onclick="event.stopPropagation(); openAudit(${audit.AuditID})">
                                     ${audit.Status === 'Completed' ? '👁 View' : '✏️ Continue'}
                                 </button>
+                                ${audit.Status === 'Completed' ? `
+                                <button class="btn btn-action-plan" onclick="event.stopPropagation(); openActionPlan(${audit.AuditID})" title="View Action Plan">
+                                    🎯 Action Plan
+                                </button>
+                                <button class="btn btn-report" onclick="event.stopPropagation(); generateReport(${audit.AuditID})" title="Generate Report">
+                                    📄 Report
+                                </button>` : ''}
                                 <button class="btn btn-secondary" onclick="event.stopPropagation(); deleteAudit(${audit.AuditID})">
                                     🗑️
                                 </button>
@@ -510,6 +539,38 @@
 
         function openAudit(id) {
             window.location.href = `/ohs-inspection/fill/${id}`;
+        }
+
+        function openActionPlan(id) {
+            window.location.href = `/ohs-inspection/action-plan/${id}`;
+        }
+
+        async function generateReport(id) {
+            const btn = event.target;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳...';
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch(`/ohs-inspection/api/audits/${id}/generate-report`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Open the report in a new tab
+                    window.open(`/ohs-inspection/reports/${result.fileName}`, '_blank');
+                } else {
+                    alert('Error generating report: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error generating report');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
         }
 
         async function deleteAudit(id) {

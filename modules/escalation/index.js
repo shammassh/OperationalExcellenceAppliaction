@@ -215,6 +215,107 @@ router.delete('/api/admin/sources/:id', async (req, res) => {
 // ==========================================
 
 // Get action items from a source
+// Helper function to build dynamic query based on available columns
+function buildActionItemsQuery(source, filters = {}) {
+    const { department, status, priority } = filters;
+    
+    // Build SELECT columns - handle optional columns
+    let selectCols = `
+        ai.${source.IdColumn} as Id,
+        ai.${source.InspectionIdColumn} as InspectionId,
+        ${source.DepartmentColumn ? `ai.${source.DepartmentColumn}` : 'NULL'} as Department,
+        ${source.DeadlineColumn ? `ai.${source.DeadlineColumn}` : 'i.InspectionDate'} as Deadline,
+        ${source.ResponsibleColumn ? `ai.${source.ResponsibleColumn}` : 'NULL'} as Responsible,
+        ${source.StatusColumn ? `ai.${source.StatusColumn}` : "'Open'"} as Status,
+        ${source.PriorityColumn ? `ai.${source.PriorityColumn}` : "'Medium'"} as Priority,
+        ai.${source.FindingColumn} as Finding,
+        ${source.ActionColumn ? `ai.${source.ActionColumn}` : 'NULL'} as Action,
+        i.${source.StoreNameColumn} as StoreName,
+        i.InspectionDate as InspectionDate,
+        i.DocumentNumber as DocumentNumber,
+        ${source.SectionColumn ? `ai.${source.SectionColumn}` : 'NULL'} as SectionName,
+        ${source.ReferenceColumn ? `ai.${source.ReferenceColumn}` : 'NULL'} as ReferenceValue,
+        '${source.SourceCode}' as SourceCode,
+        '${source.SourceName}' as SourceName,
+        ${source.Id} as SourceId,
+        CASE WHEN e.Id IS NOT NULL THEN 1 ELSE 0 END as IsEscalated,
+        e.Id as EscalatedItemId,
+        e.Status as EscalationStatus
+    `;
+    
+    // Add overdue calculation only if Deadline column exists
+    if (source.DeadlineColumn && source.StatusColumn) {
+        selectCols += `,
+        CASE WHEN ai.${source.DeadlineColumn} < CAST(GETDATE() AS DATE) 
+             AND ai.${source.StatusColumn} NOT IN ('Completed', 'Closed') 
+             THEN 1 ELSE 0 END as IsOverdue,
+        DATEDIFF(day, ai.${source.DeadlineColumn}, GETDATE()) as DaysOverdue`;
+    } else {
+        selectCols += `,
+        0 as IsOverdue,
+        0 as DaysOverdue`;
+    }
+    
+    // For ActionItems tables, all records are action items - no need to filter by Finding
+    // For InspectionItems tables (direct source), filter by Finding or Escalate
+    const isActionItemsTable = source.ActionItemsTable.includes('ActionItems');
+    
+    let query = `
+        SELECT ${selectCols}
+        FROM ${source.ActionItemsTable} ai
+        LEFT JOIN ${source.InspectionTable} i ON ai.${source.InspectionIdColumn} = i.Id
+        LEFT JOIN EscalatedItems e ON e.SourceId = ${source.Id} AND e.SourceItemId = ai.${source.IdColumn}
+        WHERE 1=1
+    `;
+    
+    // If querying inspection items directly (not action items table), filter for findings
+    if (!isActionItemsTable) {
+        query += ` AND ((ai.${source.FindingColumn} IS NOT NULL AND ai.${source.FindingColumn} != '') OR ai.Escalate = 1)`;
+    }
+    
+    // Exclude closed/completed by default unless specifically filtering for them
+    if (source.StatusColumn && (!status || status === 'Open' || status === 'Overdue')) {
+        query += ` AND ai.${source.StatusColumn} NOT IN ('Completed', 'Closed')`;
+    }
+    
+    // Add filters
+    if (department && source.DepartmentColumn) {
+        query += ` AND ai.${source.DepartmentColumn} LIKE '%${department.replace(/'/g, "''")}%'`;
+    }
+    if (status && source.StatusColumn) {
+        if (status === 'Overdue' && source.DeadlineColumn) {
+            query += ` AND ai.${source.DeadlineColumn} < CAST(GETDATE() AS DATE)`;
+        } else if (status !== 'Open' && status !== 'Overdue') {
+            query += ` AND ai.${source.StatusColumn} = '${status.replace(/'/g, "''")}'`;
+        }
+    }
+    if (priority && source.PriorityColumn) {
+        query += ` AND ai.${source.PriorityColumn} = '${priority.replace(/'/g, "''")}'`;
+    }
+    
+    // Add ORDER BY
+    if (source.DeadlineColumn && source.StatusColumn) {
+        query += ` ORDER BY 
+            CASE WHEN ai.${source.DeadlineColumn} < CAST(GETDATE() AS DATE) AND ai.${source.StatusColumn} NOT IN ('Completed', 'Closed') THEN 0 ELSE 1 END,
+            CASE ai.${source.PriorityColumn} WHEN 'High' THEN 1 WHEN 'Medium' THEN 2 WHEN 'Low' THEN 3 ELSE 4 END,
+            ai.${source.DeadlineColumn}`;
+    } else if (source.PriorityColumn) {
+        query += ` ORDER BY 
+            CASE ai.${source.PriorityColumn} 
+                WHEN 'Critical' THEN 1 
+                WHEN 'High' THEN 2 
+                WHEN 'Medium' THEN 3 
+                WHEN 'Low' THEN 4 
+                ELSE 5 
+            END,
+            i.InspectionDate DESC`;
+    } else {
+        query += ` ORDER BY i.InspectionDate DESC`;
+    }
+    
+    return query;
+}
+
 router.get('/api/action-items/:sourceCode', async (req, res) => {
     try {
         const { sourceCode } = req.params;
@@ -233,54 +334,7 @@ router.get('/api/action-items/:sourceCode', async (req, res) => {
         }
         
         const source = sourceResult.recordset[0];
-        
-        // Build dynamic query based on source configuration
-        let query = `
-            SELECT 
-                ai.${source.IdColumn} as Id,
-                ai.${source.InspectionIdColumn} as InspectionId,
-                ai.${source.DepartmentColumn} as Department,
-                ai.${source.DeadlineColumn} as Deadline,
-                ai.${source.ResponsibleColumn} as Responsible,
-                ai.${source.StatusColumn} as Status,
-                ai.${source.PriorityColumn} as Priority,
-                ai.${source.FindingColumn} as Finding,
-                ai.${source.ActionColumn} as Action,
-                i.${source.StoreNameColumn} as StoreName,
-                '${source.SourceCode}' as SourceCode,
-                '${source.SourceName}' as SourceName,
-                CASE WHEN ai.${source.DeadlineColumn} < CAST(GETDATE() AS DATE) 
-                     AND ai.${source.StatusColumn} NOT IN ('Completed', 'Closed') 
-                     THEN 1 ELSE 0 END as IsOverdue,
-                DATEDIFF(day, ai.${source.DeadlineColumn}, GETDATE()) as DaysOverdue,
-                CASE WHEN e.Id IS NOT NULL THEN 1 ELSE 0 END as IsEscalated,
-                e.Id as EscalatedItemId,
-                e.Status as EscalationStatus
-            FROM ${source.ActionItemsTable} ai
-            LEFT JOIN ${source.InspectionTable} i ON ai.${source.InspectionIdColumn} = i.Id
-            LEFT JOIN EscalatedItems e ON e.SourceId = ${source.Id} AND e.SourceItemId = ai.${source.IdColumn}
-            WHERE 1=1
-        `;
-        
-        // Add filters
-        if (department) {
-            query += ` AND ai.${source.DepartmentColumn} LIKE '%${department}%'`;
-        }
-        if (status) {
-            if (status === 'Overdue') {
-                query += ` AND ai.${source.DeadlineColumn} < CAST(GETDATE() AS DATE) AND ai.${source.StatusColumn} NOT IN ('Completed', 'Closed')`;
-            } else {
-                query += ` AND ai.${source.StatusColumn} = '${status}'`;
-            }
-        }
-        if (priority) {
-            query += ` AND ai.${source.PriorityColumn} = '${priority}'`;
-        }
-        
-        query += ` ORDER BY 
-            CASE WHEN ai.${source.DeadlineColumn} < CAST(GETDATE() AS DATE) AND ai.${source.StatusColumn} NOT IN ('Completed', 'Closed') THEN 0 ELSE 1 END,
-            ai.${source.PriorityColumn} DESC, 
-            ai.${source.DeadlineColumn}`;
+        const query = buildActionItemsQuery(source, { department, status, priority });
         
         const result = await pool.request().query(query);
         await pool.close();
@@ -321,46 +375,7 @@ router.get('/api/action-items', async (req, res) => {
         
         for (const source of sourcesToQuery) {
             try {
-                let query = `
-                    SELECT 
-                        ai.${source.IdColumn} as Id,
-                        ai.${source.InspectionIdColumn} as InspectionId,
-                        ai.${source.DepartmentColumn} as Department,
-                        ai.${source.DeadlineColumn} as Deadline,
-                        ai.${source.ResponsibleColumn} as Responsible,
-                        ai.${source.StatusColumn} as Status,
-                        ai.${source.PriorityColumn} as Priority,
-                        ai.${source.FindingColumn} as Finding,
-                        ai.${source.ActionColumn} as Action,
-                        i.${source.StoreNameColumn} as StoreName,
-                        '${source.SourceCode}' as SourceCode,
-                        '${source.SourceName}' as SourceName,
-                        '${source.IconEmoji}' as SourceIcon,
-                        '${source.ColorHex}' as SourceColor,
-                        ${source.Id} as SourceId,
-                        CASE WHEN ai.${source.DeadlineColumn} < CAST(GETDATE() AS DATE) 
-                             AND ai.${source.StatusColumn} NOT IN ('Completed', 'Closed') 
-                             THEN 1 ELSE 0 END as IsOverdue,
-                        DATEDIFF(day, ai.${source.DeadlineColumn}, GETDATE()) as DaysOverdue,
-                        CASE WHEN e.Id IS NOT NULL THEN 1 ELSE 0 END as IsEscalated,
-                        e.Id as EscalatedItemId,
-                        e.Status as EscalationStatus
-                    FROM ${source.ActionItemsTable} ai
-                    LEFT JOIN ${source.InspectionTable} i ON ai.${source.InspectionIdColumn} = i.Id
-                    LEFT JOIN EscalatedItems e ON e.SourceId = ${source.Id} AND e.SourceItemId = ai.${source.IdColumn}
-                    WHERE ai.${source.StatusColumn} NOT IN ('Completed', 'Closed')
-                `;
-                
-                if (department) {
-                    query += ` AND ai.${source.DepartmentColumn} LIKE '%${department}%'`;
-                }
-                if (status === 'Overdue') {
-                    query += ` AND ai.${source.DeadlineColumn} < CAST(GETDATE() AS DATE)`;
-                }
-                if (priority) {
-                    query += ` AND ai.${source.PriorityColumn} = '${priority}'`;
-                }
-                
+                const query = buildActionItemsQuery(source, { department, status, priority });
                 const result = await pool.request().query(query);
                 allItems = allItems.concat(result.recordset);
             } catch (queryErr) {

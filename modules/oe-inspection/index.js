@@ -2212,8 +2212,57 @@ router.post('/api/audits/:auditId/complete', async (req, res) => {
                 WHERE Id = @auditId
             `);
         
+        // Generate action items from findings
+        const findingsResult = await pool.request()
+            .input('auditId', sql.Int, auditId)
+            .query(`
+                SELECT 
+                    InspectionId,
+                    ReferenceValue,
+                    SectionName,
+                    Finding,
+                    CorrectedAction as SuggestedAction,
+                    Priority,
+                    Department
+                FROM OE_InspectionItems
+                WHERE InspectionId = @auditId
+                  AND ((Finding IS NOT NULL AND Finding != '') OR Escalate = 1)
+            `);
+        
+        let actionItemsCreated = 0;
+        for (const finding of findingsResult.recordset) {
+            // Check if action item already exists
+            const existingCheck = await pool.request()
+                .input('inspectionId', sql.Int, auditId)
+                .input('referenceValue', sql.NVarChar, finding.ReferenceValue)
+                .input('sectionName', sql.NVarChar, finding.SectionName)
+                .query(`
+                    SELECT Id FROM OE_InspectionActionItems 
+                    WHERE InspectionId = @inspectionId 
+                      AND ReferenceValue = @referenceValue 
+                      AND SectionName = @sectionName
+                `);
+            
+            if (existingCheck.recordset.length === 0) {
+                await pool.request()
+                    .input('inspectionId', sql.Int, auditId)
+                    .input('referenceValue', sql.NVarChar, finding.ReferenceValue)
+                    .input('sectionName', sql.NVarChar, finding.SectionName)
+                    .input('finding', sql.NVarChar, finding.Finding)
+                    .input('suggestedAction', sql.NVarChar, finding.SuggestedAction)
+                    .input('priority', sql.NVarChar, finding.Priority || 'Medium')
+                    .input('department', sql.NVarChar, finding.Department)
+                    .query(`
+                        INSERT INTO OE_InspectionActionItems 
+                        (InspectionId, ReferenceValue, SectionName, Finding, SuggestedAction, Priority, Status, Department, CreatedAt)
+                        VALUES (@inspectionId, @referenceValue, @sectionName, @finding, @suggestedAction, @priority, 'Open', @department, GETDATE())
+                    `);
+                actionItemsCreated++;
+            }
+        }
+        
         await pool.close();
-        res.json({ success: true, data: { totalScore } });
+        res.json({ success: true, data: { totalScore, actionItemsCreated } });
     } catch (error) {
         console.error('Error completing audit:', error);
         res.status(500).json({ success: false, error: error.message });
@@ -2705,6 +2754,136 @@ router.post('/api/section-icons/:schemaId', async (req, res) => {
     } catch (error) {
         console.error('Error saving section icons:', error);
         res.json({ success: false, error: error.message });
+    }
+});
+
+// ==========================================
+// ACTION ITEMS API (for Action Plans page)
+// ==========================================
+
+// Get all action items across all inspections
+router.get('/api/action-items', async (req, res) => {
+    try {
+        const { storeId, priority, status, fromDate, toDate } = req.query;
+        const pool = await sql.connect(dbConfig);
+        
+        let query = `
+            SELECT 
+                ai.Id as id,
+                ai.InspectionId as inspectionId,
+                ai.ReferenceValue as referenceValue,
+                ai.SectionName as sectionName,
+                ai.Finding as finding,
+                ai.SuggestedAction as suggestedAction,
+                ai.Action as cr,
+                ai.Responsible as assignedTo,
+                ai.Deadline as dueDate,
+                ai.Priority as priority,
+                ai.Status as status,
+                ai.Department as department,
+                ai.CreatedAt as createdAt,
+                ai.UpdatedAt as updatedAt,
+                ai.CompletionDate as completedAt,
+                ai.CompletionNotes as notes,
+                i.DocumentNumber as documentNumber,
+                i.StoreName as storeName,
+                i.StoreId as storeId,
+                i.InspectionDate as inspectionDate
+            FROM OE_InspectionActionItems ai
+            INNER JOIN OE_Inspections i ON ai.InspectionId = i.Id
+            WHERE 1=1
+        `;
+        
+        const request = pool.request();
+        
+        if (storeId) {
+            query += ` AND i.StoreId = @storeId`;
+            request.input('storeId', sql.Int, storeId);
+        }
+        if (priority) {
+            query += ` AND ai.Priority = @priority`;
+            request.input('priority', sql.NVarChar, priority);
+        }
+        if (status) {
+            query += ` AND ai.Status = @status`;
+            request.input('status', sql.NVarChar, status);
+        }
+        if (fromDate) {
+            query += ` AND i.InspectionDate >= @fromDate`;
+            request.input('fromDate', sql.Date, fromDate);
+        }
+        if (toDate) {
+            query += ` AND i.InspectionDate <= @toDate`;
+            request.input('toDate', sql.Date, toDate);
+        }
+        
+        query += ` ORDER BY 
+            CASE WHEN ai.Deadline < CAST(GETDATE() AS DATE) AND ai.Status != 'Closed' THEN 0 ELSE 1 END,
+            CASE ai.Priority WHEN 'High' THEN 1 WHEN 'Medium' THEN 2 WHEN 'Low' THEN 3 ELSE 4 END,
+            ai.Deadline`;
+        
+        const result = await request.query(query);
+        await pool.close();
+        
+        res.json({ success: true, data: result.recordset });
+    } catch (error) {
+        console.error('Error fetching action items:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Update action item
+router.put('/api/action-items/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { cr, assignedTo, priority, status, dueDate, notes } = req.body;
+        
+        const pool = await sql.connect(dbConfig);
+        
+        let updateFields = [];
+        const request = pool.request().input('id', sql.Int, id);
+        
+        if (cr !== undefined) {
+            updateFields.push('Action = @cr');
+            request.input('cr', sql.NVarChar, cr);
+        }
+        if (assignedTo !== undefined) {
+            updateFields.push('Responsible = @assignedTo');
+            request.input('assignedTo', sql.NVarChar, assignedTo);
+        }
+        if (priority !== undefined) {
+            updateFields.push('Priority = @priority');
+            request.input('priority', sql.NVarChar, priority);
+        }
+        if (status !== undefined) {
+            updateFields.push('Status = @status');
+            request.input('status', sql.NVarChar, status);
+            if (status === 'Closed') {
+                updateFields.push('CompletionDate = GETDATE()');
+            }
+        }
+        if (dueDate !== undefined) {
+            updateFields.push('Deadline = @dueDate');
+            request.input('dueDate', sql.Date, dueDate || null);
+        }
+        if (notes !== undefined) {
+            updateFields.push('CompletionNotes = @notes');
+            request.input('notes', sql.NVarChar, notes);
+        }
+        
+        updateFields.push('UpdatedAt = GETDATE()');
+        
+        await request.query(`
+            UPDATE OE_InspectionActionItems 
+            SET ${updateFields.join(', ')} 
+            WHERE Id = @id
+        `);
+        
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating action item:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 

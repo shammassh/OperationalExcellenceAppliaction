@@ -1,718 +1,927 @@
 /**
  * Escalation Dashboard Page
- * Main dashboard for viewing and escalating action items
+ * Action plans view similar to OE/OHS Inspection Action Plans
  */
-
-const sql = require('mssql');
-
-const dbConfig = {
-    server: process.env.SQL_SERVER || 'localhost',
-    database: process.env.SQL_DATABASE || 'OEApp_UAT',
-    user: process.env.SQL_USER || 'sa',
-    password: process.env.SQL_PASSWORD,
-    options: {
-        encrypt: process.env.SQL_ENCRYPT === 'true',
-        trustServerCertificate: process.env.SQL_TRUST_CERT === 'true'
-    }
-};
 
 module.exports = async (req, res) => {
     const isAdmin = req.currentUser?.roleNames?.includes('System Administrator');
     
     res.send(`
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
             <meta charset="UTF-8">
-            <title>Escalation Dashboard - ${process.env.APP_NAME}</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Escalation Action Plans - ${process.env.APP_NAME || 'OE App'}</title>
             <style>
-                * { box-sizing: border-box; margin: 0; padding: 0; }
-                body { 
-                    font-family: 'Segoe UI', Arial, sans-serif; 
-                    background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
-                    min-height: 100vh;
+                * {
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
                 }
-                .header {
-                    background: rgba(0,0,0,0.2);
+
+                body {
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    background: #f5f5f5;
+                    color: #333;
+                    line-height: 1.6;
+                }
+
+                .action-plan-container {
+                    max-width: 1800px;
+                    margin: 20px auto;
+                    background: white;
+                    border-radius: 10px;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                    overflow: hidden;
+                }
+
+                /* Header Styles */
+                .report-header {
+                    background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
                     color: white;
-                    padding: 15px 30px;
+                    padding: 25px;
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
-                }
-                .header h1 { font-size: 24px; }
-                .header-nav { display: flex; gap: 15px; align-items: center; }
-                .header-nav a {
-                    color: white;
-                    text-decoration: none;
-                    padding: 8px 16px;
-                    border-radius: 5px;
-                    background: rgba(255,255,255,0.1);
-                    transition: background 0.2s;
-                }
-                .header-nav a:hover { background: rgba(255,255,255,0.2); }
-                .header-nav a.active { background: rgba(255,255,255,0.3); }
-                
-                .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
-                
-                .stats-row {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                    gap: 15px;
-                    margin-bottom: 20px;
-                }
-                .stat-card {
-                    background: white;
-                    border-radius: 10px;
-                    padding: 20px;
-                    text-align: center;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                }
-                .stat-card .icon { font-size: 32px; margin-bottom: 10px; }
-                .stat-card .value { font-size: 36px; font-weight: bold; color: #1f2937; }
-                .stat-card .label { color: #6b7280; font-size: 14px; }
-                .stat-card.overdue { border-left: 4px solid #dc2626; }
-                .stat-card.high { border-left: 4px solid #f59e0b; }
-                .stat-card.escalated { border-left: 4px solid #7c3aed; }
-                .stat-card.total { border-left: 4px solid #10b981; }
-                
-                .content-grid {
-                    display: grid;
-                    grid-template-columns: 280px 1fr;
+                    flex-wrap: wrap;
                     gap: 20px;
                 }
-                
-                .sidebar {
-                    background: white;
-                    border-radius: 10px;
-                    padding: 20px;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                    height: fit-content;
-                }
-                .sidebar h3 { margin-bottom: 15px; color: #1f2937; }
-                
-                .source-list { list-style: none; }
-                .source-item {
-                    padding: 12px 15px;
-                    border-radius: 8px;
-                    cursor: pointer;
-                    margin-bottom: 8px;
+
+                .report-header h1 {
+                    font-size: 28px;
+                    font-weight: bold;
                     display: flex;
                     align-items: center;
+                    gap: 12px;
+                }
+
+                .header-actions {
+                    display: flex;
                     gap: 10px;
-                    transition: background 0.2s;
-                    border: 2px solid transparent;
+                    flex-wrap: wrap;
                 }
-                .source-item:hover { background: #f3f4f6; }
-                .source-item.active { background: #ede9fe; border-color: #7c3aed; }
-                .source-item .icon { font-size: 20px; }
-                .source-item .name { flex: 1; font-weight: 500; }
-                .source-item .count {
-                    background: #e5e7eb;
-                    padding: 2px 8px;
-                    border-radius: 10px;
+
+                .header-actions button, .header-actions a {
+                    padding: 10px 15px;
+                    border: none;
+                    border-radius: 5px;
+                    background: rgba(255,255,255,0.2);
+                    color: white;
+                    cursor: pointer;
+                    font-size: 14px;
+                    transition: background 0.3s;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    text-decoration: none;
+                }
+
+                .header-actions button:hover, .header-actions a:hover {
+                    background: rgba(255,255,255,0.3);
+                }
+
+                .back-btn {
+                    background: rgba(255,255,255,0.1) !important;
+                }
+
+                /* Summary Section */
+                .summary-section {
+                    padding: 25px;
+                    background: #f8f9fa;
+                    border-bottom: 1px solid #e9ecef;
+                }
+
+                .summary-section h2 {
+                    color: #2c3e50;
+                    margin-bottom: 15px;
+                    font-size: 20px;
+                }
+
+                .summary-stats {
+                    display: flex;
+                    gap: 20px;
+                    flex-wrap: wrap;
+                }
+
+                .stat-item {
+                    background: white;
+                    padding: 15px 20px;
+                    border-radius: 8px;
+                    text-align: center;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    min-width: 120px;
+                }
+
+                .stat-number {
+                    display: block;
+                    font-size: 28px;
+                    font-weight: bold;
+                    color: #2c3e50;
+                }
+
+                .stat-label {
                     font-size: 12px;
+                    color: #666;
+                    margin-top: 5px;
                 }
-                .source-item.active .count { background: #7c3aed; color: white; }
-                
-                .filter-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; }
-                .filter-section h4 { margin-bottom: 10px; color: #6b7280; font-size: 12px; text-transform: uppercase; }
-                .filter-select {
-                    width: 100%;
-                    padding: 10px;
+
+                .stat-item.overdue .stat-number { color: #dc2626; }
+                .stat-item.high .stat-number { color: #f59e0b; }
+                .stat-item.medium .stat-number { color: #3b82f6; }
+                .stat-item.escalated .stat-number { color: #7c3aed; }
+                .stat-item.total .stat-number { color: #10b981; }
+
+                /* Filter Section */
+                .filter-section {
+                    padding: 20px 25px;
+                    background: #fff;
+                    border-bottom: 1px solid #e9ecef;
+                    display: flex;
+                    gap: 15px;
+                    flex-wrap: wrap;
+                    align-items: flex-end;
+                }
+
+                .filter-group {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                }
+
+                .filter-group label {
+                    font-size: 12px;
+                    color: #6b7280;
+                    font-weight: 600;
+                }
+
+                .filter-group select {
+                    padding: 8px 12px;
                     border: 1px solid #d1d5db;
                     border-radius: 6px;
                     font-size: 14px;
-                    margin-bottom: 10px;
+                    min-width: 150px;
                 }
-                
-                .main-content {
-                    background: white;
-                    border-radius: 10px;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                    overflow: hidden;
-                }
-                .content-header {
-                    padding: 20px;
-                    border-bottom: 1px solid #e5e7eb;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }
-                .content-header h2 { color: #1f2937; }
-                .content-header .actions { display: flex; gap: 10px; }
-                
-                .items-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                }
-                .items-table th, .items-table td {
-                    padding: 12px 15px;
-                    text-align: left;
-                    border-bottom: 1px solid #e5e7eb;
-                }
-                .items-table th {
-                    background: #f9fafb;
-                    font-weight: 600;
-                    color: #6b7280;
-                    font-size: 12px;
-                    text-transform: uppercase;
-                }
-                .items-table tr:hover { background: #f9fafb; }
-                
-                .badge {
-                    padding: 4px 10px;
-                    border-radius: 20px;
-                    font-size: 11px;
-                    font-weight: 600;
-                }
-                .badge-overdue { background: #fee2e2; color: #dc2626; }
-                .badge-high { background: #fef3c7; color: #d97706; }
-                .badge-medium { background: #dbeafe; color: #2563eb; }
-                .badge-low { background: #d1fae5; color: #059669; }
-                .badge-critical { background: #dc2626; color: white; }
-                .badge-escalated { background: #ede9fe; color: #7c3aed; }
-                
-                .source-badge {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 5px;
-                    padding: 4px 10px;
-                    border-radius: 20px;
-                    font-size: 11px;
-                    font-weight: 500;
-                }
-                
-                .btn {
+
+                .filter-btn {
                     padding: 8px 16px;
+                    background: #7c3aed;
+                    color: white;
                     border: none;
                     border-radius: 6px;
                     cursor: pointer;
                     font-size: 14px;
+                }
+
+                .filter-btn:hover { background: #6d28d9; }
+
+                .filter-btn.secondary {
+                    background: #e5e7eb;
+                    color: #374151;
+                }
+
+                .filter-btn.secondary:hover { background: #d1d5db; }
+
+                /* Table Styles */
+                .table-container {
+                    overflow-x: auto;
+                    padding: 20px;
+                }
+
+                .action-plan-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 14px;
+                }
+
+                .action-plan-table th {
+                    background: #7c3aed;
+                    color: white;
+                    padding: 12px 8px;
+                    text-align: left;
+                    font-weight: 600;
+                    white-space: nowrap;
+                    font-size: 12px;
+                }
+
+                .action-plan-table td {
+                    padding: 10px 8px;
+                    border-bottom: 1px solid #e9ecef;
+                    vertical-align: top;
+                    font-size: 13px;
+                }
+
+                .action-plan-table tr:hover {
+                    background: #f8f9fa;
+                }
+
+                .action-plan-table tr.overdue {
+                    background: #fef2f2;
+                }
+
+                .source-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 4px;
+                    padding: 4px 10px;
+                    border-radius: 12px;
+                    font-size: 11px;
+                    font-weight: 600;
+                    white-space: nowrap;
+                }
+
+                .source-ohs { background: #fee2e2; color: #991b1b; }
+                .source-oe { background: #dbeafe; color: #1e40af; }
+
+                .priority-badge {
+                    display: inline-block;
+                    padding: 4px 10px;
+                    border-radius: 12px;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+
+                .priority-high { background: #fee2e2; color: #991b1b; }
+                .priority-medium { background: #fef3c7; color: #92400e; }
+                .priority-low { background: #dbeafe; color: #1e40af; }
+                .priority-critical { background: #dc2626; color: white; }
+
+                .status-badge {
+                    display: inline-block;
+                    padding: 4px 10px;
+                    border-radius: 12px;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+
+                .status-open { background: #fef3c7; color: #92400e; }
+                .status-in-progress { background: #dbeafe; color: #1e40af; }
+                .status-closed { background: #d1fae5; color: #065f46; }
+                .status-escalated { background: #ede9fe; color: #7c3aed; }
+
+                .overdue-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 4px;
+                    padding: 3px 8px;
+                    border-radius: 12px;
+                    font-size: 10px;
+                    font-weight: 600;
+                    background: #dc2626;
+                    color: white;
+                    margin-left: 6px;
+                }
+
+                /* Document grouping styles */
+                .doc-group-header {
+                    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+                    font-weight: 600;
+                }
+
+                .doc-group-header td {
+                    padding: 12px 8px !important;
+                    border-bottom: 2px solid #7c3aed !important;
+                }
+
+                .doc-info {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                }
+
+                .doc-number {
+                    font-size: 14px;
+                    font-weight: 700;
+                    color: #1f2937;
+                }
+
+                .doc-store {
+                    font-size: 13px;
+                    color: #6b7280;
+                }
+
+                .doc-date {
+                    font-size: 12px;
+                    color: #9ca3af;
+                }
+
+                .items-count {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: #7c3aed;
+                    color: white;
+                    font-size: 11px;
+                    font-weight: 700;
+                    padding: 3px 10px;
+                    border-radius: 12px;
+                    margin-left: 10px;
+                }
+
+                .group-item-row {
+                    background: #fefefe;
+                }
+
+                .group-item-row:hover {
+                    background: #f5f3ff !important;
+                }
+
+                .group-item-row td:first-child {
+                    padding-left: 25px !important;
+                }
+
+                .finding-col {
+                    max-width: 250px;
+                    min-width: 200px;
+                }
+
+                .finding-text {
+                    color: #374151;
+                    font-size: 12px;
+                    line-height: 1.4;
+                }
+
+                .action-col {
+                    max-width: 200px;
+                    min-width: 150px;
+                }
+
+                .input-field {
+                    width: 100%;
+                    padding: 6px;
+                    border: 1px solid #d1d5db;
+                    border-radius: 4px;
+                    font-size: 11px;
+                    font-family: inherit;
+                }
+
+                .input-field:focus {
+                    outline: none;
+                    border-color: #7c3aed;
+                    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+                }
+
+                textarea.input-field {
+                    resize: vertical;
+                    min-height: 50px;
+                }
+
+                .action-btns {
+                    display: flex;
+                    gap: 5px;
+                }
+
+                .btn {
+                    padding: 6px 12px;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 11px;
                     transition: all 0.2s;
                 }
+
                 .btn-primary { background: #7c3aed; color: white; }
                 .btn-primary:hover { background: #6d28d9; }
                 .btn-danger { background: #dc2626; color: white; }
                 .btn-danger:hover { background: #b91c1c; }
-                .btn-sm { padding: 5px 10px; font-size: 12px; }
-                
-                .action-btn {
-                    padding: 5px 10px;
-                    border: none;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-size: 12px;
-                    margin-right: 5px;
-                }
-                .action-btn.escalate { background: #7c3aed; color: white; }
-                .action-btn.escalate:hover { background: #6d28d9; }
-                .action-btn.view { background: #e5e7eb; color: #374151; }
-                .action-btn.view:hover { background: #d1d5db; }
-                
+                .btn-success { background: #10b981; color: white; }
+                .btn-success:hover { background: #059669; }
+
                 .empty-state {
+                    text-align: center;
                     padding: 60px 20px;
-                    text-align: center;
                     color: #6b7280;
                 }
-                .empty-state .icon { font-size: 48px; margin-bottom: 15px; }
-                
-                .loading {
-                    padding: 40px;
-                    text-align: center;
-                    color: #6b7280;
+
+                .empty-state .icon {
+                    font-size: 64px;
+                    margin-bottom: 20px;
                 }
-                
+
+                .empty-state p {
+                    font-size: 16px;
+                }
+
                 /* Modal */
-                .modal {
-                    display: none;
+                .modal-overlay {
                     position: fixed;
                     top: 0;
                     left: 0;
                     width: 100%;
                     height: 100%;
                     background: rgba(0,0,0,0.5);
-                    z-index: 1000;
-                    align-items: center;
+                    display: none;
                     justify-content: center;
+                    align-items: center;
+                    z-index: 1000;
                 }
-                .modal.active { display: flex; }
-                .modal-content {
+
+                .modal-overlay.show { display: flex; }
+
+                .modal {
                     background: white;
-                    border-radius: 10px;
-                    width: 90%;
-                    max-width: 600px;
+                    padding: 25px;
+                    border-radius: 12px;
+                    width: 500px;
+                    max-width: 90%;
                     max-height: 90vh;
                     overflow-y: auto;
                 }
-                .modal-header {
-                    padding: 20px;
-                    border-bottom: 1px solid #e5e7eb;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
+
+                .modal-title {
+                    font-size: 20px;
+                    font-weight: 600;
+                    margin-bottom: 20px;
+                    color: #1f2937;
                 }
-                .modal-header h3 { color: #1f2937; }
-                .modal-close {
-                    background: none;
-                    border: none;
-                    font-size: 24px;
-                    cursor: pointer;
-                    color: #6b7280;
-                }
-                .modal-body { padding: 20px; }
-                .modal-footer {
-                    padding: 15px 20px;
-                    border-top: 1px solid #e5e7eb;
-                    display: flex;
-                    justify-content: flex-end;
-                    gap: 10px;
-                }
-                
+
                 .form-group { margin-bottom: 15px; }
-                .form-group label {
-                    display: block;
-                    margin-bottom: 5px;
-                    font-weight: 500;
-                    color: #374151;
-                }
-                .form-group input, .form-group select, .form-group textarea {
+                .form-label { display: block; font-size: 13px; color: #6b7280; margin-bottom: 5px; font-weight: 500; }
+                .form-input, .form-select, .form-textarea {
                     width: 100%;
                     padding: 10px;
                     border: 1px solid #d1d5db;
                     border-radius: 6px;
                     font-size: 14px;
                 }
-                .form-group textarea { resize: vertical; min-height: 80px; }
-                .form-group .readonly {
-                    background: #f3f4f6;
-                    color: #6b7280;
+                .form-textarea { resize: vertical; min-height: 80px; }
+
+                .modal-actions {
+                    display: flex;
+                    gap: 10px;
+                    justify-content: flex-end;
+                    margin-top: 20px;
                 }
-                
-                .info-row {
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 15px;
+
+                .toast {
+                    position: fixed;
+                    bottom: 20px;
+                    right: 20px;
+                    padding: 12px 24px;
+                    background: #10b981;
+                    color: white;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                    transform: translateY(100px);
+                    opacity: 0;
+                    transition: all 0.3s;
                 }
-                
-                .truncate {
-                    max-width: 250px;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
+
+                .toast.show { transform: translateY(0); opacity: 1; }
+                .toast.error { background: #dc2626; }
+
+                ${isAdmin ? `
+                .admin-link {
+                    margin-left: auto;
                 }
+                ` : ''}
             </style>
         </head>
         <body>
-            <div class="header">
-                <h1>🔴 Escalation Dashboard</h1>
-                <div class="header-nav">
-                    <a href="/escalation" class="active">Dashboard</a>
-                    ${isAdmin ? `
-                        <a href="/escalation/admin/sources">Sources</a>
-                        <a href="/escalation/admin/templates">Email Templates</a>
-                        <a href="/escalation/admin/contacts">Contacts</a>
-                    ` : ''}
-                    <a href="/dashboard">← Back to Dashboard</a>
+            <div class="action-plan-container">
+                <!-- Header -->
+                <div class="report-header">
+                    <h1>📋 Escalation Action Plans</h1>
+                    <div class="header-actions">
+                        <a href="/" class="back-btn">← Dashboard</a>
+                        <button onclick="exportToExcel()">📥 Export Excel</button>
+                        <button onclick="loadActionItems()">🔄 Refresh</button>
+                        ${isAdmin ? '<a href="/escalation/admin/sources" class="admin-link">⚙️ Admin Settings</a>' : ''}
+                    </div>
+                </div>
+
+                <!-- Summary Stats -->
+                <div class="summary-section">
+                    <h2>📊 Summary</h2>
+                    <div class="summary-stats">
+                        <div class="stat-item total">
+                            <span class="stat-number" id="statTotal">0</span>
+                            <div class="stat-label">Total Items</div>
+                        </div>
+                        <div class="stat-item overdue">
+                            <span class="stat-number" id="statOverdue">0</span>
+                            <div class="stat-label">🔴 Overdue</div>
+                        </div>
+                        <div class="stat-item high">
+                            <span class="stat-number" id="statHigh">0</span>
+                            <div class="stat-label">🟠 High Priority</div>
+                        </div>
+                        <div class="stat-item medium">
+                            <span class="stat-number" id="statMedium">0</span>
+                            <div class="stat-label">🟡 Medium Priority</div>
+                        </div>
+                        <div class="stat-item escalated">
+                            <span class="stat-number" id="statEscalated">0</span>
+                            <div class="stat-label">⚡ Escalated</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="filter-section">
+                    <div class="filter-group">
+                        <label>Source</label>
+                        <select id="filterSource" onchange="loadActionItems()">
+                            <option value="">All Sources</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Priority</label>
+                        <select id="filterPriority" onchange="loadActionItems()">
+                            <option value="">All Priorities</option>
+                            <option value="High">High</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Low">Low</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Status</label>
+                        <select id="filterStatus" onchange="loadActionItems()">
+                            <option value="">All Statuses</option>
+                            <option value="Open">Open</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Overdue">Overdue</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Department</label>
+                        <select id="filterDepartment" onchange="loadActionItems()">
+                            <option value="">All Departments</option>
+                        </select>
+                    </div>
+                    <button class="filter-btn secondary" onclick="clearFilters()">Clear Filters</button>
+                </div>
+
+                <!-- Table -->
+                <div class="table-container">
+                    <table class="action-plan-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">#</th>
+                                <th colspan="2">Section</th>
+                                <th>Finding</th>
+                                <th>Corrective Action</th>
+                                <th>Responsible</th>
+                                <th>Department</th>
+                                <th>Priority</th>
+                                <th>Deadline</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="actionItemsBody">
+                            <tr>
+                                <td colspan="11" class="empty-state">
+                                    <div class="icon">📋</div>
+                                    <p>Loading action items...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-            
-            <div class="container">
-                <div class="stats-row">
-                    <div class="stat-card total">
-                        <div class="icon">📋</div>
-                        <div class="value" id="stat-total">-</div>
-                        <div class="label">Open Action Items</div>
+
+            <!-- Edit Modal -->
+            <div class="modal-overlay" id="editModal">
+                <div class="modal">
+                    <h3 class="modal-title">✏️ Update Action Item</h3>
+                    <input type="hidden" id="editItemId">
+                    <input type="hidden" id="editSourceCode">
+
+                    <div class="form-group">
+                        <label class="form-label">Finding</label>
+                        <textarea class="form-textarea" id="editFinding" readonly style="background: #f3f4f6;"></textarea>
                     </div>
-                    <div class="stat-card overdue">
-                        <div class="icon">⚠️</div>
-                        <div class="value" id="stat-overdue">-</div>
-                        <div class="label">Overdue Items</div>
+
+                    <div class="form-group">
+                        <label class="form-label">Corrective Action</label>
+                        <textarea class="form-textarea" id="editAction"></textarea>
                     </div>
-                    <div class="stat-card high">
-                        <div class="icon">🔥</div>
-                        <div class="value" id="stat-high">-</div>
-                        <div class="label">High Priority</div>
+
+                    <div class="form-group">
+                        <label class="form-label">Responsible Person</label>
+                        <input type="text" class="form-input" id="editResponsible" placeholder="Person responsible">
                     </div>
-                    <div class="stat-card escalated">
-                        <div class="icon">🔴</div>
-                        <div class="value" id="stat-escalated">-</div>
-                        <div class="label">Escalated</div>
+
+                    <div class="form-group">
+                        <label class="form-label">Priority</label>
+                        <select class="form-select" id="editPriority">
+                            <option value="High">High</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Low">Low</option>
+                        </select>
                     </div>
-                </div>
-                
-                <div class="content-grid">
-                    <div class="sidebar">
-                        <h3>📂 Sources</h3>
-                        <ul class="source-list" id="source-list">
-                            <li class="source-item active" data-source="all">
-                                <span class="icon">📋</span>
-                                <span class="name">All Sources</span>
-                                <span class="count" id="count-all">0</span>
-                            </li>
-                        </ul>
-                        
-                        <div class="filter-section">
-                            <h4>Filters</h4>
-                            <select class="filter-select" id="filter-department">
-                                <option value="">All Departments</option>
-                                <option value="Maintenance">Maintenance</option>
-                                <option value="Procurement">Procurement</option>
-                                <option value="Cleaning">Cleaning</option>
-                            </select>
-                            <select class="filter-select" id="filter-status">
-                                <option value="">All Status</option>
-                                <option value="Overdue">Overdue</option>
-                                <option value="Open">Open</option>
-                                <option value="InProgress">In Progress</option>
-                            </select>
-                            <select class="filter-select" id="filter-priority">
-                                <option value="">All Priority</option>
-                                <option value="Critical">Critical</option>
-                                <option value="High">High</option>
-                                <option value="Medium">Medium</option>
-                                <option value="Low">Low</option>
-                            </select>
-                        </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" id="editStatus">
+                            <option value="Open">Open</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Closed">Closed</option>
+                        </select>
                     </div>
-                    
-                    <div class="main-content">
-                        <div class="content-header">
-                            <h2 id="content-title">All Action Items</h2>
-                            <div class="actions">
-                                <button class="btn btn-primary" onclick="refreshData()">🔄 Refresh</button>
-                            </div>
-                        </div>
-                        
-                        <div id="items-container">
-                            <div class="loading">Loading action items...</div>
-                        </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Deadline</label>
+                        <input type="date" class="form-input" id="editDeadline">
+                    </div>
+
+                    <div class="modal-actions">
+                        <button class="btn" style="background: #e5e7eb; color: #374151;" onclick="closeModal()">Cancel</button>
+                        <button class="btn btn-primary" onclick="saveActionItem()">💾 Save Changes</button>
                     </div>
                 </div>
             </div>
-            
-            <!-- Escalation Modal -->
-            <div class="modal" id="escalate-modal">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3>🔴 Escalate Action Item</h3>
-                        <button class="modal-close" onclick="closeModal()">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="info-row">
-                            <div class="form-group">
-                                <label>Source</label>
-                                <input type="text" id="esc-source" class="readonly" readonly>
-                            </div>
-                            <div class="form-group">
-                                <label>Store</label>
-                                <input type="text" id="esc-store" class="readonly" readonly>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Finding</label>
-                            <textarea id="esc-finding" class="readonly" readonly></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label>Action Required</label>
-                            <textarea id="esc-action" class="readonly" readonly></textarea>
-                        </div>
-                        <div class="info-row">
-                            <div class="form-group">
-                                <label>Department</label>
-                                <input type="text" id="esc-department" class="readonly" readonly>
-                            </div>
-                            <div class="form-group">
-                                <label>Deadline</label>
-                                <input type="text" id="esc-deadline" class="readonly" readonly>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Escalation Reason *</label>
-                            <textarea id="esc-reason" placeholder="Why is this item being escalated?" required></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label>Priority</label>
-                            <select id="esc-priority">
-                                <option value="Critical">Critical</option>
-                                <option value="High" selected>High</option>
-                                <option value="Medium">Medium</option>
-                            </select>
-                        </div>
-                        <input type="hidden" id="esc-data">
-                    </div>
-                    <div class="modal-footer">
-                        <button class="btn" onclick="closeModal()">Cancel</button>
-                        <button class="btn btn-danger" onclick="submitEscalation()">🔴 Escalate</button>
-                    </div>
-                </div>
-            </div>
-            
+
+            <div class="toast" id="toast"></div>
+
             <script>
+                let actionItems = [];
                 let sources = [];
-                let currentSource = 'all';
-                let items = [];
-                
-                async function loadStats() {
-                    try {
-                        const res = await fetch('/escalation/api/stats');
-                        const data = await res.json();
-                        if (data.success) {
-                            document.getElementById('stat-total').textContent = data.data.totalItems;
-                            document.getElementById('stat-overdue').textContent = data.data.overdueItems;
-                            document.getElementById('stat-high').textContent = data.data.highPriorityItems;
-                            document.getElementById('stat-escalated').textContent = data.data.escalatedItems;
-                        }
-                    } catch (err) {
-                        console.error('Error loading stats:', err);
-                    }
-                }
-                
+
+                // Source icon mapping
+                const sourceIcons = {
+                    'OHS_INSPECTION': '🛡️',
+                    'OE_INSPECTION': '🔍'
+                };
+
                 async function loadSources() {
                     try {
-                        const res = await fetch('/escalation/api/sources');
-                        const data = await res.json();
-                        if (data.success) {
-                            sources = data.data;
-                            renderSources();
+                        const response = await fetch('/escalation/api/sources');
+                        const result = await response.json();
+                        if (result.success) {
+                            sources = result.data;
+                            const select = document.getElementById('filterSource');
+                            sources.forEach(source => {
+                                const option = document.createElement('option');
+                                option.value = source.SourceCode;
+                                option.textContent = (sourceIcons[source.SourceCode] || '📋') + ' ' + source.SourceName;
+                                select.appendChild(option);
+                            });
                         }
-                    } catch (err) {
-                        console.error('Error loading sources:', err);
+                    } catch (error) {
+                        console.error('Error loading sources:', error);
                     }
                 }
-                
-                function renderSources() {
-                    const list = document.getElementById('source-list');
-                    const allItem = list.querySelector('[data-source="all"]');
-                    
-                    // Icon mapping for sources
-                    const sourceIcons = {
-                        'OHS_INSPECTION': '🛡️',
-                        'OE_INSPECTION': '🔍',
-                        'COMPLAINTS': '📢',
-                        'SECURITY': '🔒'
-                    };
-                    
-                    // Remove existing source items (except "all")
-                    list.querySelectorAll('.source-item:not([data-source="all"])').forEach(el => el.remove());
-                    
-                    sources.forEach(source => {
-                        const icon = sourceIcons[source.SourceCode] || '📋';
-                        const li = document.createElement('li');
-                        li.className = 'source-item';
-                        li.dataset.source = source.SourceCode;
-                        li.innerHTML = \`
-                            <span class="icon">\${icon}</span>
-                            <span class="name">\${source.SourceName}</span>
-                            <span class="count" id="count-\${source.SourceCode}">0</span>
+
+                async function loadActionItems() {
+                    const sourceCode = document.getElementById('filterSource').value;
+                    const priority = document.getElementById('filterPriority').value;
+                    const status = document.getElementById('filterStatus').value;
+                    const department = document.getElementById('filterDepartment').value;
+
+                    const params = new URLSearchParams();
+                    if (sourceCode) params.append('sourceCode', sourceCode);
+                    if (priority) params.append('priority', priority);
+                    if (status) params.append('status', status);
+                    if (department) params.append('department', department);
+
+                    try {
+                        const response = await fetch('/escalation/api/action-items?' + params);
+                        const result = await response.json();
+
+                        if (result.success) {
+                            actionItems = result.data || [];
+                            renderActionItems();
+                            updateStats();
+                            updateDepartmentFilter();
+                        }
+                    } catch (error) {
+                        console.error('Error loading action items:', error);
+                        showToast('Error loading action items', true);
+                    }
+                }
+
+                function renderActionItems() {
+                    const tbody = document.getElementById('actionItemsBody');
+
+                    if (actionItems.length === 0) {
+                        tbody.innerHTML = \`
+                            <tr>
+                                <td colspan="11" class="empty-state">
+                                    <div class="icon">✅</div>
+                                    <p>No action items found</p>
+                                </td>
+                            </tr>
                         \`;
-                        li.onclick = () => selectSource(source.SourceCode, source.SourceName);
-                        list.appendChild(li);
-                    });
-                }
-                
-                function selectSource(sourceCode, sourceName) {
-                    currentSource = sourceCode;
-                    document.querySelectorAll('.source-item').forEach(el => {
-                        el.classList.toggle('active', el.dataset.source === sourceCode);
-                    });
-                    document.getElementById('content-title').textContent = 
-                        sourceCode === 'all' ? 'All Action Items' : sourceName + ' Action Items';
-                    loadItems();
-                }
-                
-                async function loadItems() {
-                    const container = document.getElementById('items-container');
-                    container.innerHTML = '<div class="loading">Loading action items...</div>';
-                    
-                    try {
-                        const department = document.getElementById('filter-department').value;
-                        const status = document.getElementById('filter-status').value;
-                        const priority = document.getElementById('filter-priority').value;
-                        
-                        let url = '/escalation/api/action-items?';
-                        if (currentSource !== 'all') url += 'sourceCode=' + currentSource + '&';
-                        if (department) url += 'department=' + department + '&';
-                        if (status) url += 'status=' + status + '&';
-                        if (priority) url += 'priority=' + priority + '&';
-                        
-                        const res = await fetch(url);
-                        const data = await res.json();
-                        
-                        if (data.success) {
-                            items = data.data;
-                            renderItems();
-                            updateCounts();
-                        }
-                    } catch (err) {
-                        console.error('Error loading items:', err);
-                        container.innerHTML = '<div class="empty-state"><div class="icon">❌</div><p>Error loading items</p></div>';
-                    }
-                }
-                
-                function renderItems() {
-                    const container = document.getElementById('items-container');
-                    
-                    // Icon mapping for sources
-                    const sourceIcons = {
-                        'OHS_INSPECTION': '🛡️',
-                        'OE_INSPECTION': '🔍',
-                        'COMPLAINTS': '📢',
-                        'SECURITY': '🔒'
-                    };
-                    
-                    if (items.length === 0) {
-                        container.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>No action items found</p></div>';
                         return;
                     }
-                    
-                    container.innerHTML = \`
-                        <table class="items-table">
-                            <thead>
-                                <tr>
-                                    <th>Source</th>
-                                    <th>Store</th>
-                                    <th>Finding</th>
-                                    <th>Department</th>
-                                    <th>Deadline</th>
-                                    <th>Priority</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                \${items.map(item => {
-                                    const icon = sourceIcons[item.SourceCode] || '📋';
-                                    return \`
-                                    <tr>
-                                        <td>
-                                            <span class="source-badge" style="background: \${item.SourceColor}20; color: \${item.SourceColor}">
-                                                \${icon} \${item.SourceName}
-                                            </span>
-                                        </td>
-                                        <td>\${item.StoreName || '-'}</td>
-                                        <td class="truncate" title="\${escapeHtml(item.Finding || '')}">\${item.Finding || '-'}</td>
-                                        <td>\${item.Department || '-'}</td>
-                                        <td>
-                                            \${formatDate(item.Deadline)}
-                                            \${item.IsOverdue ? '<span class="badge badge-overdue">Overdue</span>' : ''}
-                                            \${item.DaysOverdue > 0 ? '<br><small style="color:#dc2626">' + item.DaysOverdue + ' days</small>' : ''}
-                                        </td>
-                                        <td><span class="badge badge-\${(item.Priority || 'medium').toLowerCase()}">\${item.Priority || 'Medium'}</span></td>
-                                        <td>
-                                            \${item.IsEscalated 
-                                                ? '<span class="badge badge-escalated">Escalated</span>' 
-                                                : '<span class="badge">' + (item.Status || 'Open') + '</span>'}
-                                        </td>
-                                        <td>
-                                            \${!item.IsEscalated 
-                                                ? '<button class="action-btn escalate" onclick="openEscalateModal(' + JSON.stringify(item).replace(/"/g, '&quot;') + ')">🔴 Escalate</button>'
-                                                : '<span style="color:#7c3aed;font-size:12px">Escalated</span>'}
-                                        </td>
-                                    </tr>
-                                \`;}).join('')}
-                            </tbody>
-                        </table>
-                    \`;
-                }
-                
-                function updateCounts() {
-                    // Update "All" count
-                    document.getElementById('count-all').textContent = items.length;
-                    
-                    // Update per-source counts
-                    sources.forEach(source => {
-                        const count = items.filter(i => i.SourceCode === source.SourceCode).length;
-                        const el = document.getElementById('count-' + source.SourceCode);
-                        if (el) el.textContent = count;
-                    });
-                }
-                
-                function openEscalateModal(item) {
-                    document.getElementById('esc-source').value = item.SourceName;
-                    document.getElementById('esc-store').value = item.StoreName || '';
-                    document.getElementById('esc-finding').value = item.Finding || '';
-                    document.getElementById('esc-action').value = item.Action || '';
-                    document.getElementById('esc-department').value = item.Department || '';
-                    document.getElementById('esc-deadline').value = formatDate(item.Deadline);
-                    document.getElementById('esc-reason').value = '';
-                    document.getElementById('esc-priority').value = item.Priority || 'High';
-                    document.getElementById('esc-data').value = JSON.stringify(item);
-                    document.getElementById('escalate-modal').classList.add('active');
-                }
-                
-                function closeModal() {
-                    document.getElementById('escalate-modal').classList.remove('active');
-                }
-                
-                async function submitEscalation() {
-                    const item = JSON.parse(document.getElementById('esc-data').value);
-                    const reason = document.getElementById('esc-reason').value.trim();
-                    const priority = document.getElementById('esc-priority').value;
-                    
-                    if (!reason) {
-                        alert('Please enter an escalation reason');
-                        return;
-                    }
-                    
-                    try {
-                        const res = await fetch('/escalation/api/escalate', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                sourceId: item.SourceId,
-                                sourceItemId: item.Id,
-                                sourceInspectionId: item.InspectionId,
-                                department: item.Department,
+
+                    // Group items by DocumentNumber
+                    const grouped = {};
+                    actionItems.forEach(item => {
+                        const key = item.DocumentNumber || 'Unknown';
+                        if (!grouped[key]) {
+                            grouped[key] = {
+                                documentNumber: item.DocumentNumber,
                                 storeName: item.StoreName,
-                                finding: item.Finding,
-                                actionRequired: item.Action,
-                                deadline: item.Deadline,
-                                responsible: item.Responsible,
-                                priority: priority,
-                                reason: reason
-                            })
-                        });
-                        
-                        const data = await res.json();
-                        if (data.success) {
-                            alert('Item escalated successfully');
-                            closeModal();
-                            refreshData();
-                        } else {
-                            alert('Error: ' + data.error);
+                                sourceCode: item.SourceCode,
+                                inspectionDate: item.InspectionDate,
+                                items: []
+                            };
                         }
-                    } catch (err) {
-                        console.error('Error escalating:', err);
-                        alert('Error escalating item');
+                        grouped[key].items.push(item);
+                    });
+
+                    // Render grouped items
+                    let html = '';
+                    Object.keys(grouped).forEach((docNum, groupIndex) => {
+                        const group = grouped[docNum];
+                        const sourceIcon = sourceIcons[group.sourceCode] || '📋';
+                        const sourceClass = group.sourceCode === 'OHS_INSPECTION' ? 'source-ohs' : 'source-oe';
+                        const sourceName = group.sourceCode === 'OHS_INSPECTION' ? 'OHS Inspection' : 'OE Inspection';
+                        const inspDate = group.inspectionDate ? new Date(group.inspectionDate).toLocaleDateString() : '';
+
+                        // Group header row
+                        html += \`
+                            <tr class="doc-group-header">
+                                <td colspan="12">
+                                    <div class="doc-info">
+                                        <span class="source-badge \${sourceClass}">
+                                            \${sourceIcon} \${group.sourceCode === 'OHS_INSPECTION' ? 'OHS' : 'OE'}
+                                        </span>
+                                        <span class="doc-number">📄 \${group.documentNumber || 'N/A'}</span>
+                                        <span class="doc-store">🏪 \${group.storeName || '-'}</span>
+                                        <span class="doc-date">📅 \${inspDate}</span>
+                                        <span class="items-count">\${group.items.length} finding\${group.items.length > 1 ? 's' : ''}</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        \`;
+
+                        // Item rows
+                        group.items.forEach((item, itemIndex) => {
+                            const isOverdue = item.Deadline && new Date(item.Deadline) < new Date() && item.Status !== 'Closed';
+                            
+                            html += \`
+                                <tr class="group-item-row \${isOverdue ? 'overdue' : ''}">
+                                    <td>
+                                        <span style="color: #9ca3af; font-size: 11px;">#\${itemIndex + 1}</span>
+                                    </td>
+                                    <td colspan="2">\${item.SectionName || '-'}</td>
+                                    <td class="finding-col">
+                                        <div class="finding-text">\${item.Finding || '-'}</div>
+                                    </td>
+                                    <td class="action-col">
+                                        <div class="finding-text">\${item.Action || '-'}</div>
+                                    </td>
+                                    <td>\${item.Responsible || '-'}</td>
+                                    <td>\${item.Department || '-'}</td>
+                                    <td>
+                                        <span class="priority-badge priority-\${(item.Priority || 'medium').toLowerCase()}">
+                                            \${item.Priority || 'Medium'}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        \${item.Deadline ? new Date(item.Deadline).toLocaleDateString() : '-'}
+                                        \${isOverdue ? '<span class="overdue-badge">⏰ OVERDUE</span>' : ''}
+                                    </td>
+                                    <td>
+                                        <span class="status-badge status-\${(item.Status || 'open').toLowerCase().replace(' ', '-')}">
+                                            \${item.Status || 'Open'}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="action-btns">
+                                            <button class="btn btn-primary" onclick="editItem(\${item.Id}, '\${item.SourceCode}')">✏️</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            \`;
+                        });
+                    });
+
+                    tbody.innerHTML = html;
+                }
+
+                function updateStats() {
+                    const total = actionItems.length;
+                    const overdue = actionItems.filter(i => i.Deadline && new Date(i.Deadline) < new Date() && i.Status !== 'Closed').length;
+                    const high = actionItems.filter(i => i.Priority === 'High').length;
+                    const medium = actionItems.filter(i => i.Priority === 'Medium').length;
+                    const escalated = actionItems.filter(i => i.IsEscalated).length;
+
+                    document.getElementById('statTotal').textContent = total;
+                    document.getElementById('statOverdue').textContent = overdue;
+                    document.getElementById('statHigh').textContent = high;
+                    document.getElementById('statMedium').textContent = medium;
+                    document.getElementById('statEscalated').textContent = escalated;
+                }
+
+                function updateDepartmentFilter() {
+                    const departments = [...new Set(actionItems.map(i => i.Department).filter(d => d))];
+                    const select = document.getElementById('filterDepartment');
+                    const currentValue = select.value;
+                    
+                    // Clear and rebuild
+                    select.innerHTML = '<option value="">All Departments</option>';
+                    departments.forEach(dept => {
+                        const option = document.createElement('option');
+                        option.value = dept;
+                        option.textContent = dept;
+                        if (dept === currentValue) option.selected = true;
+                        select.appendChild(option);
+                    });
+                }
+
+                function clearFilters() {
+                    document.getElementById('filterSource').value = '';
+                    document.getElementById('filterPriority').value = '';
+                    document.getElementById('filterStatus').value = '';
+                    document.getElementById('filterDepartment').value = '';
+                    loadActionItems();
+                }
+
+                function editItem(id, sourceCode) {
+                    const item = actionItems.find(i => i.Id === id);
+                    if (!item) return;
+
+                    document.getElementById('editItemId').value = id;
+                    document.getElementById('editSourceCode').value = sourceCode;
+                    document.getElementById('editFinding').value = item.Finding || '';
+                    document.getElementById('editAction').value = item.Action || '';
+                    document.getElementById('editResponsible').value = item.Responsible || '';
+                    document.getElementById('editPriority').value = item.Priority || 'Medium';
+                    document.getElementById('editStatus').value = item.Status || 'Open';
+                    document.getElementById('editDeadline').value = item.Deadline ? item.Deadline.split('T')[0] : '';
+
+                    document.getElementById('editModal').classList.add('show');
+                }
+
+                function closeModal() {
+                    document.getElementById('editModal').classList.remove('show');
+                }
+
+                async function saveActionItem() {
+                    const id = document.getElementById('editItemId').value;
+                    const sourceCode = document.getElementById('editSourceCode').value;
+                    
+                    // Determine the correct API endpoint based on source
+                    let apiUrl;
+                    if (sourceCode === 'OHS_INSPECTION') {
+                        apiUrl = '/ohs-inspection/api/action-items/' + id;
+                    } else if (sourceCode === 'OE_INSPECTION') {
+                        apiUrl = '/oe-inspection/api/action-items/' + id;
+                    } else {
+                        showToast('Unknown source type', true);
+                        return;
+                    }
+
+                    const data = {
+                        cr: document.getElementById('editAction').value,
+                        assignedTo: document.getElementById('editResponsible').value,
+                        priority: document.getElementById('editPriority').value,
+                        status: document.getElementById('editStatus').value,
+                        dueDate: document.getElementById('editDeadline').value || null
+                    };
+
+                    try {
+                        const response = await fetch(apiUrl, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        });
+
+                        const result = await response.json();
+                        if (result.success) {
+                            closeModal();
+                            showToast('Action item updated successfully!');
+                            loadActionItems();
+                        } else {
+                            showToast('Error: ' + result.error, true);
+                        }
+                    } catch (error) {
+                        console.error('Error saving:', error);
+                        showToast('Error saving action item', true);
                     }
                 }
-                
-                function refreshData() {
-                    loadStats();
-                    loadItems();
+
+                function exportToExcel() {
+                    let csv = 'Source,Document No,Store,Section,Finding,Corrective Action,Responsible,Department,Priority,Deadline,Status\\n';
+                    actionItems.forEach(item => {
+                        csv += \`"\${item.SourceCode || ''}","\${item.DocumentNumber || ''}","\${item.StoreName || ''}","\${item.SectionName || ''}","\${(item.Finding || '').replace(/"/g, '""')}","\${(item.Action || '').replace(/"/g, '""')}","\${item.Responsible || ''}","\${item.Department || ''}","\${item.Priority || ''}","\${item.Deadline ? new Date(item.Deadline).toLocaleDateString() : ''}","\${item.Status || ''}"\\n\`;
+                    });
+
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'escalation-action-items-' + new Date().toISOString().split('T')[0] + '.csv';
+                    a.click();
+                    URL.revokeObjectURL(url);
                 }
-                
-                function formatDate(dateStr) {
-                    if (!dateStr) return '-';
-                    const d = new Date(dateStr);
-                    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+                function showToast(message, isError = false) {
+                    const toast = document.getElementById('toast');
+                    toast.textContent = message;
+                    toast.className = 'toast' + (isError ? ' error' : '');
+                    toast.classList.add('show');
+                    setTimeout(() => toast.classList.remove('show'), 3000);
                 }
-                
-                function escapeHtml(str) {
-                    if (!str) return '';
-                    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-                }
-                
-                // Event listeners
-                document.getElementById('filter-department').onchange = loadItems;
-                document.getElementById('filter-status').onchange = loadItems;
-                document.getElementById('filter-priority').onchange = loadItems;
-                
+
                 // Initialize
-                loadStats();
                 loadSources();
-                loadItems();
+                loadActionItems();
             </script>
         </body>
         </html>

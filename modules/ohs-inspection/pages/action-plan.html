@@ -3,297 +3,748 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OHS Inspection - Action Plan</title>
+    <title>Action Plan - OHS Inspection</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-            min-height: 100vh;
-            color: #1e293b;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
-        .header {
-            background: rgba(255, 255, 255, 0.95);
-            border-bottom: 1px solid rgba(225, 112, 85, 0.3);
-            padding: 1rem 2rem;
-            position: sticky;
-            top: 0;
-            z-index: 100;
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .action-plan-container {
+            max-width: 1800px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        /* Header Styles */
+        .report-header {
+            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+            color: white;
+            padding: 25px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            flex-wrap: wrap;
+            gap: 20px;
         }
 
-        .header-left { display: flex; align-items: center; gap: 1rem; }
+        .header-content {
+            flex: 1;
+        }
+
+        .report-header h1 {
+            font-size: 28px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .report-info {
+            display: flex;
+            gap: 25px;
+            flex-wrap: wrap;
+        }
+
+        .info-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-group label {
+            font-size: 11px;
+            opacity: 0.8;
+            margin-bottom: 2px;
+            text-transform: uppercase;
+        }
+
+        .info-value {
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .header-actions button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .header-actions button:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-1px);
+        }
 
         .back-btn {
-            background: linear-gradient(135deg, #475569 0%, #334155 100%);
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.3s ease;
-            text-decoration: none;
+            background: rgba(255,255,255,0.1) !important;
         }
 
-        .header-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            background: linear-gradient(135deg, #e17055, #d63031);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
+        .save-btn {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
         }
 
-        .main-container { max-width: 1400px; margin: 2rem auto; padding: 0 2rem; }
-
-        .stats-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
+        .save-btn:hover {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
         }
 
-        .stat-card {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-            border: 1px solid rgba(225, 112, 85, 0.2);
+        /* Summary Section */
+        .summary-section {
+            padding: 25px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
         }
 
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 0.25rem;
+        .summary-section h2 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 20px;
         }
 
-        .stat-label { font-size: 0.9rem; color: #64748b; }
-
-        .stat-high { color: #ef4444; }
-        .stat-medium { color: #f59e0b; }
-        .stat-low { color: #3b82f6; }
-        .stat-closed { color: #10b981; }
-
-        .filters-bar {
+        .summary-stats {
             display: flex;
-            gap: 1rem;
+            gap: 20px;
             flex-wrap: wrap;
-            margin-bottom: 1.5rem;
-            padding: 1rem;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
         }
 
-        .filter-group { display: flex; flex-direction: column; gap: 0.25rem; }
-        .filter-label { font-size: 0.8rem; color: #64748b; }
-
-        .filter-select, .filter-input {
-            padding: 0.5rem 1rem;
-            border: 1px solid #e2e8f0;
+        .stat-item {
+            background: white;
+            padding: 15px 20px;
             border-radius: 8px;
-            font-size: 0.9rem;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            min-width: 120px;
+        }
+
+        .stat-number {
+            display: block;
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .stat-item.high .stat-number { color: #ef4444; }
+        .stat-item.medium .stat-number { color: #f59e0b; }
+        .stat-item.low .stat-number { color: #3b82f6; }
+        .stat-item.no .stat-number { color: #dc2626; }
+        .stat-item.partial .stat-number { color: #f59e0b; }
+
+        /* Instructions Section */
+        .instructions-section {
+            padding: 20px 25px;
+            background: #fff3e0;
+            border-left: 4px solid #e17055;
+            margin: 0;
+        }
+
+        .instructions-section h3 {
+            color: #d63031;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .instructions-section ol {
+            margin-left: 20px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .instructions-section li {
+            margin-bottom: 5px;
+        }
+
+        /* Filter Section */
+        .filter-section {
+            padding: 20px 25px;
+            background: #fff;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .filter-group label {
+            font-size: 12px;
+            color: #6b7280;
+            font-weight: 600;
+        }
+
+        .filter-group select {
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
             min-width: 150px;
         }
 
-        .btn {
-            padding: 0.5rem 1rem;
-            border: none;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
+        /* Table Styles */
+        .table-container {
+            overflow-x: auto;
+            padding: 20px;
         }
 
-        .btn-primary {
-            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
-            color: white;
-        }
-
-        .btn-secondary { background: #f1f5f9; color: #475569; }
-
-        .action-items-container {
-            background: white;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-        }
-
-        table {
+        .action-plan-table {
             width: 100%;
             border-collapse: collapse;
+            font-size: 14px;
         }
 
-        th, td {
-            padding: 1rem;
+        .action-plan-table th {
+            background: #d63031;
+            color: white;
+            padding: 12px 8px;
             text-align: left;
-            border-bottom: 1px solid #f1f5f9;
-        }
-
-        th {
-            background: rgba(225, 112, 85, 0.1);
             font-weight: 600;
-            color: #475569;
-            font-size: 0.85rem;
+            white-space: nowrap;
+            font-size: 12px;
         }
 
-        tr:hover { background: rgba(225, 112, 85, 0.03); }
+        .action-plan-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #e9ecef;
+            vertical-align: top;
+            font-size: 13px;
+        }
+
+        .action-plan-table tr:hover {
+            background: #fef2f2;
+        }
+
+        .ref-col {
+            font-weight: 600;
+            color: #d63031;
+            white-space: nowrap;
+        }
+
+        .section-col {
+            white-space: nowrap;
+        }
+
+        .section-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .answer-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .answer-no {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .answer-partial {
+            background: #fef3c7;
+            color: #92400e;
+        }
 
         .priority-badge {
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
             font-weight: 600;
         }
 
-        .priority-high { background: #fef2f2; color: #ef4444; }
-        .priority-medium { background: #fffbeb; color: #f59e0b; }
-        .priority-low { background: #eff6ff; color: #3b82f6; }
-
-        .status-badge {
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
+        .priority-high {
+            background: #fee2e2;
+            color: #991b1b;
         }
 
-        .status-open { background: #fef2f2; color: #ef4444; }
-        .status-in-progress { background: #fffbeb; color: #f59e0b; }
-        .status-closed { background: #ecfdf5; color: #10b981; }
-
-        .action-btns { display: flex; gap: 0.5rem; }
-
-        .btn-sm {
-            padding: 0.35rem 0.75rem;
-            font-size: 0.8rem;
+        .priority-medium {
+            background: #fef3c7;
+            color: #92400e;
         }
 
-        .modal-overlay {
+        .priority-low {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .finding-col {
+            max-width: 200px;
+            min-width: 150px;
+        }
+
+        .question-title {
+            font-weight: 500;
+            margin-bottom: 6px;
+            font-size: 12px;
+        }
+
+        .finding-text {
+            color: #6b7280;
+            font-size: 11px;
+        }
+
+        .escalate-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 500;
+            background: #fae8ff;
+            color: #86198f;
+            margin-top: 4px;
+        }
+
+        /* Input Fields */
+        .input-col {
+            min-width: 120px;
+        }
+
+        .action-input {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 50px;
+        }
+
+        .action-input:focus {
+            outline: none;
+            border-color: #e17055;
+            box-shadow: 0 0 0 2px rgba(225, 112, 85, 0.2);
+        }
+
+        .deadline-input {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+
+        .deadline-input:focus {
+            outline: none;
+            border-color: #e17055;
+        }
+
+        .person-input {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+
+        .person-input:focus {
+            outline: none;
+            border-color: #e17055;
+        }
+
+        .status-select {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 11px;
+            background: white;
+        }
+
+        .status-select:focus {
+            outline: none;
+            border-color: #e17055;
+        }
+
+        .status-pending { background-color: #fef3c7; }
+        .status-in-progress { background-color: #dbeafe; }
+        .status-completed { background-color: #d1fae5; }
+        .status-deferred { background-color: #f3f4f6; }
+
+        /* Picture Upload */
+        .picture-section {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .picture-upload-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 5px 8px;
+            background: #f3f4f6;
+            border: 1px dashed #9ca3af;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 10px;
+            color: #4b5563;
+            transition: all 0.2s;
+        }
+
+        .picture-upload-btn:hover {
+            background: #e5e7eb;
+            border-color: #6b7280;
+        }
+
+        .picture-input {
+            display: none;
+        }
+
+        .picture-preview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .picture-thumb {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            object-fit: cover;
+            cursor: pointer;
+            border: 1px solid #e5e7eb;
+            transition: all 0.2s;
+        }
+
+        .picture-thumb:hover {
+            border-color: #e17055;
+            transform: scale(1.05);
+        }
+
+        .picture-thumb-wrapper {
+            position: relative;
+        }
+
+        .remove-picture {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 16px;
+            height: 16px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Lightbox */
+        .lightbox-overlay {
+            display: none;
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.5);
-            display: none;
+            background: rgba(0,0,0,0.9);
+            z-index: 1000;
             justify-content: center;
             align-items: center;
-            z-index: 1000;
         }
 
-        .modal-overlay.show { display: flex; }
+        .lightbox-overlay.show {
+            display: flex;
+        }
 
-        .modal {
-            background: white;
-            padding: 2rem;
-            border-radius: 16px;
-            width: 600px;
+        .lightbox-content {
             max-width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
+            max-height: 90%;
+            position: relative;
         }
 
-        .modal-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-bottom: 1.5rem;
-            color: #1e293b;
-        }
-
-        .form-group { margin-bottom: 1rem; }
-        .form-label { display: block; font-size: 0.9rem; color: #64748b; margin-bottom: 0.5rem; }
-
-        .form-input, .form-select, .form-textarea {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #e2e8f0;
+        .lightbox-image {
+            max-width: 100%;
+            max-height: 85vh;
             border-radius: 8px;
-            font-size: 0.95rem;
         }
 
-        .form-textarea { resize: vertical; min-height: 80px; }
-
-        .modal-actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem; }
-
-        .empty-state {
-            text-align: center;
-            padding: 4rem;
-            color: #64748b;
+        .lightbox-close {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 32px;
+            cursor: pointer;
         }
 
-        .empty-icon { font-size: 4rem; margin-bottom: 1rem; }
-
+        /* Toast Notification */
         .toast {
             position: fixed;
-            bottom: 2rem;
-            right: 2rem;
-            background: #10b981;
-            color: white;
-            padding: 1rem 2rem;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 20px;
             border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-            transform: translateY(100px);
-            opacity: 0;
-            transition: all 0.3s;
+            color: white;
+            font-weight: 500;
+            z-index: 1001;
+            animation: slideIn 0.3s ease;
         }
 
-        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.success {
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
 
-        .finding-text {
-            max-width: 300px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+        .toast.error {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+
+        .toast.info {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .empty-state .icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .empty-state h3 {
+            font-size: 20px;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+
+        .empty-state p {
+            color: #6b7280;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #e5e7eb;
+            border-top-color: #e17055;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Print Styles */
+        @media print {
+            .header-actions, .filter-section, .instructions-section {
+                display: none !important;
+            }
+
+            .report-header {
+                background: #d63031 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .action-plan-table th {
+                background: #d63031 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .action-input, .deadline-input, .person-input, .status-select {
+                border: none;
+                background: transparent;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .report-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .summary-stats {
+                flex-direction: column;
+            }
+
+            .stat-item {
+                width: 100%;
+            }
+
+            .filter-section {
+                flex-direction: column;
+                align-items: stretch;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="header-left">
-            <a href="/ohs-inspection" class="back-btn">← Back</a>
-            <span class="header-title">📋 Action Plan</span>
+    <div class="action-plan-container">
+        <!-- Header -->
+        <div class="report-header">
+            <div class="header-content">
+                <h1>🛡️ OHS ACTION PLAN</h1>
+                <div class="report-info" id="reportInfo">
+                    <div class="info-group">
+                        <label>Document Number:</label>
+                        <span class="info-value" id="docNumber">Loading...</span>
+                    </div>
+                    <div class="info-group">
+                        <label>Store:</label>
+                        <span class="info-value" id="storeName">Loading...</span>
+                    </div>
+                    <div class="info-group">
+                        <label>Inspection Date:</label>
+                        <span class="info-value" id="auditDate">Loading...</span>
+                    </div>
+                    <div class="info-group">
+                        <label>Total Score:</label>
+                        <span class="info-value" id="totalScore">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="back-btn" onclick="goBack()">
+                    ← Back
+                </button>
+                <button class="save-btn" onclick="saveActionPlan()">
+                    💾 Save
+                </button>
+                <button onclick="generateFullReport()" style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);">
+                    📄 Generate Report
+                </button>
+                <button onclick="sendToStoreManager()" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
+                    📧 Send to Manager
+                </button>
+                <button onclick="window.print()">
+                    🖨️ Print
+                </button>
+                <button onclick="exportToCSV()">
+                    📊 Export CSV
+                </button>
+            </div>
         </div>
-        <div>
-            <button class="btn btn-primary" onclick="exportToExcel()">📥 Export Excel</button>
-        </div>
-    </div>
 
-    <div class="main-container">
-        <div class="stats-row">
-            <div class="stat-card">
-                <div class="stat-value stat-high" id="highCount">0</div>
-                <div class="stat-label">🔴 High Priority</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value stat-medium" id="mediumCount">0</div>
-                <div class="stat-label">🟡 Medium Priority</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value stat-low" id="lowCount">0</div>
-                <div class="stat-label">🔵 Low Priority</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value stat-closed" id="closedCount">0</div>
-                <div class="stat-label">✅ Closed</div>
+        <!-- Summary Section -->
+        <div class="summary-section">
+            <h2>📋 Action Items Summary</h2>
+            <div class="summary-stats" id="summaryStats">
+                <div class="stat-item">
+                    <span class="stat-number" id="totalItems">0</span>
+                    <span class="stat-label">Total Items</span>
+                </div>
+                <div class="stat-item no">
+                    <span class="stat-number" id="noItems">0</span>
+                    <span class="stat-label">No (Non-Compliant)</span>
+                </div>
+                <div class="stat-item partial">
+                    <span class="stat-number" id="partialItems">0</span>
+                    <span class="stat-label">Partially Compliant</span>
+                </div>
+                <div class="stat-item high">
+                    <span class="stat-number" id="highPriority">0</span>
+                    <span class="stat-label">High Priority</span>
+                </div>
+                <div class="stat-item medium">
+                    <span class="stat-number" id="mediumPriority">0</span>
+                    <span class="stat-label">Medium Priority</span>
+                </div>
+                <div class="stat-item low">
+                    <span class="stat-number" id="lowPriority">0</span>
+                    <span class="stat-label">Low Priority</span>
+                </div>
             </div>
         </div>
 
-        <div class="filters-bar">
+        <!-- Instructions -->
+        <div class="instructions-section">
+            <h3>📝 Instructions for Store Manager</h3>
+            <ol>
+                <li><strong>Review each finding</strong> and understand the corrective action needed</li>
+                <li><strong>Fill in the Action to be Taken</strong> column with specific actions you will implement</li>
+                <li><strong>Set realistic deadlines</strong> for each action based on Priority</li>
+                <li><strong>Assign responsible person</strong> for each action</li>
+                <li><strong>Update status</strong> as actions progress</li>
+                <li><strong>Upload pictures</strong> of completed actions where applicable</li>
+                <li><strong>Write down the updates and comments</strong> related to each finding</li>
+            </ol>
+        </div>
+
+        <!-- Filters -->
+        <div class="filter-section">
             <div class="filter-group">
-                <span class="filter-label">Store</span>
-                <select class="filter-select" id="filterStore" onchange="loadActionItems()">
-                    <option value="">All Stores</option>
+                <label>Section</label>
+                <select id="sectionFilter" onchange="applyFilters()">
+                    <option value="">All Sections</option>
                 </select>
             </div>
             <div class="filter-group">
-                <span class="filter-label">Priority</span>
-                <select class="filter-select" id="filterPriority" onchange="loadActionItems()">
+                <label>Answer</label>
+                <select id="answerFilter" onchange="applyFilters()">
+                    <option value="">All</option>
+                    <option value="No">No</option>
+                    <option value="Partially">Partially</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Priority</label>
+                <select id="priorityFilter" onchange="applyFilters()">
                     <option value="">All Priorities</option>
                     <option value="High">High</option>
                     <option value="Medium">Medium</option>
@@ -301,300 +752,591 @@
                 </select>
             </div>
             <div class="filter-group">
-                <span class="filter-label">Status</span>
-                <select class="filter-select" id="filterStatus" onchange="loadActionItems()">
+                <label>Status</label>
+                <select id="statusFilter" onchange="applyFilters()">
                     <option value="">All Statuses</option>
-                    <option value="Open">Open</option>
+                    <option value="Pending">Pending</option>
                     <option value="In Progress">In Progress</option>
-                    <option value="Closed">Closed</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Deferred">Deferred</option>
                 </select>
             </div>
             <div class="filter-group">
-                <span class="filter-label">From Date</span>
-                <input type="date" class="filter-input" id="filterFromDate" onchange="loadActionItems()">
-            </div>
-            <div class="filter-group">
-                <span class="filter-label">To Date</span>
-                <input type="date" class="filter-input" id="filterToDate" onchange="loadActionItems()">
-            </div>
-            <div class="filter-group" style="justify-content: flex-end;">
-                <button class="btn btn-secondary" onclick="clearFilters()">Clear Filters</button>
+                <label>Escalated</label>
+                <select id="escalateFilter" onchange="applyFilters()">
+                    <option value="">All</option>
+                    <option value="true">Escalated Only</option>
+                </select>
             </div>
         </div>
 
-        <div class="action-items-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Inspection</th>
-                        <th>Store</th>
-                        <th>Finding</th>
-                        <th>Corrective Action</th>
-                        <th>Priority</th>
-                        <th>Status</th>
-                        <th>Due Date</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="actionItemsBody">
-                    <tr>
-                        <td colspan="8" class="empty-state">
-                            <div class="empty-icon">📋</div>
-                            <p>Loading action items...</p>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <div class="modal-overlay" id="editModal">
-        <div class="modal">
-            <h3 class="modal-title">Update Action Item</h3>
-            <input type="hidden" id="actionItemId">
-
-            <div class="form-group">
-                <label class="form-label">Finding</label>
-                <textarea class="form-textarea" id="editFinding" readonly></textarea>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Corrective Action</label>
-                <textarea class="form-textarea" id="editCR"></textarea>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Assigned To</label>
-                <input type="text" class="form-input" id="editAssignedTo" placeholder="Person responsible">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Priority</label>
-                <select class="form-select" id="editPriority">
-                    <option value="High">High</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Low">Low</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Status</label>
-                <select class="form-select" id="editStatus">
-                    <option value="Open">Open</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Closed">Closed</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Due Date</label>
-                <input type="date" class="form-input" id="editDueDate">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Notes</label>
-                <textarea class="form-textarea" id="editNotes" placeholder="Additional notes..."></textarea>
-            </div>
-
-            <div class="modal-actions">
-                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="saveActionItem()">💾 Save</button>
+        <!-- Table Container -->
+        <div class="table-container" id="tableContainer">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>Loading action items...</div>
             </div>
         </div>
     </div>
 
-    <div class="toast" id="toast"></div>
+    <!-- Lightbox -->
+    <div class="lightbox-overlay" id="lightbox" onclick="closeLightbox()">
+        <div class="lightbox-content" onclick="event.stopPropagation()">
+            <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+            <img class="lightbox-image" id="lightboxImg" src="" alt="Full size image">
+        </div>
+    </div>
 
     <script>
+        let auditData = null;
         let actionItems = [];
+        let filteredItems = [];
+        let savedResponses = {};
 
-        async function loadStores() {
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Get audit ID from URL path (e.g., /ohs-inspection/action-plan/16)
+            const pathParts = window.location.pathname.split('/');
+            const auditId = pathParts[pathParts.length - 1];
+            
+            if (!auditId || isNaN(auditId)) {
+                showError('No inspection ID provided');
+                return;
+            }
+
+            await loadAuditData(auditId);
+        });
+
+        function goBack() {
+            window.location.href = '/ohs-inspection/action-plans';
+        }
+
+        async function loadAuditData(auditId) {
             try {
-                const response = await fetch('/ohs-inspection/api/stores');
+                const response = await fetch(`/ohs-inspection/api/audits/${auditId}`);
                 const result = await response.json();
-                if (result.success) {
-                    const select = document.getElementById('filterStore');
-                    result.data.forEach(store => {
-                        const option = document.createElement('option');
-                        option.value = store.id;
-                        option.textContent = store.name;
-                        select.appendChild(option);
+
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to load inspection');
+                }
+
+                auditData = result.data;
+                
+                // Load saved action plan responses
+                await loadSavedResponses();
+                
+                extractActionItems();
+                updateHeader();
+                updateSummary();
+                populateFilters();
+                applyFilters();
+
+            } catch (error) {
+                console.error('Error loading inspection:', error);
+                showError(error.message);
+            }
+        }
+
+        async function loadSavedResponses() {
+            try {
+                const response = await fetch(`/ohs-inspection/api/action-plan/${auditData.documentNumber}`);
+                const result = await response.json();
+                
+                if (result.success && result.actions) {
+                    // Index by referenceValue for easy lookup
+                    result.actions.forEach(action => {
+                        savedResponses[action.ReferenceValue] = action;
                     });
+                    console.log('Loaded saved responses:', Object.keys(savedResponses).length);
                 }
             } catch (error) {
-                console.error('Error loading stores:', error);
+                console.warn('No saved responses found:', error.message);
             }
         }
 
-        async function loadActionItems() {
-            const storeId = document.getElementById('filterStore').value;
-            const priority = document.getElementById('filterPriority').value;
-            const status = document.getElementById('filterStatus').value;
-            const fromDate = document.getElementById('filterFromDate').value;
-            const toDate = document.getElementById('filterToDate').value;
-
-            const params = new URLSearchParams();
-            if (storeId) params.append('storeId', storeId);
-            if (priority) params.append('priority', priority);
-            if (status) params.append('status', status);
-            if (fromDate) params.append('fromDate', fromDate);
-            if (toDate) params.append('toDate', toDate);
-
-            try {
-                const response = await fetch(`/ohs-inspection/api/action-items?${params}`);
-                const result = await response.json();
-
-                if (result.success) {
-                    actionItems = result.data || [];
-                    renderActionItems();
-                    updateStats();
+        function extractActionItems() {
+            actionItems = [];
+            
+            for (const section of auditData.sections) {
+                for (const item of section.items) {
+                    // Filter for No or Partially answers, or items with findings/escalation
+                    if (item.selectedChoice === 'No' || item.selectedChoice === 'Partially' || item.finding || item.escalate) {
+                        // Check for saved response
+                        const saved = savedResponses[item.referenceValue] || {};
+                        
+                        // Parse pictures - could be in PicturesPaths or Pictures field
+                        let pictures = [];
+                        const picturesData = saved.PicturesPaths || saved.Pictures;
+                        if (picturesData) {
+                            try {
+                                pictures = typeof picturesData === 'string' ? JSON.parse(picturesData) : picturesData;
+                            } catch (e) {
+                                console.warn('Error parsing pictures:', e);
+                            }
+                        }
+                        
+                        actionItems.push({
+                            responseId: item.responseId,
+                            sectionNumber: section.sectionNumber,
+                            sectionName: section.sectionName,
+                            referenceValue: item.referenceValue || '-',
+                            title: item.title,
+                            selectedChoice: item.selectedChoice,
+                            finding: item.finding || '',
+                            priority: item.priority || 'Medium',
+                            escalate: item.escalate,
+                            department: item.department || '',
+                            cr: item.cr || '',
+                            // Editable fields - use saved or empty
+                            actionTaken: saved.ActionTaken || item.cr || '',
+                            deadline: saved.Deadline ? saved.Deadline.split('T')[0] : '',
+                            personInCharge: saved.PersonInCharge || '',
+                            status: saved.Status || 'Pending',
+                            pictures: pictures,
+                            notes: saved.Notes || item.comment || ''
+                        });
+                    }
                 }
-            } catch (error) {
-                console.error('Error loading action items:', error);
             }
+
+            // Sort by section number, then reference value
+            actionItems.sort((a, b) => {
+                if (a.sectionNumber !== b.sectionNumber) {
+                    return (a.sectionNumber || 0) - (b.sectionNumber || 0);
+                }
+                return (a.referenceValue || '').localeCompare(b.referenceValue || '');
+            });
         }
 
-        function renderActionItems() {
-            const tbody = document.getElementById('actionItemsBody');
+        function updateHeader() {
+            document.getElementById('docNumber').textContent = auditData.documentNumber || '-';
+            document.getElementById('storeName').textContent = auditData.storeName || '-';
+            document.getElementById('auditDate').textContent = formatDate(auditData.auditDate);
+            document.getElementById('totalScore').textContent = auditData.score !== null 
+                ? `${Math.round(auditData.score)}%` 
+                : '-';
+        }
 
-            if (actionItems.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="8" class="empty-state">
-                            <div class="empty-icon">✅</div>
-                            <p>No action items found</p>
-                        </td>
-                    </tr>
+        function updateSummary() {
+            const noCount = actionItems.filter(i => i.selectedChoice === 'No').length;
+            const partialCount = actionItems.filter(i => i.selectedChoice === 'Partially').length;
+            const highCount = actionItems.filter(i => i.priority === 'High').length;
+            const mediumCount = actionItems.filter(i => i.priority === 'Medium').length;
+            const lowCount = actionItems.filter(i => i.priority === 'Low').length;
+
+            document.getElementById('totalItems').textContent = actionItems.length;
+            document.getElementById('noItems').textContent = noCount;
+            document.getElementById('partialItems').textContent = partialCount;
+            document.getElementById('highPriority').textContent = highCount;
+            document.getElementById('mediumPriority').textContent = mediumCount;
+            document.getElementById('lowPriority').textContent = lowCount;
+        }
+
+        function populateFilters() {
+            const sections = [...new Set(actionItems.map(i => i.sectionName))];
+            const sectionSelect = document.getElementById('sectionFilter');
+            
+            sections.forEach(section => {
+                const option = document.createElement('option');
+                option.value = section;
+                option.textContent = section;
+                sectionSelect.appendChild(option);
+            });
+        }
+
+        function applyFilters() {
+            const section = document.getElementById('sectionFilter').value;
+            const answer = document.getElementById('answerFilter').value;
+            const priority = document.getElementById('priorityFilter').value;
+            const status = document.getElementById('statusFilter').value;
+            const escalate = document.getElementById('escalateFilter').value;
+
+            filteredItems = actionItems.filter(item => {
+                if (section && item.sectionName !== section) return false;
+                if (answer && item.selectedChoice !== answer) return false;
+                if (priority && item.priority !== priority) return false;
+                if (status && item.status !== status) return false;
+                if (escalate === 'true' && !item.escalate) return false;
+                return true;
+            });
+
+            renderTable();
+        }
+
+        function renderTable() {
+            const container = document.getElementById('tableContainer');
+
+            if (filteredItems.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">✅</div>
+                        <h3>No Action Items</h3>
+                        <p>This inspection has no items requiring action.</p>
+                    </div>
                 `;
                 return;
             }
 
-            tbody.innerHTML = actionItems.map(item => `
-                <tr>
-                    <td><strong>${item.documentNumber || '-'}</strong></td>
-                    <td>${item.storeName || '-'}</td>
-                    <td class="finding-text" title="${item.finding || ''}">${item.finding || '-'}</td>
-                    <td class="finding-text" title="${item.cr || ''}">${item.cr || '-'}</td>
-                    <td>
-                        <span class="priority-badge priority-${(item.priority || 'medium').toLowerCase()}">
-                            ${item.priority || 'Medium'}
-                        </span>
-                    </td>
-                    <td>
-                        <span class="status-badge status-${(item.status || 'open').toLowerCase().replace(' ', '-')}">
-                            ${item.status || 'Open'}
-                        </span>
-                    </td>
-                    <td>${item.dueDate ? new Date(item.dueDate).toLocaleDateString() : '-'}</td>
-                    <td>
-                        <div class="action-btns">
-                            <button class="btn btn-secondary btn-sm" onclick="editItem(${item.id})">✏️</button>
-                        </div>
-                    </td>
-                </tr>
+            let html = `
+                <table class="action-plan-table">
+                    <thead>
+                        <tr>
+                            <th style="width:60px;">Ref#</th>
+                            <th>Section</th>
+                            <th>Answer</th>
+                            <th>Finding / Question</th>
+                            <th>Priority</th>
+                            <th style="min-width:150px;">Action to be Taken</th>
+                            <th style="width:100px;">Deadline</th>
+                            <th style="width:100px;">Person in Charge</th>
+                            <th style="width:100px;">Status</th>
+                            <th style="width:80px;">Evidence</th>
+                            <th style="min-width:120px;">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            filteredItems.forEach((item, index) => {
+                const answerClass = item.selectedChoice === 'No' ? 'answer-no' : 'answer-partial';
+                const priorityClass = `priority-${(item.priority || 'medium').toLowerCase()}`;
+                const statusClass = `status-${(item.status || 'pending').toLowerCase().replace(' ', '-')}`;
+
+                html += `
+                    <tr data-index="${index}">
+                        <td class="ref-col">${item.referenceValue}</td>
+                        <td class="section-col">
+                            <span class="section-badge">${item.sectionName}</span>
+                        </td>
+                        <td>
+                            <span class="answer-badge ${answerClass}">${item.selectedChoice || '-'}</span>
+                        </td>
+                        <td class="finding-col">
+                            <div class="question-title">${item.title}</div>
+                            ${item.finding ? `<div class="finding-text">${item.finding}</div>` : ''}
+                            ${item.escalate ? `<span class="escalate-badge">⚠️ Escalated${item.department ? ` to ${item.department}` : ''}</span>` : ''}
+                        </td>
+                        <td>
+                            <span class="priority-badge ${priorityClass}">${item.priority || 'Medium'}</span>
+                        </td>
+                        <td class="input-col">
+                            <textarea class="action-input" 
+                                data-field="actionTaken" 
+                                data-index="${index}"
+                                placeholder="Describe the action...">${item.actionTaken || ''}</textarea>
+                        </td>
+                        <td class="input-col">
+                            <input type="date" class="deadline-input" 
+                                data-field="deadline" 
+                                data-index="${index}"
+                                value="${item.deadline || ''}">
+                        </td>
+                        <td class="input-col">
+                            <input type="text" class="person-input" 
+                                data-field="personInCharge" 
+                                data-index="${index}"
+                                placeholder="Name..."
+                                value="${item.personInCharge || ''}">
+                        </td>
+                        <td class="input-col">
+                            <select class="status-select ${statusClass}" 
+                                data-field="status" 
+                                data-index="${index}"
+                                onchange="updateStatusStyle(this)">
+                                <option value="Pending" ${item.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                                <option value="In Progress" ${item.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                                <option value="Completed" ${item.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                                <option value="Deferred" ${item.status === 'Deferred' ? 'selected' : ''}>Deferred</option>
+                            </select>
+                        </td>
+                        <td class="input-col">
+                            <div class="picture-section">
+                                <label class="picture-upload-btn">
+                                    📷 Add Photo
+                                    <input type="file" class="picture-input" 
+                                        accept="image/*" 
+                                        data-index="${index}"
+                                        onchange="handlePictureUpload(this)">
+                                </label>
+                                <div class="picture-preview" id="preview-${index}">
+                                    ${renderPictures(item.pictures, index)}
+                                </div>
+                            </div>
+                        </td>
+                        <td class="input-col">
+                            <textarea class="action-input" 
+                                data-field="notes" 
+                                data-index="${index}"
+                                placeholder="Additional notes..."
+                                style="min-height:40px;">${item.notes || ''}</textarea>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+
+            // Add event listeners for input changes
+            container.querySelectorAll('.action-input, .deadline-input, .person-input, .status-select').forEach(input => {
+                input.addEventListener('change', (e) => {
+                    const index = parseInt(e.target.dataset.index);
+                    const field = e.target.dataset.field;
+                    filteredItems[index][field] = e.target.value;
+                    
+                    // Also update in main actionItems array
+                    const mainIndex = actionItems.findIndex(ai => ai.responseId === filteredItems[index].responseId);
+                    if (mainIndex >= 0) {
+                        actionItems[mainIndex][field] = e.target.value;
+                    }
+                });
+            });
+        }
+
+        function renderPictures(pictures, index) {
+            if (!pictures || pictures.length === 0) return '';
+            
+            return pictures.map((pic, picIndex) => `
+                <div class="picture-thumb-wrapper">
+                    <img src="${pic}" class="picture-thumb" onclick="openLightbox('${pic}')" alt="Evidence">
+                    <button class="remove-picture" onclick="removePicture(${index}, ${picIndex})">×</button>
+                </div>
             `).join('');
         }
 
-        function updateStats() {
-            const high = actionItems.filter(i => i.priority === 'High' && i.status !== 'Closed').length;
-            const medium = actionItems.filter(i => i.priority === 'Medium' && i.status !== 'Closed').length;
-            const low = actionItems.filter(i => i.priority === 'Low' && i.status !== 'Closed').length;
-            const closed = actionItems.filter(i => i.status === 'Closed').length;
-
-            document.getElementById('highCount').textContent = high;
-            document.getElementById('mediumCount').textContent = medium;
-            document.getElementById('lowCount').textContent = low;
-            document.getElementById('closedCount').textContent = closed;
+        function updateStatusStyle(select) {
+            select.className = 'status-select status-' + select.value.toLowerCase().replace(' ', '-');
         }
 
-        function editItem(id) {
-            const item = actionItems.find(i => i.id === id);
-            if (!item) return;
+        async function handlePictureUpload(input) {
+            const index = parseInt(input.dataset.index);
+            const file = input.files[0];
+            if (!file) return;
 
-            document.getElementById('actionItemId').value = item.id;
-            document.getElementById('editFinding').value = item.finding || '';
-            document.getElementById('editCR').value = item.cr || '';
-            document.getElementById('editAssignedTo').value = item.assignedTo || '';
-            document.getElementById('editPriority').value = item.priority || 'Medium';
-            document.getElementById('editStatus').value = item.status || 'Open';
-            document.getElementById('editDueDate').value = item.dueDate ? item.dueDate.split('T')[0] : '';
-            document.getElementById('editNotes').value = item.notes || '';
-
-            document.getElementById('editModal').classList.add('show');
-        }
-
-        function closeModal() {
-            document.getElementById('editModal').classList.remove('show');
-        }
-
-        async function saveActionItem() {
-            const id = document.getElementById('actionItemId').value;
-
-            const data = {
-                cr: document.getElementById('editCR').value,
-                assignedTo: document.getElementById('editAssignedTo').value,
-                priority: document.getElementById('editPriority').value,
-                status: document.getElementById('editStatus').value,
-                dueDate: document.getElementById('editDueDate').value || null,
-                notes: document.getElementById('editNotes').value
+            // Convert to base64 for now (in production, upload to server)
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (!filteredItems[index].pictures) {
+                    filteredItems[index].pictures = [];
+                }
+                filteredItems[index].pictures.push(e.target.result);
+                
+                // Also update in main array
+                const mainIndex = actionItems.findIndex(ai => ai.responseId === filteredItems[index].responseId);
+                if (mainIndex >= 0) {
+                    if (!actionItems[mainIndex].pictures) {
+                        actionItems[mainIndex].pictures = [];
+                    }
+                    actionItems[mainIndex].pictures.push(e.target.result);
+                }
+                
+                // Update preview
+                document.getElementById(`preview-${index}`).innerHTML = renderPictures(filteredItems[index].pictures, index);
             };
+            reader.readAsDataURL(file);
+            
+            // Clear input
+            input.value = '';
+        }
 
+        function removePicture(itemIndex, picIndex) {
+            filteredItems[itemIndex].pictures.splice(picIndex, 1);
+            
+            // Also update in main array
+            const mainIndex = actionItems.findIndex(ai => ai.responseId === filteredItems[itemIndex].responseId);
+            if (mainIndex >= 0) {
+                actionItems[mainIndex].pictures = [...filteredItems[itemIndex].pictures];
+            }
+            
+            document.getElementById(`preview-${itemIndex}`).innerHTML = renderPictures(filteredItems[itemIndex].pictures, itemIndex);
+        }
+
+        function openLightbox(src) {
+            document.getElementById('lightboxImg').src = src;
+            document.getElementById('lightbox').classList.add('show');
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.remove('show');
+        }
+
+        async function saveActionPlan() {
             try {
-                const response = await fetch(`/ohs-inspection/api/action-items/${id}`, {
-                    method: 'PUT',
+                const actions = actionItems.map(item => ({
+                    documentNumber: auditData.documentNumber,
+                    referenceValue: item.referenceValue,
+                    sectionName: item.sectionName,
+                    question: item.title,
+                    finding: item.finding,
+                    selectedChoice: item.selectedChoice,
+                    priority: item.priority,
+                    actionTaken: item.actionTaken,
+                    deadline: item.deadline || null,
+                    personInCharge: item.personInCharge,
+                    status: item.status,
+                    pictures: item.pictures || [],
+                    notes: item.notes
+                }));
+
+                const response = await fetch('/ohs-inspection/api/action-plan/save', {
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify({ 
+                        documentNumber: auditData.documentNumber,
+                        actions 
+                    })
                 });
 
                 const result = await response.json();
+                
                 if (result.success) {
-                    closeModal();
-                    showToast('Action item updated!');
-                    loadActionItems();
+                    showToast('Action plan saved successfully!', 'success');
                 } else {
-                    alert('Error: ' + result.error);
+                    showToast('Error saving: ' + result.error, 'error');
                 }
             } catch (error) {
-                console.error('Error saving action item:', error);
-                alert('Error saving action item');
+                console.error('Error saving action plan:', error);
+                showToast('Error saving action plan', 'error');
             }
         }
 
-        function clearFilters() {
-            document.getElementById('filterStore').value = '';
-            document.getElementById('filterPriority').value = '';
-            document.getElementById('filterStatus').value = '';
-            document.getElementById('filterFromDate').value = '';
-            document.getElementById('filterToDate').value = '';
-            loadActionItems();
-        }
-
-        function exportToExcel() {
-            // Simple CSV export
-            let csv = 'Inspection,Store,Finding,Corrective Action,Priority,Status,Due Date,Assigned To\n';
+        function exportToCSV() {
+            let csv = 'Reference,Section,Answer,Question,Finding,Priority,Action to be Taken,Deadline,Person in Charge,Status,Notes\n';
+            
             actionItems.forEach(item => {
-                csv += `"${item.documentNumber || ''}","${item.storeName || ''}","${(item.finding || '').replace(/"/g, '""')}","${(item.cr || '').replace(/"/g, '""')}","${item.priority || ''}","${item.status || ''}","${item.dueDate ? new Date(item.dueDate).toLocaleDateString() : ''}","${item.assignedTo || ''}"\n`;
+                csv += `"${item.referenceValue}","${item.sectionName}","${item.selectedChoice}","${(item.title || '').replace(/"/g, '""')}","${(item.finding || '').replace(/"/g, '""')}","${item.priority}","${(item.actionTaken || '').replace(/"/g, '""')}","${item.deadline || ''}","${item.personInCharge || ''}","${item.status}","${(item.notes || '').replace(/"/g, '""')}"\n`;
             });
 
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `ohs-action-items-${new Date().toISOString().split('T')[0]}.csv`;
+            a.download = `OHS-ActionPlan-${auditData.documentNumber}-${new Date().toISOString().split('T')[0]}.csv`;
             a.click();
             URL.revokeObjectURL(url);
         }
 
-        function showToast(message) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 3000);
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
         }
 
-        // Initialize
-        loadStores();
-        loadActionItems();
+        function showError(message) {
+            const container = document.getElementById('tableContainer');
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="icon">❌</div>
+                    <h3>Error Loading Inspection</h3>
+                    <p>${message}</p>
+                    <button onclick="goBack()" style="margin-top:20px;padding:10px 20px;background:#e17055;color:white;border:none;border-radius:6px;cursor:pointer;">
+                        ← Back to List
+                    </button>
+                </div>
+            `;
+        }
+
+        function showToast(message, type = 'info') {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Keyboard shortcut for save
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                saveActionPlan();
+            }
+        });
+
+        // Generate Full Report
+        async function generateFullReport() {
+            if (!auditData) {
+                showToast('No inspection data loaded', 'error');
+                return;
+            }
+
+            try {
+                showToast('Generating report...', 'info');
+                
+                const response = await fetch(`/ohs-inspection/api/audits/${auditData.auditId}/generate-report`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast('Report generated successfully!', 'success');
+                    // Open the report in a new tab
+                    window.open(`/ohs-inspection/reports/${result.fileName}`, '_blank');
+                } else {
+                    showToast('Error: ' + result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Error generating report:', error);
+                showToast('Error generating report', 'error');
+            }
+        }
+
+        // Send to Store Manager
+        async function sendToStoreManager() {
+            if (!auditData) {
+                showToast('No inspection data loaded', 'error');
+                return;
+            }
+
+            // First save the action plan
+            await saveActionPlan();
+
+            // Show email modal or prompt
+            const email = prompt('Enter Store Manager email address:', '');
+            if (!email) return;
+
+            try {
+                showToast('Sending action plan...', 'info');
+                
+                const response = await fetch('/ohs-inspection/api/action-plan/send-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        documentNumber: auditData.documentNumber,
+                        storeName: auditData.storeName,
+                        auditDate: auditData.auditDate,
+                        score: auditData.score,
+                        recipientEmail: email,
+                        actionItems: actionItems.map(item => ({
+                            referenceValue: item.referenceValue,
+                            sectionName: item.sectionName,
+                            finding: item.finding || item.title,
+                            selectedChoice: item.selectedChoice,
+                            priority: item.priority,
+                            actionTaken: item.actionTaken,
+                            deadline: item.deadline,
+                            personInCharge: item.personInCharge,
+                            status: item.status
+                        }))
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast('Action plan sent to ' + email, 'success');
+                } else {
+                    showToast('Error: ' + result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Error sending email:', error);
+                showToast('Error sending email', 'error');
+            }
+        }
     </script>
 </body>
 </html>
