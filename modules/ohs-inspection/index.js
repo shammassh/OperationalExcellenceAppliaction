@@ -1861,7 +1861,7 @@ router.post('/api/audits/:auditId/complete', async (req, res) => {
                 WHERE Id = @auditId
             `);
         
-        // Generate action items from findings
+        // Generate action items from findings (items with No/Partially answers, findings, or escalation flag)
         const findingsResult = await pool.request()
             .input('auditId', sql.Int, auditId)
             .query(`
@@ -1869,13 +1869,15 @@ router.post('/api/audits/:auditId/complete', async (req, res) => {
                     InspectionId,
                     ReferenceValue,
                     SectionName,
+                    Question,
                     Finding,
                     CorrectedAction as SuggestedAction,
                     Priority,
-                    Department
+                    Department,
+                    Answer
                 FROM OHS_InspectionItems
                 WHERE InspectionId = @auditId
-                  AND ((Finding IS NOT NULL AND Finding != '') OR Escalate = 1)
+                  AND (Answer IN ('No', 'Partially') OR (Finding IS NOT NULL AND Finding != '') OR Escalate = 1)
             `);
         
         let actionItemsCreated = 0;
@@ -1893,11 +1895,14 @@ router.post('/api/audits/:auditId/complete', async (req, res) => {
                 `);
             
             if (existingCheck.recordset.length === 0) {
+                // Use Finding if available, otherwise use Question with Answer
+                const findingText = finding.Finding || `${finding.Question} (Answer: ${finding.Answer})`;
+                
                 await pool.request()
                     .input('inspectionId', sql.Int, auditId)
                     .input('referenceValue', sql.NVarChar, finding.ReferenceValue)
                     .input('sectionName', sql.NVarChar, finding.SectionName)
-                    .input('finding', sql.NVarChar, finding.Finding)
+                    .input('finding', sql.NVarChar, findingText)
                     .input('suggestedAction', sql.NVarChar, finding.SuggestedAction)
                     .input('priority', sql.NVarChar, finding.Priority || 'Medium')
                     .input('department', sql.NVarChar, finding.Department)
@@ -2158,6 +2163,24 @@ router.get('/api/audits/reports/:fileName', (req, res) => {
     const reportsDir = path.join(__dirname, '..', '..', 'reports', 'ohs-inspection');
     const filePath = path.join(reportsDir, fileName);
     
+    if (!filePath.startsWith(reportsDir)) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    if (fs.existsSync(filePath)) {
+        res.sendFile(filePath);
+    } else {
+        res.status(404).json({ error: 'Report not found' });
+    }
+});
+
+// Serve report files at /reports/:fileName (for direct report links)
+router.get('/reports/:fileName', (req, res) => {
+    const { fileName } = req.params;
+    const reportsDir = path.join(__dirname, '..', '..', 'reports', 'ohs-inspection');
+    const filePath = path.join(reportsDir, fileName);
+    
+    // Security check - prevent directory traversal
     if (!filePath.startsWith(reportsDir)) {
         return res.status(403).json({ error: 'Access denied' });
     }
