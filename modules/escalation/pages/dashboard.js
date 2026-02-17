@@ -555,17 +555,15 @@ module.exports = async (req, res) => {
                 <!-- Table -->
                 <div class="table-container">
                     <table class="action-plan-table">
-                        <thead>
+                        <thead id="tableHead">
                             <tr>
                                 <th style="width: 40px;">#</th>
-                                <th colspan="2">Section</th>
+                                <th>Document</th>
+                                <th>Store</th>
                                 <th>Finding</th>
-                                <th>Corrective Action</th>
-                                <th>Responsible</th>
-                                <th>Department</th>
+                                <th>Status</th>
                                 <th>Priority</th>
                                 <th>Deadline</th>
-                                <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -638,11 +636,23 @@ module.exports = async (req, res) => {
             <script>
                 let actionItems = [];
                 let sources = [];
+                let currentDisplayColumns = [];
+                
+                // Default display columns
+                const defaultDisplayColumns = [
+                    {field: 'DocumentNumber', label: 'Document #', width: '120px'},
+                    {field: 'StoreName', label: 'Store', width: '150px'},
+                    {field: 'Finding', label: 'Finding', width: 'auto'},
+                    {field: 'Status', label: 'Status', width: '100px'},
+                    {field: 'Priority', label: 'Priority', width: '80px'},
+                    {field: 'Deadline', label: 'Deadline', width: '100px'}
+                ];
 
                 // Source icon mapping
                 const sourceIcons = {
                     'OHS_INSPECTION': '🛡️',
-                    'OE_INSPECTION': '🔍'
+                    'OE_INSPECTION': '🔍',
+                    'COMPLAINTS': '📢'
                 };
 
                 async function loadSources() {
@@ -653,9 +663,10 @@ module.exports = async (req, res) => {
                             sources = result.data;
                             const select = document.getElementById('filterSource');
                             sources.forEach(source => {
+                                sourceIcons[source.SourceCode] = source.IconEmoji || '📋';
                                 const option = document.createElement('option');
                                 option.value = source.SourceCode;
-                                option.textContent = (sourceIcons[source.SourceCode] || '📋') + ' ' + source.SourceName;
+                                option.textContent = (source.IconEmoji || '📋') + ' ' + source.SourceName;
                                 select.appendChild(option);
                             });
                         }
@@ -676,6 +687,25 @@ module.exports = async (req, res) => {
                     if (status) params.append('status', status);
                     if (department) params.append('department', department);
 
+                    // Get display columns for selected source
+                    if (sourceCode) {
+                        const source = sources.find(s => s.SourceCode === sourceCode);
+                        if (source && source.DisplayColumns) {
+                            try {
+                                currentDisplayColumns = JSON.parse(source.DisplayColumns);
+                            } catch (e) {
+                                currentDisplayColumns = defaultDisplayColumns;
+                            }
+                        } else {
+                            currentDisplayColumns = defaultDisplayColumns;
+                        }
+                    } else {
+                        currentDisplayColumns = defaultDisplayColumns;
+                    }
+                    
+                    // Update table headers
+                    updateTableHeaders();
+
                     try {
                         const response = await fetch('/escalation/api/action-items?' + params);
                         const result = await response.json();
@@ -691,14 +721,25 @@ module.exports = async (req, res) => {
                         showToast('Error loading action items', true);
                     }
                 }
+                
+                function updateTableHeaders() {
+                    const thead = document.getElementById('tableHead');
+                    let headerHtml = '<tr><th style="width: 40px;">#</th>';
+                    currentDisplayColumns.forEach(col => {
+                        headerHtml += \`<th style="width: \${col.width || 'auto'};">\${col.label}</th>\`;
+                    });
+                    headerHtml += '<th style="width: 80px;">Actions</th></tr>';
+                    thead.innerHTML = headerHtml;
+                }
 
                 function renderActionItems() {
                     const tbody = document.getElementById('actionItemsBody');
+                    const colCount = currentDisplayColumns.length + 2; // +2 for # and Actions
 
                     if (actionItems.length === 0) {
                         tbody.innerHTML = \`
                             <tr>
-                                <td colspan="11" class="empty-state">
+                                <td colspan="\${colCount}" class="empty-state">
                                     <div class="icon">✅</div>
                                     <p>No action items found</p>
                                 </td>
@@ -716,6 +757,7 @@ module.exports = async (req, res) => {
                                 documentNumber: item.DocumentNumber,
                                 storeName: item.StoreName,
                                 sourceCode: item.SourceCode,
+                                sourceName: item.SourceName,
                                 inspectionDate: item.InspectionDate,
                                 items: []
                             };
@@ -728,22 +770,20 @@ module.exports = async (req, res) => {
                     Object.keys(grouped).forEach((docNum, groupIndex) => {
                         const group = grouped[docNum];
                         const sourceIcon = sourceIcons[group.sourceCode] || '📋';
-                        const sourceClass = group.sourceCode === 'OHS_INSPECTION' ? 'source-ohs' : 'source-oe';
-                        const sourceName = group.sourceCode === 'OHS_INSPECTION' ? 'OHS Inspection' : 'OE Inspection';
                         const inspDate = group.inspectionDate ? new Date(group.inspectionDate).toLocaleDateString() : '';
 
                         // Group header row
                         html += \`
                             <tr class="doc-group-header">
-                                <td colspan="12">
+                                <td colspan="\${colCount}">
                                     <div class="doc-info">
-                                        <span class="source-badge \${sourceClass}">
-                                            \${sourceIcon} \${group.sourceCode === 'OHS_INSPECTION' ? 'OHS' : 'OE'}
+                                        <span class="source-badge" style="background: var(--source-color, #7c3aed);">
+                                            \${sourceIcon} \${group.sourceName || group.sourceCode}
                                         </span>
                                         <span class="doc-number">📄 \${group.documentNumber || 'N/A'}</span>
                                         <span class="doc-store">🏪 \${group.storeName || '-'}</span>
                                         <span class="doc-date">📅 \${inspDate}</span>
-                                        <span class="items-count">\${group.items.length} finding\${group.items.length > 1 ? 's' : ''}</span>
+                                        <span class="items-count">\${group.items.length} item\${group.items.length > 1 ? 's' : ''}</span>
                                     </div>
                                 </td>
                             </tr>
@@ -751,47 +791,60 @@ module.exports = async (req, res) => {
 
                         // Item rows
                         group.items.forEach((item, itemIndex) => {
-                            const isOverdue = item.Deadline && new Date(item.Deadline) < new Date() && item.Status !== 'Closed';
+                            const isOverdue = item.Deadline && new Date(item.Deadline) < new Date() && item.Status !== 'Closed' && item.Status !== 'Completed';
                             
+                            html += \`<tr class="group-item-row \${isOverdue ? 'overdue' : ''}">\`;
+                            html += \`<td><span style="color: #9ca3af; font-size: 11px;">#\${itemIndex + 1}</span></td>\`;
+                            
+                            // Render dynamic columns
+                            currentDisplayColumns.forEach(col => {
+                                const value = item[col.field];
+                                html += renderCellValue(col.field, value, item, isOverdue);
+                            });
+                            
+                            // Actions column
                             html += \`
-                                <tr class="group-item-row \${isOverdue ? 'overdue' : ''}">
-                                    <td>
-                                        <span style="color: #9ca3af; font-size: 11px;">#\${itemIndex + 1}</span>
-                                    </td>
-                                    <td colspan="2">\${item.SectionName || '-'}</td>
-                                    <td class="finding-col">
-                                        <div class="finding-text">\${item.Finding || '-'}</div>
-                                    </td>
-                                    <td class="action-col">
-                                        <div class="finding-text">\${item.Action || '-'}</div>
-                                    </td>
-                                    <td>\${item.Responsible || '-'}</td>
-                                    <td>\${item.Department || '-'}</td>
-                                    <td>
-                                        <span class="priority-badge priority-\${(item.Priority || 'medium').toLowerCase()}">
-                                            \${item.Priority || 'Medium'}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        \${item.Deadline ? new Date(item.Deadline).toLocaleDateString() : '-'}
-                                        \${isOverdue ? '<span class="overdue-badge">⏰ OVERDUE</span>' : ''}
-                                    </td>
-                                    <td>
-                                        <span class="status-badge status-\${(item.Status || 'open').toLowerCase().replace(' ', '-')}">
-                                            \${item.Status || 'Open'}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div class="action-btns">
-                                            <button class="btn btn-primary" onclick="editItem(\${item.Id}, '\${item.SourceCode}')">✏️</button>
-                                        </div>
-                                    </td>
-                                </tr>
+                                <td>
+                                    <div class="action-btns">
+                                        <button class="btn btn-primary" onclick="editItem(\${item.Id}, '\${item.SourceCode}')">✏️</button>
+                                    </div>
+                                </td>
                             \`;
+                            html += \`</tr>\`;
                         });
                     });
 
                     tbody.innerHTML = html;
+                }
+                
+                function renderCellValue(field, value, item, isOverdue) {
+                    // Special rendering for specific fields
+                    switch (field) {
+                        case 'Status':
+                            return \`<td><span class="status-badge status-\${(value || 'open').toLowerCase().replace(' ', '-')}">\${value || 'Open'}</span></td>\`;
+                        
+                        case 'Priority':
+                            return \`<td><span class="priority-badge priority-\${(value || 'medium').toLowerCase()}">\${value || 'Medium'}</span></td>\`;
+                        
+                        case 'Deadline':
+                        case 'DueDate':
+                            const dateStr = value ? new Date(value).toLocaleDateString() : '-';
+                            const overdueTag = isOverdue ? '<span class="overdue-badge">⏰ OVERDUE</span>' : '';
+                            return \`<td>\${dateStr} \${overdueTag}</td>\`;
+                        
+                        case 'Finding':
+                        case 'Description':
+                            return \`<td class="finding-col"><div class="finding-text">\${value || '-'}</div></td>\`;
+                        
+                        case 'Action':
+                            return \`<td class="action-col"><div class="finding-text">\${value || '-'}</div></td>\`;
+                        
+                        case 'InspectionDate':
+                            return \`<td>\${value ? new Date(value).toLocaleDateString() : '-'}</td>\`;
+                        
+                        default:
+                            return \`<td>\${value || '-'}</td>\`;
+                    }
                 }
 
                 function updateStats() {

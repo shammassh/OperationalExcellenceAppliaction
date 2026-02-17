@@ -95,6 +95,62 @@ router.get('/api/admin/sources', async (req, res) => {
     }
 });
 
+// Get table columns (helper for admin)
+router.get('/api/admin/table-columns', async (req, res) => {
+    try {
+        if (!req.currentUser?.roleNames?.includes('System Administrator')) {
+            return res.status(403).json({ success: false, error: 'Admin access required' });
+        }
+        
+        const tableName = req.query.table;
+        if (!tableName) {
+            return res.status(400).json({ success: false, error: 'Table name required' });
+        }
+        
+        // Sanitize table name to prevent SQL injection
+        const sanitizedTableName = tableName.replace(/[^a-zA-Z0-9_]/g, '');
+        
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request()
+            .input('tableName', sql.NVarChar, sanitizedTableName)
+            .query(`
+                SELECT COLUMN_NAME, DATA_TYPE 
+                FROM INFORMATION_SCHEMA.COLUMNS 
+                WHERE TABLE_NAME = @tableName 
+                ORDER BY ORDINAL_POSITION
+            `);
+        await pool.close();
+        
+        res.json({ success: true, columns: result.recordset });
+    } catch (err) {
+        console.error('Error fetching table columns:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// List all tables (helper for admin)
+router.get('/api/admin/list-tables', async (req, res) => {
+    try {
+        if (!req.currentUser?.roleNames?.includes('System Administrator')) {
+            return res.status(403).json({ success: false, error: 'Admin access required' });
+        }
+        
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request().query(`
+            SELECT TABLE_NAME 
+            FROM INFORMATION_SCHEMA.TABLES 
+            WHERE TABLE_TYPE = 'BASE TABLE' 
+            ORDER BY TABLE_NAME
+        `);
+        await pool.close();
+        
+        res.json({ success: true, tables: result.recordset });
+    } catch (err) {
+        console.error('Error fetching tables:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // Create/Update source
 router.post('/api/admin/sources', async (req, res) => {
     try {
@@ -105,8 +161,8 @@ router.post('/api/admin/sources', async (req, res) => {
         const { id, sourceCode, sourceName, moduleName, actionItemsTable, formCode, 
                 inspectionTable, idColumn, inspectionIdColumn, departmentColumn, 
                 deadlineColumn, responsibleColumn, statusColumn, priorityColumn,
-                findingColumn, actionColumn, storeNameColumn, iconEmoji, colorHex, 
-                isActive, sortOrder } = req.body;
+                findingColumn, actionColumn, storeNameColumn, dateColumn, iconEmoji, colorHex, 
+                isActive, sortOrder, displayColumns } = req.body;
         
         const pool = await sql.connect(dbConfig);
         
@@ -130,10 +186,12 @@ router.post('/api/admin/sources', async (req, res) => {
                 .input('findingColumn', sql.NVarChar, findingColumn || 'Finding')
                 .input('actionColumn', sql.NVarChar, actionColumn || 'Action')
                 .input('storeNameColumn', sql.NVarChar, storeNameColumn || 'StoreName')
+                .input('dateColumn', sql.NVarChar, dateColumn || 'CreatedAt')
                 .input('iconEmoji', sql.NVarChar, iconEmoji || '📋')
                 .input('colorHex', sql.NVarChar, colorHex || '#0078d4')
                 .input('isActive', sql.Bit, isActive !== false)
                 .input('sortOrder', sql.Int, sortOrder || 0)
+                .input('displayColumns', sql.NVarChar, displayColumns || null)
                 .query(`
                     UPDATE EscalationSources SET
                         SourceCode = @sourceCode, SourceName = @sourceName, ModuleName = @moduleName,
@@ -141,8 +199,8 @@ router.post('/api/admin/sources', async (req, res) => {
                         IdColumn = @idColumn, InspectionIdColumn = @inspectionIdColumn, DepartmentColumn = @departmentColumn,
                         DeadlineColumn = @deadlineColumn, ResponsibleColumn = @responsibleColumn, StatusColumn = @statusColumn,
                         PriorityColumn = @priorityColumn, FindingColumn = @findingColumn, ActionColumn = @actionColumn,
-                        StoreNameColumn = @storeNameColumn, IconEmoji = @iconEmoji, ColorHex = @colorHex,
-                        IsActive = @isActive, SortOrder = @sortOrder, UpdatedAt = GETDATE()
+                        StoreNameColumn = @storeNameColumn, DateColumn = @dateColumn, IconEmoji = @iconEmoji, ColorHex = @colorHex,
+                        IsActive = @isActive, SortOrder = @sortOrder, DisplayColumns = @displayColumns, UpdatedAt = GETDATE()
                     WHERE Id = @id
                 `);
         } else {
@@ -164,21 +222,23 @@ router.post('/api/admin/sources', async (req, res) => {
                 .input('findingColumn', sql.NVarChar, findingColumn || 'Finding')
                 .input('actionColumn', sql.NVarChar, actionColumn || 'Action')
                 .input('storeNameColumn', sql.NVarChar, storeNameColumn || 'StoreName')
+                .input('dateColumn', sql.NVarChar, dateColumn || 'CreatedAt')
                 .input('iconEmoji', sql.NVarChar, iconEmoji || '📋')
                 .input('colorHex', sql.NVarChar, colorHex || '#0078d4')
                 .input('isActive', sql.Bit, isActive !== false)
                 .input('sortOrder', sql.Int, sortOrder || 0)
+                .input('displayColumns', sql.NVarChar, displayColumns || null)
                 .query(`
                     INSERT INTO EscalationSources (
                         SourceCode, SourceName, ModuleName, ActionItemsTable, FormCode, InspectionTable,
                         IdColumn, InspectionIdColumn, DepartmentColumn, DeadlineColumn, ResponsibleColumn,
-                        StatusColumn, PriorityColumn, FindingColumn, ActionColumn, StoreNameColumn,
-                        IconEmoji, ColorHex, IsActive, SortOrder
+                        StatusColumn, PriorityColumn, FindingColumn, ActionColumn, StoreNameColumn, DateColumn,
+                        IconEmoji, ColorHex, IsActive, SortOrder, DisplayColumns
                     ) VALUES (
                         @sourceCode, @sourceName, @moduleName, @actionItemsTable, @formCode, @inspectionTable,
                         @idColumn, @inspectionIdColumn, @departmentColumn, @deadlineColumn, @responsibleColumn,
-                        @statusColumn, @priorityColumn, @findingColumn, @actionColumn, @storeNameColumn,
-                        @iconEmoji, @colorHex, @isActive, @sortOrder
+                        @statusColumn, @priorityColumn, @findingColumn, @actionColumn, @storeNameColumn, @dateColumn,
+                        @iconEmoji, @colorHex, @isActive, @sortOrder, @displayColumns
                     )
                 `);
         }
@@ -210,110 +270,163 @@ router.delete('/api/admin/sources/:id', async (req, res) => {
     }
 });
 
+// Test source - verify SQL query works
+router.get('/api/admin/test-source/:id', async (req, res) => {
+    let query = '';
+    try {
+        if (!req.currentUser?.roleNames?.includes('System Administrator')) {
+            return res.status(403).json({ success: false, error: 'Admin access required' });
+        }
+        
+        const pool = await sql.connect(dbConfig);
+        
+        // Get source config
+        const sourceResult = await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query('SELECT * FROM EscalationSources WHERE Id = @id');
+        
+        if (sourceResult.recordset.length === 0) {
+            await pool.close();
+            return res.json({ success: false, error: 'Source not found' });
+        }
+        
+        const source = sourceResult.recordset[0];
+        
+        // Build simple test query
+        query = buildSimpleQuery(source, {});
+        
+        // Execute query with TOP 10
+        const testQuery = query.replace('SELECT', 'SELECT TOP 10');
+        const result = await pool.request().query(testQuery);
+        
+        // Map results to standard format
+        const items = result.recordset.map(row => {
+            const item = mapRowToItem(row, source);
+            return calculateOverdue(item);
+        });
+        
+        // Get total count
+        const countQuery = `SELECT COUNT(*) as total FROM ${source.ActionItemsTable}`;
+        const countResult = await pool.request().query(countQuery);
+        
+        await pool.close();
+        
+        res.json({ 
+            success: true, 
+            items: items,
+            rawData: result.recordset, // Show raw data for debugging
+            totalItems: countResult.recordset[0].total,
+            query: query
+        });
+    } catch (err) {
+        console.error('Error testing source:', err);
+        res.json({ success: false, error: err.message, query: query });
+    }
+});
+
 // ==========================================
 // API ROUTES - ACTION ITEMS
 // ==========================================
 
-// Get action items from a source
-// Helper function to build dynamic query based on available columns
-function buildActionItemsQuery(source, filters = {}) {
+// Helper function to check if a column mapping is valid (not empty, not a placeholder)
+function isValidColumn(col) {
+    if (!col) return false;
+    const trimmed = col.trim();
+    if (!trimmed) return false;
+    const invalidValues = ['-- none --', '-- select --', 'none', 'null', 'undefined', ''];
+    return !invalidValues.includes(trimmed.toLowerCase());
+}
+
+// SIMPLE query builder - just SELECT * from table, no complex column mapping in SQL
+// Column mapping is done in JavaScript after fetching results
+function buildSimpleQuery(source, filters = {}) {
     const { department, status, priority } = filters;
     
-    // Build SELECT columns - handle optional columns
-    let selectCols = `
-        ai.${source.IdColumn} as Id,
-        ai.${source.InspectionIdColumn} as InspectionId,
-        ${source.DepartmentColumn ? `ai.${source.DepartmentColumn}` : 'NULL'} as Department,
-        ${source.DeadlineColumn ? `ai.${source.DeadlineColumn}` : 'i.InspectionDate'} as Deadline,
-        ${source.ResponsibleColumn ? `ai.${source.ResponsibleColumn}` : 'NULL'} as Responsible,
-        ${source.StatusColumn ? `ai.${source.StatusColumn}` : "'Open'"} as Status,
-        ${source.PriorityColumn ? `ai.${source.PriorityColumn}` : "'Medium'"} as Priority,
-        ai.${source.FindingColumn} as Finding,
-        ${source.ActionColumn ? `ai.${source.ActionColumn}` : 'NULL'} as Action,
-        i.${source.StoreNameColumn} as StoreName,
-        i.InspectionDate as InspectionDate,
-        i.DocumentNumber as DocumentNumber,
-        ${source.SectionColumn ? `ai.${source.SectionColumn}` : 'NULL'} as SectionName,
-        ${source.ReferenceColumn ? `ai.${source.ReferenceColumn}` : 'NULL'} as ReferenceValue,
-        '${source.SourceCode}' as SourceCode,
-        '${source.SourceName}' as SourceName,
-        ${source.Id} as SourceId,
-        CASE WHEN e.Id IS NOT NULL THEN 1 ELSE 0 END as IsEscalated,
-        e.Id as EscalatedItemId,
-        e.Status as EscalationStatus
-    `;
+    // Just SELECT * from the main table
+    let query = `SELECT * FROM ${source.ActionItemsTable}`;
     
-    // Add overdue calculation only if Deadline column exists
-    if (source.DeadlineColumn && source.StatusColumn) {
-        selectCols += `,
-        CASE WHEN ai.${source.DeadlineColumn} < CAST(GETDATE() AS DATE) 
-             AND ai.${source.StatusColumn} NOT IN ('Completed', 'Closed') 
-             THEN 1 ELSE 0 END as IsOverdue,
-        DATEDIFF(day, ai.${source.DeadlineColumn}, GETDATE()) as DaysOverdue`;
-    } else {
-        selectCols += `,
-        0 as IsOverdue,
-        0 as DaysOverdue`;
+    // Build WHERE clause dynamically - only filter if column exists
+    let conditions = [];
+    
+    // Exclude closed/completed if Status column exists
+    if (isValidColumn(source.StatusColumn) && (!status || status === 'Open' || status === 'Overdue')) {
+        conditions.push(`${source.StatusColumn} NOT IN ('Completed', 'Closed')`);
     }
     
-    // For ActionItems tables, all records are action items - no need to filter by Finding
-    // For InspectionItems tables (direct source), filter by Finding or Escalate
-    const isActionItemsTable = source.ActionItemsTable.includes('ActionItems');
-    
-    let query = `
-        SELECT ${selectCols}
-        FROM ${source.ActionItemsTable} ai
-        LEFT JOIN ${source.InspectionTable} i ON ai.${source.InspectionIdColumn} = i.Id
-        LEFT JOIN EscalatedItems e ON e.SourceId = ${source.Id} AND e.SourceItemId = ai.${source.IdColumn}
-        WHERE 1=1
-    `;
-    
-    // If querying inspection items directly (not action items table), filter for findings
-    if (!isActionItemsTable) {
-        query += ` AND ((ai.${source.FindingColumn} IS NOT NULL AND ai.${source.FindingColumn} != '') OR ai.Escalate = 1)`;
+    // Add filters only if column is valid
+    if (department && isValidColumn(source.DepartmentColumn)) {
+        conditions.push(`${source.DepartmentColumn} LIKE '%${department.replace(/'/g, "''")}%'`);
     }
-    
-    // Exclude closed/completed by default unless specifically filtering for them
-    if (source.StatusColumn && (!status || status === 'Open' || status === 'Overdue')) {
-        query += ` AND ai.${source.StatusColumn} NOT IN ('Completed', 'Closed')`;
-    }
-    
-    // Add filters
-    if (department && source.DepartmentColumn) {
-        query += ` AND ai.${source.DepartmentColumn} LIKE '%${department.replace(/'/g, "''")}%'`;
-    }
-    if (status && source.StatusColumn) {
-        if (status === 'Overdue' && source.DeadlineColumn) {
-            query += ` AND ai.${source.DeadlineColumn} < CAST(GETDATE() AS DATE)`;
+    if (status && isValidColumn(source.StatusColumn)) {
+        if (status === 'Overdue' && isValidColumn(source.DeadlineColumn)) {
+            conditions.push(`${source.DeadlineColumn} < CAST(GETDATE() AS DATE)`);
         } else if (status !== 'Open' && status !== 'Overdue') {
-            query += ` AND ai.${source.StatusColumn} = '${status.replace(/'/g, "''")}'`;
+            conditions.push(`${source.StatusColumn} = '${status.replace(/'/g, "''")}'`);
         }
     }
-    if (priority && source.PriorityColumn) {
-        query += ` AND ai.${source.PriorityColumn} = '${priority.replace(/'/g, "''")}'`;
+    if (priority && isValidColumn(source.PriorityColumn)) {
+        conditions.push(`${source.PriorityColumn} = '${priority.replace(/'/g, "''")}'`);
     }
     
-    // Add ORDER BY
-    if (source.DeadlineColumn && source.StatusColumn) {
-        query += ` ORDER BY 
-            CASE WHEN ai.${source.DeadlineColumn} < CAST(GETDATE() AS DATE) AND ai.${source.StatusColumn} NOT IN ('Completed', 'Closed') THEN 0 ELSE 1 END,
-            CASE ai.${source.PriorityColumn} WHEN 'High' THEN 1 WHEN 'Medium' THEN 2 WHEN 'Low' THEN 3 ELSE 4 END,
-            ai.${source.DeadlineColumn}`;
-    } else if (source.PriorityColumn) {
-        query += ` ORDER BY 
-            CASE ai.${source.PriorityColumn} 
-                WHEN 'Critical' THEN 1 
-                WHEN 'High' THEN 2 
-                WHEN 'Medium' THEN 3 
-                WHEN 'Low' THEN 4 
-                ELSE 5 
-            END,
-            i.InspectionDate DESC`;
+    if (conditions.length > 0) {
+        query += ' WHERE ' + conditions.join(' AND ');
+    }
+    
+    // Simple ORDER BY - use date column if available, otherwise Id
+    if (isValidColumn(source.DateColumn)) {
+        query += ` ORDER BY ${source.DateColumn} DESC`;
+    } else if (isValidColumn(source.DeadlineColumn)) {
+        query += ` ORDER BY ${source.DeadlineColumn} DESC`;
     } else {
-        query += ` ORDER BY i.InspectionDate DESC`;
+        query += ` ORDER BY ${source.IdColumn || 'Id'} DESC`;
     }
     
     return query;
+}
+
+// Map raw database row to standard escalation item format
+function mapRowToItem(row, source) {
+    const idCol = source.IdColumn || 'Id';
+    const id = row[idCol] || row.Id || row.id;
+    
+    return {
+        Id: id,
+        InspectionId: id,
+        Department: isValidColumn(source.DepartmentColumn) ? row[source.DepartmentColumn] : null,
+        Deadline: isValidColumn(source.DeadlineColumn) ? row[source.DeadlineColumn] : null,
+        Responsible: isValidColumn(source.ResponsibleColumn) ? row[source.ResponsibleColumn] : null,
+        Status: isValidColumn(source.StatusColumn) ? row[source.StatusColumn] : 'Open',
+        Priority: isValidColumn(source.PriorityColumn) ? row[source.PriorityColumn] : 'Medium',
+        Finding: isValidColumn(source.FindingColumn) ? row[source.FindingColumn] : '',
+        Action: isValidColumn(source.ActionColumn) ? row[source.ActionColumn] : null,
+        StoreName: isValidColumn(source.StoreNameColumn) ? row[source.StoreNameColumn] : null,
+        InspectionDate: isValidColumn(source.DateColumn) ? row[source.DateColumn] : row.CreatedAt,
+        DocumentNumber: `${source.SourceCode}-${id}`,
+        SectionName: isValidColumn(source.SectionColumn) ? row[source.SectionColumn] : null,
+        ReferenceValue: isValidColumn(source.ReferenceColumn) ? row[source.ReferenceColumn] : null,
+        SourceCode: source.SourceCode,
+        SourceName: source.SourceName,
+        SourceId: source.Id,
+        IsEscalated: 0, // Will be updated below
+        EscalatedItemId: null,
+        EscalationStatus: null,
+        IsOverdue: 0,
+        DaysOverdue: 0
+    };
+}
+
+// Calculate overdue status
+function calculateOverdue(item) {
+    if (item.Deadline && item.Status && !['Completed', 'Closed'].includes(item.Status)) {
+        const deadline = new Date(item.Deadline);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (deadline < today) {
+            item.IsOverdue = 1;
+            item.DaysOverdue = Math.floor((today - deadline) / (1000 * 60 * 60 * 24));
+        }
+    }
+    return item;
 }
 
 router.get('/api/action-items/:sourceCode', async (req, res) => {
@@ -334,12 +447,36 @@ router.get('/api/action-items/:sourceCode', async (req, res) => {
         }
         
         const source = sourceResult.recordset[0];
-        const query = buildActionItemsQuery(source, { department, status, priority });
+        const query = buildSimpleQuery(source, { department, status, priority });
         
         const result = await pool.request().query(query);
-        await pool.close();
         
-        res.json({ success: true, data: result.recordset, source });
+        // Get escalation status for these items
+        const itemIds = result.recordset.map(r => r[source.IdColumn || 'Id'] || r.Id).filter(id => id);
+        let escalatedMap = {};
+        if (itemIds.length > 0) {
+            const escResult = await pool.request()
+                .input('sourceId', sql.Int, source.Id)
+                .query(`SELECT SourceItemId, Id, Status FROM EscalatedItems WHERE SourceId = @sourceId`);
+            escResult.recordset.forEach(e => {
+                escalatedMap[e.SourceItemId] = { id: e.Id, status: e.Status };
+            });
+        }
+        
+        // Map rows to standard format
+        const items = result.recordset.map(row => {
+            const item = mapRowToItem(row, source);
+            const esc = escalatedMap[item.Id];
+            if (esc) {
+                item.IsEscalated = 1;
+                item.EscalatedItemId = esc.id;
+                item.EscalationStatus = esc.status;
+            }
+            return calculateOverdue(item);
+        });
+        
+        await pool.close();
+        res.json({ success: true, data: items, source, query });
     } catch (err) {
         console.error('Error fetching action items:', err);
         res.status(500).json({ success: false, error: err.message });
@@ -375,9 +512,31 @@ router.get('/api/action-items', async (req, res) => {
         
         for (const source of sourcesToQuery) {
             try {
-                const query = buildActionItemsQuery(source, { department, status, priority });
+                const query = buildSimpleQuery(source, { department, status, priority });
                 const result = await pool.request().query(query);
-                allItems = allItems.concat(result.recordset);
+                
+                // Get escalation status for this source
+                const escResult = await pool.request()
+                    .input('sourceId', sql.Int, source.Id)
+                    .query(`SELECT SourceItemId, Id, Status FROM EscalatedItems WHERE SourceId = @sourceId`);
+                const escalatedMap = {};
+                escResult.recordset.forEach(e => {
+                    escalatedMap[e.SourceItemId] = { id: e.Id, status: e.Status };
+                });
+                
+                // Map rows to standard format
+                const items = result.recordset.map(row => {
+                    const item = mapRowToItem(row, source);
+                    const esc = escalatedMap[item.Id];
+                    if (esc) {
+                        item.IsEscalated = 1;
+                        item.EscalatedItemId = esc.id;
+                        item.EscalationStatus = esc.status;
+                    }
+                    return calculateOverdue(item);
+                });
+                
+                allItems = allItems.concat(items);
             } catch (queryErr) {
                 console.error(`Error querying source ${source.SourceCode}:`, queryErr.message);
             }
