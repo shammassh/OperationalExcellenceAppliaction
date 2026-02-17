@@ -33,6 +33,7 @@ const ohsModule = require('./modules/ohs');
 const ohsInspectionModule = require('./modules/ohs-inspection');
 const securityServicesModule = require('./modules/security-services');
 const securityModule = require('./modules/security');
+const escalationModule = require('./modules/escalation');
 
 const app = express();
 const PORT = process.env.PORT || 3010;
@@ -80,6 +81,7 @@ app.use('/ohs', requireAuth, formAccessMiddleware, ohsModule);
 app.use('/ohs-inspection', requireAuth, formAccessMiddleware, ohsInspectionModule);
 app.use('/security-services', requireAuth, formAccessMiddleware, securityServicesModule);
 app.use('/security', requireAuth, formAccessMiddleware, securityModule);
+app.use('/escalation', requireAuth, formAccessMiddleware, escalationModule);
 
 // ==========================================
 // Routes
@@ -186,7 +188,10 @@ app.get('/dashboard', requireAuth, (req, res) => {
         'SECURITY_CLEANING': 'security',
         
         // HR module (HR_DASHBOARD is required for HR access)
-        'HR_DASHBOARD': 'hr'
+        'HR_DASHBOARD': 'hr',
+        
+        // Escalation module
+        'ESCALATION_DASHBOARD': 'escalation', 'ESCALATION_MANAGEMENT': 'escalation', 'ESCALATION_ADMIN': 'escalation'
     };
     
     // Calculate which menus user can access based on their form permissions
@@ -205,7 +210,7 @@ app.get('/dashboard', requireAuth, (req, res) => {
     
     // System Administrator always has full access (no SQL check needed)
     if (roleNames.includes('System Administrator')) {
-        ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel'].forEach(m => accessibleMenus.add(m));
+        ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel', 'escalation'].forEach(m => accessibleMenus.add(m));
     }
     
     // Build menu items based on permissions
@@ -217,6 +222,7 @@ app.get('/dashboard', requireAuth, (req, res) => {
         { id: 'ohs-inspection', icon: '🛡️', title: 'OHS Inspection', href: '/ohs-inspection', desc: 'OHS safety inspections & audits' },
         { id: 'oe', icon: '📋', title: 'Operational Excellence', href: '/operational-excellence', desc: 'Audits, action plans & reports' },
         { id: 'oe-inspection', icon: '🔍', title: 'OE Inspection', href: '/oe-inspection', desc: 'OE inspections, reports & action plans' },
+        { id: 'escalation', icon: '🔴', title: 'Escalation', href: '/escalation', desc: 'Escalate & track overdue action items' },
         { id: 'thirdparty', icon: '🤝', title: 'Third-Party Services', href: '/third-party', desc: 'Service providers & compliance' },
         { id: 'security', icon: '🏢', title: 'Facility Management Department', href: '/security', desc: 'Facility incidents & inspections' },
         { id: 'hr', icon: '👥', title: 'HR & Talent', href: '/hr', desc: 'Employee relations & cases' }

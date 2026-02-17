@@ -119,7 +119,12 @@ async function runSetup(dbName) {
             ['HR_DASHBOARD', 'HR Dashboard', 'HR', '/hr', 'Human Resources'],
             
             // Personnel Module
-            ['PERSONNEL_DASHBOARD', 'Personnel', 'Personnel', '/personnel', 'Personnel mgmt']
+            ['PERSONNEL_DASHBOARD', 'Personnel', 'Personnel', '/personnel', 'Personnel mgmt'],
+            
+            // Escalation Module
+            ['ESCALATION_DASHBOARD', 'Escalation Dashboard', 'Escalation', '/escalation', 'View and manage escalated action items'],
+            ['ESCALATION_MANAGEMENT', 'Escalation Management', 'Escalation', '/escalation/manage', 'Escalate and track action items'],
+            ['ESCALATION_ADMIN', 'Escalation Admin', 'Escalation', '/escalation/admin', 'Admin: sources, templates, contacts']
         ];
         
         // Insert or update each form
