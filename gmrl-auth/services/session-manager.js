@@ -292,6 +292,106 @@ class SessionManager {
     static isValidTokenFormat(token) {
         return typeof token === 'string' && token.length === 64 && /^[0-9a-f]+$/.test(token);
     }
+
+    /**
+     * Get all sessions with user info (for admin monitoring)
+     */
+    static async getAllSessions() {
+        const pool = await sql.connect(config.database);
+        
+        const result = await pool.request()
+            .query(`
+                SELECT 
+                    s.Id,
+                    s.SessionId as session_id,
+                    s.UserId as user_id,
+                    s.ExpiresAt as expires_at,
+                    s.CreatedAt as created_at,
+                    u.Email as email,
+                    u.DisplayName as display_name,
+                    u.IsActive as user_is_active,
+                    r.RoleName as role,
+                    CASE WHEN s.ExpiresAt > GETDATE() THEN 1 ELSE 0 END as is_active
+                FROM Sessions s
+                LEFT JOIN Users u ON s.UserId = u.Id
+                LEFT JOIN UserRoles r ON u.RoleId = r.Id
+                ORDER BY s.CreatedAt DESC
+            `);
+        
+        return result.recordset;
+    }
+
+    /**
+     * Get session statistics (for admin dashboard)
+     */
+    static async getSessionStatistics() {
+        const pool = await sql.connect(config.database);
+        
+        // Total active sessions
+        const activeResult = await pool.request()
+            .query(`SELECT COUNT(*) as count FROM Sessions WHERE ExpiresAt > GETDATE()`);
+        
+        // Unique users with active sessions
+        const uniqueUsersResult = await pool.request()
+            .query(`SELECT COUNT(DISTINCT UserId) as count FROM Sessions WHERE ExpiresAt > GETDATE()`);
+        
+        // Users with duplicate active sessions
+        const duplicatesResult = await pool.request()
+            .query(`
+                SELECT COUNT(*) as count FROM (
+                    SELECT UserId, COUNT(*) as session_count 
+                    FROM Sessions 
+                    WHERE ExpiresAt > GETDATE() 
+                    GROUP BY UserId 
+                    HAVING COUNT(*) > 1
+                ) as duplicates
+            `);
+        
+        // Expired sessions in last 24 hours
+        const expiredResult = await pool.request()
+            .query(`
+                SELECT COUNT(*) as count 
+                FROM Sessions 
+                WHERE ExpiresAt < GETDATE() 
+                AND ExpiresAt > DATEADD(hour, -24, GETDATE())
+            `);
+        
+        return {
+            totalActive: activeResult.recordset[0].count,
+            uniqueUsers: uniqueUsersResult.recordset[0].count,
+            duplicates: duplicatesResult.recordset[0].count,
+            expiredLast24h: expiredResult.recordset[0].count
+        };
+    }
+
+    /**
+     * Revoke a specific session (admin action)
+     */
+    static async revokeSession(sessionId) {
+        const pool = await sql.connect(config.database);
+        
+        const result = await pool.request()
+            .input('sessionId', sql.NVarChar, sessionId)
+            .query('DELETE FROM Sessions WHERE SessionId = @sessionId');
+        
+        console.log(`✅ Session ${sessionId.substring(0, 8)}... revoked by admin`);
+        return result.rowsAffected[0] > 0;
+    }
+
+    /**
+     * Cleanup expired sessions and return count
+     */
+    static async cleanupExpiredSessionsWithCount() {
+        const pool = await sql.connect(config.database);
+        
+        const result = await pool.request()
+            .query('DELETE FROM Sessions WHERE ExpiresAt < GETDATE()');
+        
+        const count = result.rowsAffected[0];
+        console.log(`✅ Cleaned up ${count} expired session(s) by admin`);
+        
+        return count;
+    }
 }
 
 module.exports = SessionManager;

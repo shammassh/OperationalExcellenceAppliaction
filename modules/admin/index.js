@@ -13,18 +13,57 @@ const dbConfig = {
     options: config.database.options
 };
 
-// Check if user is System Administrator
-const requireSysAdmin = (req, res, next) => {
+// Check if user is System Administrator OR has form-based permission
+const requireSysAdmin = async (req, res, next) => {
+    // System Administrator (roleId 31) has full access to all admin pages
     if (req.currentUser && req.currentUser.roleId === 31) {
-        next();
-    } else {
-        res.status(403).send(`
-            <script>
-                alert('Access Denied. System Administrator role required.');
-                window.location.href = '/dashboard';
-            </script>
-        `);
+        return next();
     }
+    
+    // Check for dynamic form-based permission
+    // Map URL to FormCode
+    const urlToFormCode = {
+        '/admin': 'ADMIN_DASHBOARD',
+        '/admin/users': 'ADMIN_USERS',
+        '/admin/roles': 'ADMIN_ROLES',
+        '/admin/forms': 'ADMIN_FORMS',
+        '/admin/stores': 'ADMIN_STORES',
+        '/admin/impersonate': 'ADMIN_IMPERSONATE',
+        '/admin/sessions': 'ADMIN_SESSIONS',
+        '/admin/notification-history': 'ADMIN_NOTIFICATIONS'
+    };
+    
+    // Find matching form code
+    const currentPath = req.originalUrl.split('?')[0].replace(/\/$/, '');
+    let formCode = null;
+    
+    // Check for exact match first
+    if (urlToFormCode[currentPath]) {
+        formCode = urlToFormCode[currentPath];
+    } else {
+        // Check for prefix match (e.g., /admin/users/123 -> ADMIN_USERS)
+        for (const [path, code] of Object.entries(urlToFormCode)) {
+            if (currentPath.startsWith(path + '/') || currentPath === path) {
+                formCode = code;
+                break;
+            }
+        }
+    }
+    
+    if (formCode && req.currentUser && req.currentUser.permissions) {
+        const permission = req.currentUser.permissions[formCode];
+        if (permission && permission.canView) {
+            return next();
+        }
+    }
+    
+    // No access
+    res.status(403).send(`
+        <script>
+            alert('Access Denied. You do not have permission to access this page.');
+            window.location.href = '/dashboard';
+        </script>
+    `);
 };
 
 // Apply sysadmin check to all routes
@@ -230,6 +269,11 @@ router.get('/', (req, res) => {
                         <div class="card-icon">👤</div>
                         <div class="card-title">Impersonate User</div>
                         <div class="card-desc">Test permissions as another user</div>
+                    </a>
+                    <a href="/admin/sessions" class="admin-card">
+                        <div class="card-icon">🔐</div>
+                        <div class="card-title">Session Monitor</div>
+                        <div class="card-desc">View active sessions & detect duplicates</div>
                     </a>
                 </div>
             </div>

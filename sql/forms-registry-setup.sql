@@ -88,7 +88,17 @@ USING (VALUES
     ('HR_DASHBOARD', 'HR Dashboard', 'HR', '/hr', 'Human Resources dashboard'),
     
     -- Personnel Module
-    ('PERSONNEL_DASHBOARD', 'Personnel', 'Personnel', '/personnel', 'Personnel management')
+    ('PERSONNEL_DASHBOARD', 'Personnel', 'Personnel', '/personnel', 'Personnel management'),
+    
+    -- Admin Module
+    ('ADMIN_DASHBOARD', 'Admin Dashboard', 'Admin', '/admin', 'Main admin panel'),
+    ('ADMIN_USERS', 'User Management', 'Admin', '/admin/users', 'Manage users and permissions'),
+    ('ADMIN_ROLES', 'Role Management', 'Admin', '/admin/roles', 'Manage user roles'),
+    ('ADMIN_FORMS', 'Form Registry', 'Admin', '/admin/forms', 'Manage form registry'),
+    ('ADMIN_STORES', 'Store Management', 'Admin', '/admin/stores', 'Manage stores'),
+    ('ADMIN_IMPERSONATE', 'Impersonate User', 'Admin', '/admin/impersonate', 'Impersonate another user'),
+    ('ADMIN_SESSIONS', 'Session Monitor', 'Admin', '/admin/sessions', 'Monitor active sessions and detect duplicates'),
+    ('ADMIN_NOTIFICATIONS', 'Notification History', 'Admin', '/admin/notification-history', 'View notification history')
     
 ) AS source (FormCode, FormName, ModuleName, FormUrl, Description)
 ON target.FormCode = source.FormCode

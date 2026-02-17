@@ -31,6 +31,37 @@ const ChecklistsService = require('../auditor/services/checklists-service');
 // Import notification modules
 const NotificationHistoryService = require('../services/notification-history-service');
 
+/**
+ * Check if user has form-based permission or is System Administrator
+ */
+function requireFormPermission(formCode) {
+    return (req, res, next) => {
+        // System Administrator (roleId 31) has full access
+        if (req.currentUser && req.currentUser.roleId === 31) {
+            return next();
+        }
+        
+        // Check for Admin role
+        if (req.currentUser && req.currentUser.roleNames && req.currentUser.roleNames.includes('Admin')) {
+            return next();
+        }
+        
+        // Check for form-based permission
+        if (req.currentUser && req.currentUser.permissions) {
+            const permission = req.currentUser.permissions[formCode];
+            if (permission && permission.canView) {
+                return next();
+            }
+        }
+        
+        // No access
+        return res.status(403).json({
+            success: false,
+            message: 'Access denied. You do not have permission to access this resource.'
+        });
+    };
+}
+
 class AuthServer {
     constructor(app) {
         this.app = app;
@@ -38,6 +69,7 @@ class AuthServer {
         this.logoutHandler = new LogoutHandler();
         this.setupMiddleware();
         this.setupRoutes();
+        this.setupSessionCleanup();
         this.setupSessionCleanup();
     }
     
@@ -498,6 +530,115 @@ class AuthServer {
             const StoresManagementPage = require('../admin/pages/stores-management');
             StoresManagementPage.render(req, res);
         });
+
+        // ==========================================
+        // Session Activity Monitoring (Admin Only)
+        // ==========================================
+
+        // Session Activity Page
+        this.app.get('/admin/sessions', requireAuth, requireFormPermission('ADMIN_SESSIONS'), (req, res) => {
+            try {
+                const filePath = path.join(__dirname, 'admin/pages/session-activity.html');
+                console.log(`🔐 Serving session activity page: ${filePath}`);
+                res.sendFile(filePath, (err) => {
+                    if (err) {
+                        console.error('❌ Error serving session activity page:', err);
+                        res.status(404).send(`
+                            <html>
+                                <head><title>Page Not Found</title></head>
+                                <body style="font-family: Arial; padding: 50px; text-align: center;">
+                                    <h1>🔍 Page Not Found</h1>
+                                    <p>The session activity page could not be loaded.</p>
+                                    <p><a href="/dashboard">← Back to Dashboard</a></p>
+                                </body>
+                            </html>
+                        `);
+                    }
+                });
+            } catch (error) {
+                console.error('❌ Error in session activity route:', error);
+                res.status(500).send('Internal server error');
+            }
+        });
+
+        // API: Get all sessions with statistics
+        this.app.get('/api/admin/sessions', requireAuth, requireFormPermission('ADMIN_SESSIONS'), async (req, res) => {
+            try {
+                console.log(`🔐 [API] Fetching session activity (User: ${req.currentUser.email})`);
+
+                const sessions = await SessionManager.getAllSessions();
+                const statistics = await SessionManager.getSessionStatistics();
+
+                console.log(`✅ [API] Retrieved ${sessions.length} sessions`);
+
+                res.json({
+                    success: true,
+                    sessions: sessions,
+                    statistics: statistics
+                });
+
+            } catch (error) {
+                console.error('❌ [API] Error fetching sessions:', error);
+                res.status(500).json({
+                    success: false,
+                    message: 'Failed to fetch sessions',
+                    error: error.message
+                });
+            }
+        });
+
+        // API: Revoke a specific session
+        this.app.delete('/api/admin/sessions/:sessionId', requireAuth, requireFormPermission('ADMIN_SESSIONS'), async (req, res) => {
+            try {
+                const sessionId = req.params.sessionId;
+                console.log(`🔐 [API] Revoking session ${sessionId.substring(0, 8)}... (Admin: ${req.currentUser.email})`);
+
+                const revoked = await SessionManager.revokeSession(sessionId);
+
+                if (revoked) {
+                    res.json({
+                        success: true,
+                        message: 'Session revoked successfully'
+                    });
+                } else {
+                    res.status(404).json({
+                        success: false,
+                        message: 'Session not found'
+                    });
+                }
+
+            } catch (error) {
+                console.error('❌ [API] Error revoking session:', error);
+                res.status(500).json({
+                    success: false,
+                    message: 'Failed to revoke session',
+                    error: error.message
+                });
+            }
+        });
+
+        // API: Cleanup expired sessions
+        this.app.post('/api/admin/sessions/cleanup', requireAuth, requireFormPermission('ADMIN_SESSIONS'), async (req, res) => {
+            try {
+                console.log(`🔐 [API] Cleaning up expired sessions (Admin: ${req.currentUser.email})`);
+
+                const deletedCount = await SessionManager.cleanupExpiredSessionsWithCount();
+
+                res.json({
+                    success: true,
+                    deletedCount: deletedCount,
+                    message: `Cleaned up ${deletedCount} expired sessions`
+                });
+
+            } catch (error) {
+                console.error('❌ [API] Error cleaning up sessions:', error);
+                res.status(500).json({
+                    success: false,
+                    message: 'Failed to cleanup sessions',
+                    error: error.message
+                });
+            }
+        });
         
         // ==========================================
         // Auditor Routes
@@ -635,7 +776,11 @@ function initializeAuth(app) {
     console.log('[AUTH]   - GET  /auth/pending            (protected)');
     console.log('[AUTH]   - GET  /auth/session            (protected)');
     console.log('[AUTH]   - GET  /admin/users             (admin only)');
+    console.log('[AUTH]   - GET  /admin/sessions          (admin only)');
     console.log('[AUTH]   - GET  /api/admin/users         (admin only)');
+    console.log('[AUTH]   - GET  /api/admin/sessions      (admin only)');
+    console.log('[AUTH]   - DELETE /api/admin/sessions/:id (admin only)');
+    console.log('[AUTH]   - POST /api/admin/sessions/cleanup (admin only)');
     console.log('[AUTH]   - PATCH /api/admin/users/:id    (admin only)');
     console.log('[AUTH]   - PATCH /api/admin/users/:id/status (admin only)');
     console.log('[AUTH]   - POST /api/admin/sync-graph    (admin only)');

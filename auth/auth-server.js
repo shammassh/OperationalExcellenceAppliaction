@@ -46,8 +46,234 @@ const dbConfig = {
     }
 };
 
-// Session store (in-memory for simplicity)
-const sessions = new Map();
+// In-memory cache for sessions (reduces DB queries, synced with SQL)
+const sessionCache = new Map();
+
+/**
+ * Session Manager - SQL-based storage with in-memory cache
+ */
+const SessionStore = {
+    /**
+     * Create a new session in SQL database
+     */
+    async create(userId, sessionId, sessionData) {
+        let pool;
+        try {
+            pool = await sql.connect(dbConfig);
+            
+            // Remove any existing sessions for this user (prevent duplicates)
+            await pool.request()
+                .input('userId', sql.Int, userId)
+                .query('DELETE FROM Sessions WHERE UserId = @userId');
+            
+            const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+            
+            // Insert new session
+            await pool.request()
+                .input('sessionId', sql.NVarChar, sessionId)
+                .input('userId', sql.Int, userId)
+                .input('token', sql.NVarChar, JSON.stringify(sessionData))
+                .input('expiresAt', sql.DateTime2, expiresAt)
+                .query(`
+                    INSERT INTO Sessions (SessionId, UserId, Token, ExpiresAt, CreatedAt)
+                    VALUES (@sessionId, @userId, @token, @expiresAt, GETDATE())
+                `);
+            
+            // Cache the session
+            sessionCache.set(sessionId, {
+                ...sessionData,
+                expiresAt: expiresAt
+            });
+            
+            console.log(`✅ Session created in SQL for user ${userId} (expires in 24h)`);
+            return true;
+        } catch (err) {
+            console.error('Error creating session:', err);
+            return false;
+        } finally {
+            if (pool) await pool.close();
+        }
+    },
+    
+    /**
+     * Get session from cache or SQL
+     */
+    async get(sessionId) {
+        // Check cache first
+        if (sessionCache.has(sessionId)) {
+            const cached = sessionCache.get(sessionId);
+            if (new Date(cached.expiresAt) > new Date()) {
+                return cached;
+            } else {
+                sessionCache.delete(sessionId);
+            }
+        }
+        
+        // Fetch from SQL
+        let pool;
+        try {
+            pool = await sql.connect(dbConfig);
+            const result = await pool.request()
+                .input('sessionId', sql.NVarChar, sessionId)
+                .query(`
+                    SELECT s.*, u.Email, u.DisplayName, u.IsApproved, u.IsActive, u.RoleId
+                    FROM Sessions s
+                    JOIN Users u ON s.UserId = u.Id
+                    WHERE s.SessionId = @sessionId AND s.ExpiresAt > GETDATE()
+                `);
+            
+            if (result.recordset.length === 0) {
+                return null;
+            }
+            
+            const row = result.recordset[0];
+            const sessionData = JSON.parse(row.Token);
+            sessionData.expiresAt = row.ExpiresAt;
+            
+            // Cache it
+            sessionCache.set(sessionId, sessionData);
+            
+            return sessionData;
+        } catch (err) {
+            console.error('Error getting session:', err);
+            return null;
+        } finally {
+            if (pool) await pool.close();
+        }
+    },
+    
+    /**
+     * Delete session from SQL and cache
+     */
+    async delete(sessionId) {
+        sessionCache.delete(sessionId);
+        
+        let pool;
+        try {
+            pool = await sql.connect(dbConfig);
+            await pool.request()
+                .input('sessionId', sql.NVarChar, sessionId)
+                .query('DELETE FROM Sessions WHERE SessionId = @sessionId');
+            return true;
+        } catch (err) {
+            console.error('Error deleting session:', err);
+            return false;
+        } finally {
+            if (pool) await pool.close();
+        }
+    },
+    
+    /**
+     * Check if session exists
+     */
+    async has(sessionId) {
+        if (sessionCache.has(sessionId)) {
+            return true;
+        }
+        const session = await this.get(sessionId);
+        return session !== null;
+    },
+    
+    /**
+     * Get all sessions from SQL (for admin)
+     */
+    async getAll() {
+        let pool;
+        try {
+            pool = await sql.connect(dbConfig);
+            const result = await pool.request()
+                .query(`
+                    SELECT 
+                        s.SessionId as session_id,
+                        s.UserId as user_id,
+                        s.ExpiresAt as expires_at,
+                        s.CreatedAt as created_at,
+                        u.Email as email,
+                        u.DisplayName as display_name,
+                        r.RoleName as role,
+                        CASE WHEN s.ExpiresAt > GETDATE() THEN 1 ELSE 0 END as is_active
+                    FROM Sessions s
+                    LEFT JOIN Users u ON s.UserId = u.Id
+                    LEFT JOIN UserRoles r ON u.RoleId = r.Id
+                    ORDER BY s.CreatedAt DESC
+                `);
+            return result.recordset;
+        } catch (err) {
+            console.error('Error getting all sessions:', err);
+            return [];
+        } finally {
+            if (pool) await pool.close();
+        }
+    },
+    
+    /**
+     * Get statistics
+     */
+    async getStatistics() {
+        let pool;
+        try {
+            pool = await sql.connect(dbConfig);
+            
+            const activeResult = await pool.request()
+                .query(`SELECT COUNT(*) as count FROM Sessions WHERE ExpiresAt > GETDATE()`);
+            
+            const uniqueUsersResult = await pool.request()
+                .query(`SELECT COUNT(DISTINCT UserId) as count FROM Sessions WHERE ExpiresAt > GETDATE()`);
+            
+            const duplicatesResult = await pool.request()
+                .query(`
+                    SELECT COUNT(*) as count FROM (
+                        SELECT UserId FROM Sessions WHERE ExpiresAt > GETDATE() 
+                        GROUP BY UserId HAVING COUNT(*) > 1
+                    ) as dup
+                `);
+            
+            const expiredResult = await pool.request()
+                .query(`
+                    SELECT COUNT(*) as count FROM Sessions 
+                    WHERE ExpiresAt < GETDATE() AND ExpiresAt > DATEADD(hour, -24, GETDATE())
+                `);
+            
+            return {
+                totalActive: activeResult.recordset[0].count,
+                uniqueUsers: uniqueUsersResult.recordset[0].count,
+                duplicates: duplicatesResult.recordset[0].count,
+                expiredLast24h: expiredResult.recordset[0].count
+            };
+        } catch (err) {
+            console.error('Error getting statistics:', err);
+            return { totalActive: 0, uniqueUsers: 0, duplicates: 0, expiredLast24h: 0 };
+        } finally {
+            if (pool) await pool.close();
+        }
+    },
+    
+    /**
+     * Cleanup expired sessions
+     */
+    async cleanup() {
+        // Clear expired from cache
+        const now = new Date();
+        sessionCache.forEach((session, id) => {
+            if (new Date(session.expiresAt) <= now) {
+                sessionCache.delete(id);
+            }
+        });
+        
+        let pool;
+        try {
+            pool = await sql.connect(dbConfig);
+            const result = await pool.request()
+                .query('DELETE FROM Sessions WHERE ExpiresAt < GETDATE()');
+            return result.rowsAffected[0];
+        } catch (err) {
+            console.error('Error cleaning up sessions:', err);
+            return 0;
+        } finally {
+            if (pool) await pool.close();
+        }
+    }
+};
 
 /**
  * Initialize authentication routes on the Express app
@@ -149,8 +375,8 @@ function initializeAuth(app) {
                 const roleNames = roles.map(r => r.RoleName);
                 const displayRole = roleNames.length > 0 ? roleNames.join(', ') : legacyRoleName;
                 
-                // Create session
-                const sessionId = generateSessionId();
+                // Create session with user ID embedded in token
+                const sessionId = generateSessionId(user.Id);
                 const sessionData = {
                     userId: user.Id,
                     email: user.Email,
@@ -165,15 +391,8 @@ function initializeAuth(app) {
                     createdAt: new Date()
                 };
                 
-                // Add helper functions
-                sessionData.hasRole = function(roleName) {
-                    return this.roleNames.includes(roleName);
-                };
-                sessionData.hasAnyRole = function(...roles) {
-                    return roles.some(r => this.roleNames.includes(r));
-                };
-                
-                sessions.set(sessionId, sessionData);
+                // Store session in SQL database (removes existing sessions for user)
+                await SessionStore.create(user.Id, sessionId, sessionData);
                 
                 // Set session cookie
                 res.cookie('session_id', sessionId, {
@@ -244,13 +463,112 @@ function initializeAuth(app) {
     });
     
     // Logout
-    app.get('/auth/logout', (req, res) => {
+    app.get('/auth/logout', async (req, res) => {
         const sessionId = req.cookies.session_id;
         if (sessionId) {
-            sessions.delete(sessionId);
+            await SessionStore.delete(sessionId);
         }
         res.clearCookie('session_id');
         res.redirect('/');
+    });
+
+    // ==========================================
+    // Session Activity Monitoring (Admin Only)
+    // ==========================================
+
+    // Helper: Check if user has admin access for sessions
+    const requireSessionAdmin = (req, res, next) => {
+        if (!req.currentUser) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+        // System Administrator (roleId 31) has full access
+        if (req.currentUser.roleId === 31) {
+            return next();
+        }
+        // Check for Admin role
+        if (req.currentUser.roleNames && req.currentUser.roleNames.includes('Admin')) {
+            return next();
+        }
+        // Check for form-based permission
+        if (req.currentUser.permissions && req.currentUser.permissions['ADMIN_SESSIONS']?.canView) {
+            return next();
+        }
+        return res.status(403).json({ success: false, message: 'Access denied' });
+    };
+
+    // Session Activity Page
+    app.get('/admin/sessions', requireAuth, (req, res, next) => {
+        // Check access
+        if (req.currentUser.roleId !== 31 && 
+            !req.currentUser.roleNames?.includes('Admin') && 
+            !req.currentUser.permissions?.['ADMIN_SESSIONS']?.canView) {
+            return res.status(403).send(`
+                <script>
+                    alert('Access Denied. You do not have permission to access this page.');
+                    window.location.href = '/dashboard';
+                </script>
+            `);
+        }
+        const filePath = path.join(__dirname, '../gmrl-auth/admin/pages/session-activity.html');
+        res.sendFile(filePath, (err) => {
+            if (err) {
+                console.error('Error serving session activity page:', err);
+                res.status(404).send('<h1>Page Not Found</h1><a href="/dashboard">Back to Dashboard</a>');
+            }
+        });
+    });
+
+    // API: Get all sessions with statistics
+    app.get('/api/admin/sessions', requireAuth, requireSessionAdmin, async (req, res) => {
+        try {
+            console.log(`🔐 [API] Fetching session activity from SQL (User: ${req.currentUser.email})`);
+
+            // Get sessions from SQL database
+            const sessionsArray = await SessionStore.getAll();
+            const statistics = await SessionStore.getStatistics();
+
+            res.json({
+                success: true,
+                sessions: sessionsArray,
+                statistics: statistics
+            });
+
+        } catch (error) {
+            console.error('Error fetching sessions:', error);
+            res.status(500).json({ success: false, message: 'Failed to fetch sessions', error: error.message });
+        }
+    });
+
+    // API: Revoke a specific session
+    app.delete('/api/admin/sessions/:sessionId', requireAuth, requireSessionAdmin, async (req, res) => {
+        try {
+            const sessionId = req.params.sessionId;
+            console.log(`🔐 [API] Revoking session from SQL (Admin: ${req.currentUser.email})`);
+
+            const deleted = await SessionStore.delete(sessionId);
+            if (deleted) {
+                res.json({ success: true, message: 'Session revoked successfully' });
+            } else {
+                res.status(404).json({ success: false, message: 'Session not found' });
+            }
+        } catch (error) {
+            console.error('Error revoking session:', error);
+            res.status(500).json({ success: false, message: 'Failed to revoke session', error: error.message });
+        }
+    });
+
+    // API: Cleanup expired sessions
+    app.post('/api/admin/sessions/cleanup', requireAuth, requireSessionAdmin, async (req, res) => {
+        try {
+            console.log(`🔐 [API] Cleaning up expired sessions from SQL (Admin: ${req.currentUser.email})`);
+
+            const deletedCount = await SessionStore.cleanup();
+
+            res.json({ success: true, deletedCount: deletedCount, message: `Cleaned up ${deletedCount} expired sessions` });
+        } catch (error) {
+            console.error('Error cleaning up sessions:', error);
+            res.status(500).json({ success: false, message: 'Failed to cleanup sessions', error: error.message });
+        }
     });
     
     console.log('✅ Authentication routes initialized');
@@ -268,19 +586,27 @@ async function requireAuth(req, res, next) {
                          req.headers.accept?.includes('application/json') ||
                          req.headers['content-type']?.includes('application/json');
     
-    if (!sessionId || !sessions.has(sessionId)) {
+    if (!sessionId) {
         if (isApiRequest) {
             return res.status(401).json({ success: false, error: 'Session expired. Please refresh the page to login again.', sessionExpired: true });
         }
         return res.redirect('/auth/login');
     }
     
-    const session = sessions.get(sessionId);
+    // Get session from SQL (with cache)
+    const session = await SessionStore.get(sessionId);
     
-    // Check if session expired (24 hours)
-    const sessionAge = Date.now() - session.createdAt.getTime();
-    if (sessionAge > 24 * 60 * 60 * 1000) {
-        sessions.delete(sessionId);
+    if (!session) {
+        res.clearCookie('session_id');
+        if (isApiRequest) {
+            return res.status(401).json({ success: false, error: 'Session expired. Please refresh the page to login again.', sessionExpired: true });
+        }
+        return res.redirect('/auth/login');
+    }
+    
+    // Check if session expired (handled by SQL query, but double-check)
+    if (session.expiresAt && new Date(session.expiresAt) <= new Date()) {
+        await SessionStore.delete(sessionId);
         res.clearCookie('session_id');
         if (isApiRequest) {
             return res.status(401).json({ success: false, error: 'Session expired. Please refresh the page to login again.', sessionExpired: true });
@@ -424,15 +750,27 @@ function requireRole(...roles) {
 }
 
 /**
- * Generate random session ID
+ * Generate random session ID with user ID embedded
+ * Format: {random8}_{userId}_{random48}
+ * Example: mlr1pn4y_123_894a8cb2464f7799d4951017e07146aed780429678f80c50
  */
-function generateSessionId() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < 64; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
+function generateSessionId(userId) {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let prefix = '';
+    let suffix = '';
+    
+    // Generate 8 character prefix
+    for (let i = 0; i < 8; i++) {
+        prefix += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    return result;
+    
+    // Generate 48 character suffix (hex-like)
+    for (let i = 0; i < 48; i++) {
+        suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    
+    // Format: prefix_userId_suffix
+    return `${prefix}_${userId}_${suffix}`;
 }
 
 module.exports = {
