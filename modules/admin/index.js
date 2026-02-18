@@ -1829,6 +1829,37 @@ router.get('/users/:id/forms', async (req, res) => {
                         font-size: 13px;
                     }
                     .quick-actions button:hover { background: #f5f5f5; }
+                    .filter-section {
+                        display: flex;
+                        gap: 15px;
+                        margin-bottom: 20px;
+                        padding: 15px;
+                        background: #f8f9fa;
+                        border-radius: 10px;
+                        align-items: center;
+                        flex-wrap: wrap;
+                    }
+                    .filter-section label {
+                        font-weight: 500;
+                        color: #555;
+                    }
+                    .filter-section select, .filter-section input {
+                        padding: 10px 15px;
+                        border: 1px solid #ddd;
+                        border-radius: 8px;
+                        font-size: 14px;
+                        min-width: 200px;
+                    }
+                    .filter-section select:focus, .filter-section input:focus {
+                        outline: none;
+                        border-color: #0078d4;
+                    }
+                    .form-count {
+                        margin-left: auto;
+                        color: #666;
+                        font-size: 14px;
+                    }
+                    tr.hidden-row { display: none; }
                 </style>
             </head>
             <body>
@@ -1853,10 +1884,23 @@ router.get('/users/:id/forms', async (req, res) => {
                             <div class="card-title">Form Access Permissions</div>
                         </div>
                         
+                        <div class="filter-section">
+                            <label>🔍 Filter by Module:</label>
+                            <select id="moduleFilter" onchange="filterByModule()">
+                                <option value="">All Modules</option>
+                            </select>
+                            <label>Search:</label>
+                            <input type="text" id="searchFilter" placeholder="Search form name..." oninput="filterBySearch()">
+                            <label>
+                                <input type="checkbox" id="showEnabledOnly" onchange="filterForms()"> Show enabled only
+                            </label>
+                            <span class="form-count" id="formCount"></span>
+                        </div>
+                        
                         <div class="quick-actions">
-                            <button type="button" onclick="selectAll()">Select All</button>
-                            <button type="button" onclick="deselectAll()">Deselect All</button>
-                            <button type="button" onclick="selectAllViewCreate()">Enable View & Create</button>
+                            <button type="button" onclick="selectAll()">Select All (Visible)</button>
+                            <button type="button" onclick="deselectAll()">Deselect All (Visible)</button>
+                            <button type="button" onclick="selectAllViewCreate()">Enable View & Create (Visible)</button>
                         </div>
                         
                         <form action="/admin/users/${userId}/forms" method="POST">
@@ -1886,15 +1930,86 @@ router.get('/users/:id/forms', async (req, res) => {
                 </div>
                 
                 <script>
+                    // Populate module filter dropdown
+                    function initFilters() {
+                        const modules = new Set();
+                        document.querySelectorAll('tbody tr').forEach(row => {
+                            const moduleCell = row.querySelector('td:first-child .module-badge');
+                            if (moduleCell) {
+                                modules.add(moduleCell.textContent.trim());
+                            }
+                        });
+                        
+                        const select = document.getElementById('moduleFilter');
+                        Array.from(modules).sort().forEach(mod => {
+                            const option = document.createElement('option');
+                            option.value = mod;
+                            option.textContent = mod;
+                            select.appendChild(option);
+                        });
+                        
+                        updateFormCount();
+                    }
+                    
+                    // Filter forms
+                    function filterForms() {
+                        const moduleFilter = document.getElementById('moduleFilter').value.toLowerCase();
+                        const searchFilter = document.getElementById('searchFilter').value.toLowerCase();
+                        const showEnabledOnly = document.getElementById('showEnabledOnly').checked;
+                        
+                        document.querySelectorAll('tbody tr').forEach(row => {
+                            const moduleCell = row.querySelector('td:first-child .module-badge');
+                            const formCell = row.querySelector('td:nth-child(2)');
+                            const enabledCheckbox = row.querySelector('input[name*="[enabled]"]');
+                            
+                            if (!moduleCell || !formCell) return;
+                            
+                            const module = moduleCell.textContent.trim().toLowerCase();
+                            const formName = formCell.textContent.trim().toLowerCase();
+                            const isEnabled = enabledCheckbox && enabledCheckbox.checked;
+                            
+                            let show = true;
+                            
+                            if (moduleFilter && !module.includes(moduleFilter)) show = false;
+                            if (searchFilter && !formName.includes(searchFilter)) show = false;
+                            if (showEnabledOnly && !isEnabled) show = false;
+                            
+                            row.classList.toggle('hidden-row', !show);
+                        });
+                        
+                        updateFormCount();
+                    }
+                    
+                    function filterByModule() { filterForms(); }
+                    function filterBySearch() { filterForms(); }
+                    
+                    function updateFormCount() {
+                        const total = document.querySelectorAll('tbody tr').length;
+                        const visible = document.querySelectorAll('tbody tr:not(.hidden-row)').length;
+                        const enabled = document.querySelectorAll('tbody tr input[name*="[enabled]"]:checked').length;
+                        document.getElementById('formCount').textContent = \`Showing \${visible} of \${total} forms (\${enabled} enabled)\`;
+                    }
+                    
                     function selectAll() {
-                        document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+                        document.querySelectorAll('tbody tr:not(.hidden-row) input[type="checkbox"]').forEach(cb => cb.checked = true);
+                        updateFormCount();
                     }
                     function deselectAll() {
-                        document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+                        document.querySelectorAll('tbody tr:not(.hidden-row) input[type="checkbox"]').forEach(cb => cb.checked = false);
+                        updateFormCount();
                     }
                     function selectAllViewCreate() {
-                        document.querySelectorAll('input[name*="[enabled]"], input[name*="[canView]"], input[name*="[canCreate]"]').forEach(cb => cb.checked = true);
+                        document.querySelectorAll('tbody tr:not(.hidden-row) input[name*="[enabled]"], tbody tr:not(.hidden-row) input[name*="[canView]"], tbody tr:not(.hidden-row) input[name*="[canCreate]"]').forEach(cb => cb.checked = true);
+                        updateFormCount();
                     }
+                    
+                    // Update count when checkboxes change
+                    document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                        cb.addEventListener('change', updateFormCount);
+                    });
+                    
+                    // Initialize on page load
+                    initFilters();
                 </script>
             </body>
             </html>
