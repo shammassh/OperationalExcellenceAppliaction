@@ -11,16 +11,37 @@ const config = require('../../config/default');
 
 class OAuthCallbackHandler {
     constructor() {
-        // Initialize MSAL configuration
+        // Initialize MSAL configuration - NO shared cache to avoid session mixing
         this.msalConfig = {
             auth: {
                 clientId: process.env.AZURE_CLIENT_ID,
                 authority: `https://login.microsoftonline.com/${process.env.AZURE_TENANT_ID}`,
                 clientSecret: process.env.AZURE_CLIENT_SECRET
+            },
+            // Disable cache to prevent session mixing between concurrent logins
+            cache: {
+                cachePlugin: null
             }
         };
         
-        this.msalClient = new msal.ConfidentialClientApplication(this.msalConfig);
+        // Note: We create a new client per request to avoid shared state issues
+        // this.msalClient is kept for backwards compatibility but not used
+    }
+    
+    /**
+     * Create a fresh MSAL client for each request (no shared cache)
+     */
+    createMsalClient() {
+        return new msal.ConfidentialClientApplication({
+            auth: {
+                clientId: process.env.AZURE_CLIENT_ID,
+                authority: `https://login.microsoftonline.com/${process.env.AZURE_TENANT_ID}`,
+                clientSecret: process.env.AZURE_CLIENT_SECRET
+            },
+            cache: {
+                cachePlugin: null
+            }
+        });
     }
     
     /**
@@ -52,17 +73,21 @@ class OAuthCallbackHandler {
                 return res.redirect('/auth/login?error=No authorization code received');
             }
             
-            // Exchange code for token
+            // Exchange code for token (using fresh MSAL client per request)
+            console.log(`🔐 [AUTH] Processing OAuth callback...`);
             const tokenResponse = await this.exchangeCodeForToken(code, req);
             
             // Get user profile from Microsoft Graph
             const userProfile = await this.getUserProfile(tokenResponse.accessToken);
+            console.log(`👤 [AUTH] User profile fetched: ${userProfile.email} (${userProfile.displayName})`);
             
             // Check/create user in database
             const user = await this.checkOrCreateUser(userProfile);
+            console.log(`✅ [AUTH] User ID ${user.id}: ${user.email}`);
             
-            // Create session
+            // Create session - UNIQUE per user
             const session = await this.createSession(user, tokenResponse);
+            console.log(`🎫 [AUTH] Session created for user ${user.id}: ${session.SessionId.substring(0, 8)}...`);
             
             // Store returnUrl in res.locals for redirection
             res.locals.returnUrl = returnUrl;
@@ -103,7 +128,9 @@ class OAuthCallbackHandler {
             redirectUri
         };
         
-        return await this.msalClient.acquireTokenByCode(tokenRequest);
+        // Create a fresh MSAL client for this request (no shared cache)
+        const msalClient = this.createMsalClient();
+        return await msalClient.acquireTokenByCode(tokenRequest);
     }
     
     /**
