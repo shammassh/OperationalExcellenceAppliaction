@@ -231,6 +231,12 @@ router.get('/', async (req, res) => {
                             <div class="card-title">Department Reports</div>
                             <div class="card-desc">View reports filtered by department (Maintenance, Procurement, Cleaning).</div>
                         </a>
+                        
+                        <a href="/oe-inspection/schedule" class="card">
+                            <div class="card-icon">📅</div>
+                            <div class="card-title">Inspection Schedule</div>
+                            <div class="card-desc">Create and manage inspection schedules for inspectors by store and template.</div>
+                        </a>
                     </div>
                 </div>
             </body>
@@ -292,6 +298,11 @@ router.get('/store-management', (req, res) => {
 // Department Reports Page
 router.get('/department-reports', (req, res) => {
     res.sendFile(path.join(__dirname, 'pages', 'department-reports.html'));
+});
+
+// Schedule Page
+router.get('/schedule', (req, res) => {
+    res.sendFile(path.join(__dirname, 'pages', 'schedule.html'));
 });
 
 // ==========================================
@@ -2883,6 +2894,256 @@ router.put('/api/action-items/:id', async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Error updating action item:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ==========================================
+// Schedule API Routes
+// ==========================================
+
+// Get all schedules for a month
+router.get('/api/schedules', async (req, res) => {
+    try {
+        const { year, month } = req.query;
+        const pool = await sql.connect(dbConfig);
+        
+        const result = await pool.request()
+            .input('year', sql.Int, parseInt(year))
+            .input('month', sql.Int, parseInt(month))
+            .query(`
+                SELECT 
+                    s.Id,
+                    s.InspectorId,
+                    u.DisplayName as InspectorName,
+                    s.StoreId,
+                    st.StoreName,
+                    s.TemplateId,
+                    t.TemplateName,
+                    s.ScheduledDate,
+                    s.Notes,
+                    s.Status,
+                    s.CreatedBy,
+                    cb.DisplayName as CreatedByName,
+                    s.CreatedAt,
+                    s.UpdatedAt
+                FROM OE_InspectionSchedule s
+                JOIN Users u ON s.InspectorId = u.Id
+                JOIN Stores st ON s.StoreId = st.Id
+                JOIN OE_InspectionTemplates t ON s.TemplateId = t.Id
+                JOIN Users cb ON s.CreatedBy = cb.Id
+                WHERE YEAR(s.ScheduledDate) = @year AND MONTH(s.ScheduledDate) = @month
+                ORDER BY s.ScheduledDate, st.StoreName
+            `);
+        
+        await pool.close();
+        res.json({ success: true, data: result.recordset });
+    } catch (error) {
+        console.error('Error fetching schedules:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get schedules for a specific inspector
+router.get('/api/schedules/inspector/:inspectorId', async (req, res) => {
+    try {
+        const { inspectorId } = req.params;
+        const { year, month } = req.query;
+        const pool = await sql.connect(dbConfig);
+        
+        const result = await pool.request()
+            .input('inspectorId', sql.Int, parseInt(inspectorId))
+            .input('year', sql.Int, parseInt(year))
+            .input('month', sql.Int, parseInt(month))
+            .query(`
+                SELECT 
+                    s.Id,
+                    s.InspectorId,
+                    u.DisplayName as InspectorName,
+                    s.StoreId,
+                    st.StoreName,
+                    s.TemplateId,
+                    t.TemplateName,
+                    s.ScheduledDate,
+                    s.Notes,
+                    s.Status,
+                    s.CreatedAt
+                FROM OE_InspectionSchedule s
+                JOIN Users u ON s.InspectorId = u.Id
+                JOIN Stores st ON s.StoreId = st.Id
+                JOIN OE_InspectionTemplates t ON s.TemplateId = t.Id
+                WHERE s.InspectorId = @inspectorId
+                  AND YEAR(s.ScheduledDate) = @year 
+                  AND MONTH(s.ScheduledDate) = @month
+                ORDER BY s.ScheduledDate, st.StoreName
+            `);
+        
+        await pool.close();
+        res.json({ success: true, data: result.recordset });
+    } catch (error) {
+        console.error('Error fetching inspector schedules:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Create a new schedule
+router.post('/api/schedules', async (req, res) => {
+    try {
+        const { inspectorId, storeId, templateId, scheduledDate, notes } = req.body;
+        const createdBy = req.session?.user?.id || 1;
+        
+        const pool = await sql.connect(dbConfig);
+        
+        const result = await pool.request()
+            .input('inspectorId', sql.Int, inspectorId)
+            .input('storeId', sql.Int, storeId)
+            .input('templateId', sql.Int, templateId)
+            .input('scheduledDate', sql.Date, scheduledDate)
+            .input('notes', sql.NVarChar, notes || null)
+            .input('createdBy', sql.Int, createdBy)
+            .query(`
+                INSERT INTO OE_InspectionSchedule (InspectorId, StoreId, TemplateId, ScheduledDate, Notes, CreatedBy)
+                OUTPUT INSERTED.Id
+                VALUES (@inspectorId, @storeId, @templateId, @scheduledDate, @notes, @createdBy)
+            `);
+        
+        await pool.close();
+        res.json({ success: true, id: result.recordset[0].Id });
+    } catch (error) {
+        console.error('Error creating schedule:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Update a schedule
+router.put('/api/schedules/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { inspectorId, storeId, templateId, scheduledDate, notes, status } = req.body;
+        
+        const pool = await sql.connect(dbConfig);
+        
+        let updateFields = ['UpdatedAt = GETDATE()'];
+        const request = pool.request().input('id', sql.Int, id);
+        
+        if (inspectorId !== undefined) {
+            updateFields.push('InspectorId = @inspectorId');
+            request.input('inspectorId', sql.Int, inspectorId);
+        }
+        if (storeId !== undefined) {
+            updateFields.push('StoreId = @storeId');
+            request.input('storeId', sql.Int, storeId);
+        }
+        if (templateId !== undefined) {
+            updateFields.push('TemplateId = @templateId');
+            request.input('templateId', sql.Int, templateId);
+        }
+        if (scheduledDate !== undefined) {
+            updateFields.push('ScheduledDate = @scheduledDate');
+            request.input('scheduledDate', sql.Date, scheduledDate);
+        }
+        if (notes !== undefined) {
+            updateFields.push('Notes = @notes');
+            request.input('notes', sql.NVarChar, notes);
+        }
+        if (status !== undefined) {
+            updateFields.push('Status = @status');
+            request.input('status', sql.NVarChar, status);
+        }
+        
+        await request.query(`
+            UPDATE OE_InspectionSchedule 
+            SET ${updateFields.join(', ')} 
+            WHERE Id = @id
+        `);
+        
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating schedule:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Delete a schedule
+router.delete('/api/schedules/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const pool = await sql.connect(dbConfig);
+        
+        await pool.request()
+            .input('id', sql.Int, id)
+            .query('DELETE FROM OE_InspectionSchedule WHERE Id = @id');
+        
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting schedule:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get inspectors list (users with Inspector role)
+router.get('/api/schedules/data/inspectors', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        const result = await pool.request()
+            .query(`
+                SELECT DISTINCT u.Id, u.DisplayName, u.Email, r.RoleName
+                FROM Users u
+                JOIN UserRoles r ON u.RoleId = r.Id
+                WHERE u.IsActive = 1 AND u.IsApproved = 1
+                  AND r.RoleName = 'Inspector'
+                ORDER BY u.DisplayName
+            `);
+        
+        await pool.close();
+        res.json({ success: true, data: result.recordset });
+    } catch (error) {
+        console.error('Error fetching inspectors:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get stores list
+router.get('/api/schedules/data/stores', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        const result = await pool.request()
+            .query(`
+                SELECT Id, StoreName, StoreCode
+                FROM Stores
+                WHERE IsActive = 1
+                ORDER BY StoreName
+            `);
+        
+        await pool.close();
+        res.json({ success: true, data: result.recordset });
+    } catch (error) {
+        console.error('Error fetching stores:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get templates list
+router.get('/api/schedules/data/templates', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        const result = await pool.request()
+            .query(`
+                SELECT Id, TemplateName
+                FROM OE_InspectionTemplates
+                WHERE IsActive = 1
+                ORDER BY TemplateName
+            `);
+        
+        await pool.close();
+        res.json({ success: true, data: result.recordset });
+    } catch (error) {
+        console.error('Error fetching templates:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
