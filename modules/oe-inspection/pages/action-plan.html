@@ -387,6 +387,52 @@
         .status-completed { background-color: #d1fae5; }
         .status-deferred { background-color: #f3f4f6; }
 
+        /* Verification Status */
+        .verification-col {
+            min-width: 120px;
+        }
+
+        .verification-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .verification-complete {
+            background: #d1fae5;
+            color: #059669;
+        }
+
+        .verification-not-complete {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .verification-pending {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+
+        .verification-info {
+            font-size: 9px;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        .verification-photo {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            object-fit: cover;
+            cursor: pointer;
+            border: 1px solid #e5e7eb;
+            margin-top: 4px;
+        }
+
         /* Picture Upload */
         .picture-section {
             display: flex;
@@ -824,15 +870,18 @@
 
         async function loadSavedResponses() {
             try {
-                const response = await fetch(`/oe-inspection/api/action-plan/${auditData.documentNumber}`);
+                console.log('Loading saved responses for:', auditData.documentNumber);
+                const response = await fetch(`/oe-inspection/api/action-plan/by-doc/${auditData.documentNumber}`);
                 const result = await response.json();
+                console.log('API Response:', result);
                 
                 if (result.success && result.actions) {
                     // Index by referenceValue for easy lookup
                     result.actions.forEach(action => {
+                        console.log('Indexing action:', action.ReferenceValue, action);
                         savedResponses[action.ReferenceValue] = action;
                     });
-                    console.log('Loaded saved responses:', Object.keys(savedResponses).length);
+                    console.log('Loaded saved responses:', Object.keys(savedResponses).length, savedResponses);
                 }
             } catch (error) {
                 console.warn('No saved responses found:', error.message);
@@ -847,6 +896,7 @@
                     // Filter for No or Partially answers
                     if (item.selectedChoice === 'No' || item.selectedChoice === 'Partially') {
                         // Check for saved response
+                        console.log('Looking up referenceValue:', item.referenceValue, 'found:', savedResponses[item.referenceValue]);
                         const saved = savedResponses[item.referenceValue] || {};
                         
                         // Parse pictures - could be in PicturesPaths or Pictures field
@@ -876,7 +926,13 @@
                             deadline: saved.Deadline ? saved.Deadline.split('T')[0] : '',
                             personInCharge: saved.PersonInCharge || '',
                             status: saved.Status || 'Pending',
-                            pictures: pictures
+                            pictures: pictures,
+                            // Verification fields
+                            verificationStatus: saved.VerificationStatus || null,
+                            verificationNotes: saved.VerificationNotes || null,
+                            verificationPictureUrl: saved.VerificationPictureUrl || null,
+                            verifiedByName: saved.VerifiedByName || null,
+                            verifiedAt: saved.VerifiedAt || null
                         });
                     }
                 }
@@ -974,6 +1030,7 @@
                             <th>Person in Charge</th>
                             <th>Status</th>
                             <th>Pictures</th>
+                            <th>Verification</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1059,6 +1116,9 @@
                             </div>
                         </div>
                     </td>
+                    <td class="verification-col">
+                        ${renderVerificationStatus(item)}
+                    </td>
                 </tr>
             `;
         }
@@ -1080,6 +1140,39 @@
             select.className = 'status-select';
             const status = select.value.toLowerCase().replace(' ', '-');
             select.classList.add(`status-${status}`);
+        }
+
+        function renderVerificationStatus(item) {
+            // Check if this item has verification data
+            if (!item.verificationStatus) {
+                if (item.status === 'Completed') {
+                    return `<span class="verification-badge verification-pending">🕐 Pending</span>`;
+                }
+                return `<span style="color: #888; font-size: 10px;">-</span>`;
+            }
+            
+            const isComplete = item.verificationStatus === 'Verified Complete';
+            const badgeClass = isComplete ? 'verification-complete' : 'verification-not-complete';
+            const icon = isComplete ? '✅' : '❌';
+            const text = isComplete ? 'Complete' : 'Not Complete';
+            
+            let html = `
+                <span class="verification-badge ${badgeClass}">${icon} ${text}</span>
+            `;
+            
+            if (item.verifiedByName) {
+                html += `<div class="verification-info">by ${item.verifiedByName}</div>`;
+            }
+            
+            if (item.verificationNotes) {
+                html += `<div class="verification-info" title="${escapeHtml(item.verificationNotes)}">"${escapeHtml(item.verificationNotes.substring(0, 30))}${item.verificationNotes.length > 30 ? '...' : ''}"</div>`;
+            }
+            
+            if (item.verificationPictureUrl) {
+                html += `<img src="${item.verificationPictureUrl}" class="verification-photo" onclick="openLightbox('${item.verificationPictureUrl}')">`;
+            }
+            
+            return html;
         }
 
         function handlePictureUpload(index, files) {

@@ -9,6 +9,35 @@ const router = express.Router();
 const path = require('path');
 const sql = require('mssql');
 const fs = require('fs');
+const multer = require('multer');
+
+// Configure multer for verification photo uploads
+const verificationUploadDir = path.join(__dirname, '..', '..', 'uploads', 'verification');
+if (!fs.existsSync(verificationUploadDir)) {
+    fs.mkdirSync(verificationUploadDir, { recursive: true });
+}
+
+const verificationStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, verificationUploadDir),
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'verification-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const verificationUpload = multer({
+    storage: verificationStorage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = /jpeg|jpg|png|gif|webp/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+        if (extname && mimetype) {
+            return cb(null, true);
+        }
+        cb(new Error('Only image files are allowed'));
+    }
+});
 
 // Database config
 const dbConfig = {
@@ -237,6 +266,12 @@ router.get('/', async (req, res) => {
                             <div class="card-title">Inspection Schedule</div>
                             <div class="card-desc">Create and manage inspection schedules for inspectors by store and template.</div>
                         </a>
+                        
+                        <a href="/oe-inspection/implementation-verification" class="card">
+                            <div class="card-icon">✅</div>
+                            <div class="card-title">Implementation Verification</div>
+                            <div class="card-desc">Verify completed action plans submitted by store managers.</div>
+                        </a>
                     </div>
                 </div>
             </body>
@@ -303,6 +338,16 @@ router.get('/department-reports', (req, res) => {
 // Schedule Page
 router.get('/schedule', (req, res) => {
     res.sendFile(path.join(__dirname, 'pages', 'schedule.html'));
+});
+
+// Implementation Verification List Page
+router.get('/implementation-verification', (req, res) => {
+    res.sendFile(path.join(__dirname, 'pages', 'implementation-verification.html'));
+});
+
+// Implementation Verification Form Page
+router.get('/implementation-verification/:inspectionId', (req, res) => {
+    res.sendFile(path.join(__dirname, 'pages', 'verification-form.html'));
 });
 
 // ==========================================
@@ -1268,7 +1313,7 @@ router.put('/api/inspections/:id', async (req, res) => {
     }
 });
 
-// Get action plan items for an inspection
+// Get action plan items for an inspection (with verification status)
 router.get('/api/action-plan/:inspectionId', async (req, res) => {
     try {
         const { inspectionId } = req.params;
@@ -1277,9 +1322,18 @@ router.get('/api/action-plan/:inspectionId', async (req, res) => {
         const result = await pool.request()
             .input('inspectionId', sql.Int, inspectionId)
             .query(`
-                SELECT * FROM OE_InspectionActionItems
-                WHERE InspectionId = @inspectionId
-                ORDER BY Priority DESC, CreatedAt
+                SELECT ai.*, 
+                    v.Id as VerificationId,
+                    v.VerificationStatus,
+                    v.VerificationNotes,
+                    v.VerificationPictureUrl,
+                    v.VerifiedAt,
+                    u.DisplayName as VerifiedByName
+                FROM OE_InspectionActionItems ai
+                LEFT JOIN OE_ActionItemVerification v ON v.ActionItemId = ai.Id
+                LEFT JOIN Users u ON v.VerifiedBy = u.Id
+                WHERE ai.InspectionId = @inspectionId
+                ORDER BY ai.Priority DESC, ai.CreatedAt
             `);
         
         await pool.close();
@@ -2362,8 +2416,8 @@ router.get('/api/audits/:auditId/fridge-readings', async (req, res) => {
     }
 });
 
-// Get action plan for a document
-router.get('/api/action-plan/:documentNumber', async (req, res) => {
+// Get action plan for a document (with verification status)
+router.get('/api/action-plan/by-doc/:documentNumber', async (req, res) => {
     try {
         const { documentNumber } = req.params;
         const pool = await sql.connect(dbConfig);
@@ -2373,10 +2427,14 @@ router.get('/api/action-plan/:documentNumber', async (req, res) => {
             .query(`
                 SELECT 
                     a.Id, a.ReferenceValue, a.SectionName, a.Finding, 
-                    a.SuggestedAction, a.Action, a.Responsible as PersonInCharge, 
-                    a.Deadline, a.Priority, a.Status, a.Department
+                    a.SuggestedAction, a.Action as ActionTaken, a.Responsible as PersonInCharge, 
+                    a.Deadline, a.Priority, a.Status, a.Department,
+                    v.VerificationStatus, v.VerificationNotes, v.VerificationPictureUrl, v.VerifiedAt,
+                    u.DisplayName as VerifiedByName
                 FROM OE_InspectionActionItems a
                 INNER JOIN OE_Inspections i ON a.InspectionId = i.Id
+                LEFT JOIN OE_ActionItemVerification v ON v.ActionItemId = a.Id
+                LEFT JOIN Users u ON v.VerifiedBy = u.Id
                 WHERE i.DocumentNumber = @documentNumber
                 ORDER BY a.Priority DESC, a.ReferenceValue
             `);
@@ -2421,7 +2479,7 @@ router.post('/api/action-plan/save', async (req, res) => {
                 // Update existing
                 await pool.request()
                     .input('id', sql.Int, existingResult.recordset[0].Id)
-                    .input('action', sql.NVarChar, action.action || null)
+                    .input('action', sql.NVarChar, action.actionTaken || action.action || null)
                     .input('responsible', sql.NVarChar, action.personInCharge || null)
                     .input('deadline', sql.Date, action.deadline || null)
                     .input('status', sql.NVarChar, action.status || 'Open')
@@ -2439,7 +2497,7 @@ router.post('/api/action-plan/save', async (req, res) => {
                     .input('sectionName', sql.NVarChar, action.section || null)
                     .input('finding', sql.NVarChar, action.finding || null)
                     .input('suggestedAction', sql.NVarChar, action.suggestedAction || null)
-                    .input('action', sql.NVarChar, action.action || null)
+                    .input('action', sql.NVarChar, action.actionTaken || action.action || null)
                     .input('responsible', sql.NVarChar, action.personInCharge || null)
                     .input('deadline', sql.Date, action.deadline || null)
                     .input('priority', sql.NVarChar, action.priority || 'Medium')
@@ -3144,6 +3202,220 @@ router.get('/api/schedules/data/templates', async (req, res) => {
         res.json({ success: true, data: result.recordset });
     } catch (error) {
         console.error('Error fetching templates:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ==========================================
+// Implementation Verification API Routes
+// ==========================================
+
+// Get inspections with action plans for verification (completed by store managers)
+router.get('/api/verification/inspections', async (req, res) => {
+    try {
+        const { status } = req.query; // 'pending', 'verified', 'all'
+        const pool = await sql.connect(dbConfig);
+        
+        let statusFilter = '';
+        if (status === 'pending') {
+            // Inspections where at least one action item is not yet verified
+            statusFilter = `AND EXISTS (
+                SELECT 1 FROM OE_InspectionActionItems ai 
+                WHERE ai.InspectionId = i.Id
+                AND NOT EXISTS (SELECT 1 FROM OE_ActionItemVerification v WHERE v.ActionItemId = ai.Id)
+            )`;
+        } else if (status === 'verified') {
+            // Inspections where all action items have been verified
+            statusFilter = `AND NOT EXISTS (
+                SELECT 1 FROM OE_InspectionActionItems ai 
+                WHERE ai.InspectionId = i.Id
+                AND NOT EXISTS (SELECT 1 FROM OE_ActionItemVerification v WHERE v.ActionItemId = ai.Id)
+            ) AND EXISTS (SELECT 1 FROM OE_ActionItemVerification v WHERE v.InspectionId = i.Id)`;
+        }
+        
+        const result = await pool.request()
+            .query(`
+                SELECT 
+                    i.Id,
+                    i.DocumentNumber,
+                    i.StoreName,
+                    i.InspectionDate,
+                    i.Status as InspectionStatus,
+                    (SELECT COUNT(*) FROM OE_InspectionActionItems ai WHERE ai.InspectionId = i.Id) as TotalActionItems,
+                    (SELECT COUNT(*) FROM OE_InspectionActionItems ai WHERE ai.InspectionId = i.Id AND ai.Status IN ('Completed', 'In Progress', 'Deferred')) as RespondedItems,
+                    (SELECT COUNT(*) FROM OE_ActionItemVerification v WHERE v.InspectionId = i.Id) as VerifiedItems,
+                    (SELECT COUNT(*) FROM OE_ActionItemVerification v WHERE v.InspectionId = i.Id AND v.VerificationStatus = 'Verified Complete') as VerifiedComplete,
+                    (SELECT COUNT(*) FROM OE_ActionItemVerification v WHERE v.InspectionId = i.Id AND v.VerificationStatus = 'Verified Not Complete') as VerifiedNotComplete
+                FROM OE_Inspections i
+                WHERE i.Status = 'Completed'
+                  AND EXISTS (SELECT 1 FROM OE_InspectionActionItems ai WHERE ai.InspectionId = i.Id)
+                  ${statusFilter}
+                ORDER BY i.InspectionDate DESC
+            `);
+        
+        await pool.close();
+        res.json({ success: true, data: result.recordset });
+    } catch (error) {
+        console.error('Error fetching verification inspections:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get action items for a specific inspection (for verification)
+router.get('/api/verification/inspection/:inspectionId', async (req, res) => {
+    try {
+        const { inspectionId } = req.params;
+        const pool = await sql.connect(dbConfig);
+        
+        // Get inspection details
+        const inspectionResult = await pool.request()
+            .input('inspectionId', sql.Int, inspectionId)
+            .query(`
+                SELECT Id, DocumentNumber, StoreName, InspectionDate, Inspectors
+                FROM OE_Inspections WHERE Id = @inspectionId
+            `);
+        
+        // Get action items with verification status
+        const actionItemsResult = await pool.request()
+            .input('inspectionId', sql.Int, inspectionId)
+            .query(`
+                SELECT 
+                    ai.Id,
+                    ai.SectionName,
+                    ai.ReferenceValue,
+                    COALESCE(ai.Finding, ii.Finding, ii.Question) as Finding,
+                    ai.SuggestedAction,
+                    ai.Action,
+                    ai.Responsible,
+                    ai.Department,
+                    ai.Deadline,
+                    ai.Priority,
+                    ai.Status,
+                    ai.CompletionDate,
+                    ai.CompletionNotes,
+                    ai.BeforeImageUrl,
+                    ai.AfterImageUrl,
+                    ii.Answer as InspectionAnswer,
+                    v.Id as VerificationId,
+                    v.VerificationStatus,
+                    v.VerificationNotes,
+                    v.VerificationPictureUrl,
+                    v.VerifiedAt,
+                    u.DisplayName as VerifiedByName
+                FROM OE_InspectionActionItems ai
+                LEFT JOIN OE_InspectionItems ii ON ii.InspectionId = ai.InspectionId AND ii.ReferenceValue = ai.ReferenceValue
+                LEFT JOIN OE_ActionItemVerification v ON v.ActionItemId = ai.Id
+                LEFT JOIN Users u ON v.VerifiedBy = u.Id
+                WHERE ai.InspectionId = @inspectionId
+                ORDER BY ai.SectionName, ai.Id
+            `);
+        
+        await pool.close();
+        res.json({ 
+            success: true, 
+            inspection: inspectionResult.recordset[0],
+            actionItems: actionItemsResult.recordset 
+        });
+    } catch (error) {
+        console.error('Error fetching inspection for verification:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Submit verification for an action item
+router.post('/api/verification/submit', async (req, res) => {
+    try {
+        const { actionItemId, inspectionId, verificationStatus, verificationNotes, verificationPictureUrl } = req.body;
+        const verifiedBy = req.session?.user?.id || 1;
+        
+        const pool = await sql.connect(dbConfig);
+        
+        // Check if verification already exists
+        const existingResult = await pool.request()
+            .input('actionItemId', sql.Int, actionItemId)
+            .query('SELECT Id FROM OE_ActionItemVerification WHERE ActionItemId = @actionItemId');
+        
+        if (existingResult.recordset.length > 0) {
+            // Update existing verification
+            await pool.request()
+                .input('id', sql.Int, existingResult.recordset[0].Id)
+                .input('verificationStatus', sql.NVarChar, verificationStatus)
+                .input('verificationNotes', sql.NVarChar, verificationNotes || null)
+                .input('verificationPictureUrl', sql.NVarChar, verificationPictureUrl || null)
+                .input('verifiedBy', sql.Int, verifiedBy)
+                .query(`
+                    UPDATE OE_ActionItemVerification 
+                    SET VerificationStatus = @verificationStatus,
+                        VerificationNotes = @verificationNotes,
+                        VerificationPictureUrl = @verificationPictureUrl,
+                        VerifiedBy = @verifiedBy,
+                        VerifiedAt = GETDATE(),
+                        UpdatedAt = GETDATE()
+                    WHERE Id = @id
+                `);
+        } else {
+            // Insert new verification
+            await pool.request()
+                .input('actionItemId', sql.Int, actionItemId)
+                .input('inspectionId', sql.Int, inspectionId)
+                .input('verifiedBy', sql.Int, verifiedBy)
+                .input('verificationStatus', sql.NVarChar, verificationStatus)
+                .input('verificationNotes', sql.NVarChar, verificationNotes || null)
+                .input('verificationPictureUrl', sql.NVarChar, verificationPictureUrl || null)
+                .query(`
+                    INSERT INTO OE_ActionItemVerification 
+                    (ActionItemId, InspectionId, VerifiedBy, VerificationStatus, VerificationNotes, VerificationPictureUrl, VerifiedAt)
+                    VALUES (@actionItemId, @inspectionId, @verifiedBy, @verificationStatus, @verificationNotes, @verificationPictureUrl, GETDATE())
+                `);
+        }
+        
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error submitting verification:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Upload verification picture
+router.post('/api/verification/upload-picture', verificationUpload.single('picture'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: 'No file uploaded' });
+        }
+        
+        res.json({ success: true, url: `/uploads/verification/${req.file.filename}` });
+    } catch (error) {
+        console.error('Error uploading verification picture:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get verification summary stats
+router.get('/api/verification/stats', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        const result = await pool.request()
+            .query(`
+                SELECT 
+                    (SELECT COUNT(DISTINCT i.Id) FROM OE_Inspections i
+                     WHERE i.Status = 'Completed'
+                     AND EXISTS (
+                         SELECT 1 FROM OE_InspectionActionItems ai 
+                         WHERE ai.InspectionId = i.Id
+                         AND NOT EXISTS (SELECT 1 FROM OE_ActionItemVerification v WHERE v.ActionItemId = ai.Id)
+                     )) as PendingVerification,
+                    (SELECT COUNT(DISTINCT i.Id) FROM OE_Inspections i
+                     WHERE EXISTS (SELECT 1 FROM OE_ActionItemVerification v WHERE v.InspectionId = i.Id)) as Verified,
+                    (SELECT COUNT(*) FROM OE_ActionItemVerification WHERE VerificationStatus = 'Verified Complete') as VerifiedComplete,
+                    (SELECT COUNT(*) FROM OE_ActionItemVerification WHERE VerificationStatus = 'Verified Not Complete') as VerifiedNotComplete
+            `);
+        
+        await pool.close();
+        res.json({ success: true, data: result.recordset[0] });
+    } catch (error) {
+        console.error('Error fetching verification stats:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

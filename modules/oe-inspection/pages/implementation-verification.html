@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Implementation Verification - OE Inspection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 25px 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .back-btn {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .back-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
+
+        /* Main Content */
+        .main-content {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+            padding: 30px;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 15px;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            border: none;
+            background: #f0f0f0;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tab:hover {
+            background: #e0e0e0;
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .tab-badge {
+            background: rgba(255,255,255,0.3);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .tab.active .tab-badge {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* Table */
+        .inspections-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .inspections-table th,
+        .inspections-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .inspections-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+
+        .inspections-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .inspections-table .clickable {
+            cursor: pointer;
+        }
+
+        /* Status Badges */
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-pending {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .status-verified {
+            background: #d1fae5;
+            color: #059669;
+        }
+
+        .status-partial {
+            background: #dbeafe;
+            color: #2563eb;
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+
+        .progress-complete {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+
+        .progress-incomplete {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+
+        /* Verify Button */
+        .verify-btn {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .verify-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.4);
+        }
+
+        .view-btn {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+
+        .view-btn:hover {
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #888;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .empty-state h3 {
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .tabs {
+                flex-wrap: wrap;
+            }
+
+            .inspections-table {
+                font-size: 13px;
+            }
+
+            .inspections-table th,
+            .inspections-table td {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>✅ Implementation Verification</h1>
+            <a href="/oe-inspection" class="back-btn">← Back to Dashboard</a>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" style="color: #f59e0b;" id="statPending">-</div>
+                <div class="stat-label">Pending Verification</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color: #10b981;" id="statVerified">-</div>
+                <div class="stat-label">Verified Inspections</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color: #3b82f6;" id="statComplete">-</div>
+                <div class="stat-label">Verified Complete</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color: #ef4444;" id="statNotComplete">-</div>
+                <div class="stat-label">Verified Not Complete</div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab active" data-status="pending" onclick="switchTab('pending')">
+                    🕐 Pending Verification
+                    <span class="tab-badge" id="tabPendingCount">0</span>
+                </button>
+                <button class="tab" data-status="verified" onclick="switchTab('verified')">
+                    ✅ Verified
+                    <span class="tab-badge" id="tabVerifiedCount">0</span>
+                </button>
+                <button class="tab" data-status="all" onclick="switchTab('all')">
+                    📋 All
+                </button>
+            </div>
+
+            <!-- Table -->
+            <table class="inspections-table">
+                <thead>
+                    <tr>
+                        <th>Document #</th>
+                        <th>Store</th>
+                        <th>Inspection Date</th>
+                        <th>Action Items</th>
+                        <th>Verification Progress</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="inspectionsBody">
+                    <tr><td colspan="7" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let currentStatus = 'pending';
+        let allInspections = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStats();
+            loadInspections();
+        });
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/oe-inspection/api/verification/stats');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const stats = data.data;
+                    document.getElementById('statPending').textContent = stats.PendingVerification || 0;
+                    document.getElementById('statVerified').textContent = stats.Verified || 0;
+                    document.getElementById('statComplete').textContent = stats.VerifiedComplete || 0;
+                    document.getElementById('statNotComplete').textContent = stats.VerifiedNotComplete || 0;
+                    
+                    document.getElementById('tabPendingCount').textContent = stats.PendingVerification || 0;
+                    document.getElementById('tabVerifiedCount').textContent = stats.Verified || 0;
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        async function loadInspections() {
+            try {
+                const response = await fetch(`/oe-inspection/api/verification/inspections?status=${currentStatus}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    allInspections = data.data;
+                    renderInspections();
+                }
+            } catch (error) {
+                console.error('Error loading inspections:', error);
+                document.getElementById('inspectionsBody').innerHTML = `
+                    <tr><td colspan="7" class="empty-state">Error loading data</td></tr>
+                `;
+            }
+        }
+
+        function renderInspections() {
+            const tbody = document.getElementById('inspectionsBody');
+            
+            if (allInspections.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">${currentStatus === 'pending' ? '🕐' : '✅'}</div>
+                                <h3>${currentStatus === 'pending' ? 'No Pending Verifications' : 'No Verified Inspections'}</h3>
+                                <p>${currentStatus === 'pending' ? 'All action plans have been verified.' : 'No inspections have been verified yet.'}</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = allInspections.map(inspection => {
+                const closedItems = inspection.ClosedActionItems || 0;
+                const verifiedItems = inspection.VerifiedItems || 0;
+                const progress = closedItems > 0 ? Math.round((verifiedItems / closedItems) * 100) : 0;
+                
+                let statusClass = 'status-pending';
+                let statusText = 'Pending';
+                
+                if (verifiedItems === closedItems && verifiedItems > 0) {
+                    statusClass = 'status-verified';
+                    statusText = 'Verified';
+                } else if (verifiedItems > 0) {
+                    statusClass = 'status-partial';
+                    statusText = 'In Progress';
+                }
+
+                const btnClass = verifiedItems === closedItems && verifiedItems > 0 ? 'verify-btn view-btn' : 'verify-btn';
+                const btnText = verifiedItems === closedItems && verifiedItems > 0 ? '👁️ View' : '✅ Verify';
+
+                return `
+                    <tr class="clickable" onclick="openVerification(${inspection.Id})">
+                        <td><strong>${inspection.DocumentNumber}</strong></td>
+                        <td>${inspection.StoreName}</td>
+                        <td>${new Date(inspection.InspectionDate).toLocaleDateString()}</td>
+                        <td>
+                            <strong>${verifiedItems}</strong> / ${closedItems} verified
+                            <div style="font-size: 11px; color: #888;">
+                                ✅ ${inspection.VerifiedComplete || 0} complete, 
+                                ❌ ${inspection.VerifiedNotComplete || 0} not complete
+                            </div>
+                        </td>
+                        <td>
+                            <div class="progress-container">
+                                <div class="progress-bar progress-complete" style="width: ${progress}%"></div>
+                            </div>
+                            <div style="font-size: 11px; color: #888; margin-top: 4px;">${progress}%</div>
+                        </td>
+                        <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                        <td>
+                            <a href="/oe-inspection/implementation-verification/${inspection.Id}" class="${btnClass}" onclick="event.stopPropagation()">
+                                ${btnText}
+                            </a>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function switchTab(status) {
+            currentStatus = status;
+            
+            // Update tab styles
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+                if (tab.dataset.status === status) {
+                    tab.classList.add('active');
+                }
+            });
+            
+            // Reload data
+            loadInspections();
+        }
+
+        function openVerification(inspectionId) {
+            window.location.href = `/oe-inspection/implementation-verification/${inspectionId}`;
+        }
+    </script>
+</body>
+</html>

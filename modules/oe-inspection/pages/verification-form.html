@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Action Plan - OE Inspection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 25px 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .back-btn {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .back-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .inspection-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .info-value {
+            font-weight: 600;
+            color: #333;
+        }
+
+        /* Progress Bar */
+        .progress-section {
+            background: white;
+            border-radius: 15px;
+            padding: 20px 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .progress-text {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .progress-stats {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+        }
+
+        .progress-stats span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 12px;
+            background: #e0e0e0;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border-radius: 6px;
+            transition: width 0.5s;
+        }
+
+        /* Action Items */
+        .action-items-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .action-item-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .action-item-header {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 20px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1px solid #e0e0e0;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .action-item-header:hover {
+            background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+        }
+
+        .action-item-header .collapse-icon {
+            font-size: 20px;
+            transition: transform 0.3s;
+            margin-left: 15px;
+        }
+
+        .action-item-header.collapsed .collapse-icon {
+            transform: rotate(-90deg);
+        }
+
+        .action-item-body {
+            max-height: 2000px;
+            overflow: hidden;
+            transition: max-height 0.4s ease-in-out, padding 0.3s;
+        }
+
+        .action-item-body.collapsed {
+            max-height: 0;
+            padding: 0 25px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex: 1;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .status-pending {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .status-verified {
+            background: #d1fae5;
+            color: #059669;
+        }
+
+        .action-item-info h3 {
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+
+        .action-item-meta {
+            display: flex;
+            gap: 15px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .action-item-meta span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .priority-badge {
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .priority-high {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .priority-medium {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .priority-low {
+            background: #d1fae5;
+            color: #059669;
+        }
+
+        .priority-critical {
+            background: #f3e8ff;
+            color: #7c3aed;
+        }
+
+        .action-item-body {
+            padding: 25px;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .detail-box {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .detail-box.full-width {
+            grid-column: span 2;
+        }
+
+        .detail-label {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .detail-value {
+            color: #333;
+            line-height: 1.5;
+        }
+
+        /* Store Manager's Response */
+        .store-response {
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .store-response h4 {
+            color: #1e40af;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .response-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .response-item {
+            background: white;
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .response-label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .response-value {
+            color: #333;
+            font-weight: 500;
+        }
+
+        .image-preview {
+            width: 100%;
+            max-height: 200px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+
+        .image-preview:hover {
+            transform: scale(1.02);
+        }
+
+        /* Verification Form */
+        .verification-form {
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+            border: 2px dashed #10b981;
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .verification-form h4 {
+            color: #059669;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .verification-form.verified {
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            border-style: solid;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .status-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .status-btn {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-btn:hover {
+            border-color: #10b981;
+        }
+
+        .status-btn.selected-complete {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border-color: #059669;
+        }
+
+        .status-btn.selected-not-complete {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            border-color: #dc2626;
+        }
+
+        .status-btn .icon {
+            font-size: 24px;
+        }
+
+        /* File Upload */
+        .file-upload {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        .file-upload:hover {
+            border-color: #10b981;
+            background: #f0fdf4;
+        }
+
+        .file-upload input {
+            display: none;
+        }
+
+        .file-upload-preview {
+            max-width: 200px;
+            max-height: 150px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .verification-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        /* Verified Status Display */
+        .verified-status {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .verified-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .verified-complete {
+            background: #d1fae5;
+            color: #059669;
+        }
+
+        .verified-not-complete {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .verified-info {
+            font-size: 13px;
+            color: #666;
+        }
+
+        /* Image Modal */
+        .image-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .image-modal.active {
+            display: flex;
+        }
+
+        .image-modal img {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 10px;
+        }
+
+        .image-modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .details-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .detail-box.full-width {
+                grid-column: span 1;
+            }
+
+            .response-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .status-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-top">
+                <h1>✅ Verify Action Plan</h1>
+                <a href="/oe-inspection/implementation-verification" class="back-btn">← Back to List</a>
+            </div>
+            <div class="inspection-info" id="inspectionInfo">
+                <div class="info-item">
+                    <span class="info-label">Document Number</span>
+                    <span class="info-value" id="docNumber">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Store</span>
+                    <span class="info-value" id="storeName">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Inspection Date</span>
+                    <span class="info-value" id="inspectionDate">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Inspectors</span>
+                    <span class="info-value" id="inspectors">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress -->
+        <div class="progress-section">
+            <div class="progress-header">
+                <span class="progress-text">Verification Progress: <span id="progressPercent">0%</span></span>
+                <div class="progress-stats">
+                    <span>✅ <span id="verifiedComplete">0</span> Complete</span>
+                    <span>❌ <span id="verifiedNotComplete">0</span> Not Complete</span>
+                    <span>🕐 <span id="pendingItems">0</span> Pending</span>
+                </div>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Collapse/Expand Buttons -->
+        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <button onclick="collapseAll()" style="padding: 10px 20px; background: #6366f1; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                📁 Collapse All
+            </button>
+            <button onclick="expandAll()" style="padding: 10px 20px; background: #10b981; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                📂 Expand All
+            </button>
+        </div>
+
+        <!-- Action Items -->
+        <div class="action-items-container" id="actionItemsContainer">
+            <div style="text-align: center; padding: 40px; color: #666;">Loading action items...</div>
+        </div>
+    </div>
+
+    <!-- Image Modal -->
+    <div class="image-modal" id="imageModal" onclick="closeImageModal()">
+        <button class="image-modal-close" onclick="closeImageModal()">×</button>
+        <img id="modalImage" src="" alt="Full size image">
+    </div>
+
+    <script>
+        const inspectionId = window.location.pathname.split('/').pop();
+        let inspection = null;
+        let actionItems = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadInspectionData();
+        });
+
+        async function loadInspectionData() {
+            try {
+                const response = await fetch(`/oe-inspection/api/verification/inspection/${inspectionId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    inspection = data.inspection;
+                    actionItems = data.actionItems;
+                    
+                    renderInspectionInfo();
+                    renderActionItems();
+                    updateProgress();
+                }
+            } catch (error) {
+                console.error('Error loading inspection:', error);
+            }
+        }
+
+        function renderInspectionInfo() {
+            document.getElementById('docNumber').textContent = inspection.DocumentNumber;
+            document.getElementById('storeName').textContent = inspection.StoreName;
+            document.getElementById('inspectionDate').textContent = new Date(inspection.InspectionDate).toLocaleDateString();
+            document.getElementById('inspectors').textContent = inspection.Inspectors || '-';
+        }
+
+        function renderActionItems() {
+            const container = document.getElementById('actionItemsContainer');
+            
+            if (actionItems.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #666;">
+                        No action items to verify.
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = actionItems.map((item, index) => {
+                const priorityClass = `priority-${(item.Priority || 'medium').toLowerCase()}`;
+                const isVerified = item.VerificationId !== null;
+                const statusClass = isVerified ? 'status-verified' : 'status-pending';
+                const statusText = isVerified ? '✅ Verified' : '⏳ Pending';
+                
+                return `
+                    <div class="action-item-card" id="item-${item.Id}">
+                        <div class="action-item-header" onclick="toggleCard(${item.Id})">
+                            <div class="header-left">
+                                <span class="collapse-icon" id="icon-${item.Id}">▼</span>
+                                <div class="action-item-info">
+                                    <h3>${item.SectionName} - ${item.ReferenceValue || 'Finding'}</h3>
+                                    <div class="action-item-meta">
+                                        <span>📋 ${item.Department || 'General'}</span>
+                                        <span>👤 ${item.Responsible || '-'}</span>
+                                        <span>📅 Due: ${item.Deadline ? new Date(item.Deadline).toLocaleDateString() : '-'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="header-right">
+                                <span class="status-indicator ${statusClass}">${statusText}</span>
+                                <span class="priority-badge ${priorityClass}">${item.Priority || 'Medium'}</span>
+                            </div>
+                        </div>
+                        <div class="action-item-body" id="body-${item.Id}">
+                            <!-- Finding Details -->
+                            <div class="details-grid">
+                                <div class="detail-box full-width">
+                                    <div class="detail-label">📋 Finding / Question</div>
+                                    <div class="detail-value">${item.Finding || '-'}</div>
+                                </div>
+                                <div class="detail-box">
+                                    <div class="detail-label">🔍 Inspection Result</div>
+                                    <div class="detail-value" style="color: ${item.InspectionAnswer === 'No' ? '#ef4444' : '#f59e0b'}; font-weight: 600;">
+                                        ${item.InspectionAnswer || '-'}
+                                    </div>
+                                </div>
+                                <div class="detail-box">
+                                    <div class="detail-label">Suggested Action</div>
+                                    <div class="detail-value">${item.SuggestedAction || '-'}</div>
+                                </div>
+                                <div class="detail-box">
+                                    <div class="detail-label">Current Status</div>
+                                    <div class="detail-value">${item.Status}</div>
+                                </div>
+                            </div>
+
+                            <!-- Store Manager's Response -->
+                            <div class="store-response">
+                                <h4>🏪 Store Manager's Response</h4>
+                                <div class="response-grid">
+                                    <div class="response-item">
+                                        <div class="response-label">Action Taken</div>
+                                        <div class="response-value">${item.Action || '-'}</div>
+                                    </div>
+                                    <div class="response-item">
+                                        <div class="response-label">Completion Notes</div>
+                                        <div class="response-value">${item.CompletionNotes || '-'}</div>
+                                    </div>
+                                    <div class="response-item">
+                                        <div class="response-label">Before Image</div>
+                                        ${item.BeforeImageUrl ? `<img src="${item.BeforeImageUrl}" class="image-preview" onclick="openImageModal('${item.BeforeImageUrl}')">` : '<div class="response-value">No image</div>'}
+                                    </div>
+                                    <div class="response-item">
+                                        <div class="response-label">After Image</div>
+                                        ${item.AfterImageUrl ? `<img src="${item.AfterImageUrl}" class="image-preview" onclick="openImageModal('${item.AfterImageUrl}')">` : '<div class="response-value">No image</div>'}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Verification Form -->
+                            <div class="verification-form ${isVerified ? 'verified' : ''}" id="form-${item.Id}">
+                                <h4>${isVerified ? '✅ Verification Complete' : '🔍 Your Verification'}</h4>
+                                
+                                ${isVerified ? `
+                                    <div class="verified-status">
+                                        <span class="verified-badge ${item.VerificationStatus === 'Verified Complete' ? 'verified-complete' : 'verified-not-complete'}">
+                                            ${item.VerificationStatus === 'Verified Complete' ? '✅ Verified Complete' : '❌ Verified Not Complete'}
+                                        </span>
+                                        <span class="verified-info">
+                                            by ${item.VerifiedByName} on ${new Date(item.VerifiedAt).toLocaleString()}
+                                        </span>
+                                    </div>
+                                ` : ''}
+
+                                <div class="form-group">
+                                    <label>Verification Status</label>
+                                    <div class="status-buttons">
+                                        <button type="button" class="status-btn ${item.VerificationStatus === 'Verified Complete' ? 'selected-complete' : ''}" 
+                                                onclick="selectStatus(${item.Id}, 'Verified Complete')" id="btn-complete-${item.Id}">
+                                            <span class="icon">✅</span>
+                                            <span>Verified Complete</span>
+                                        </button>
+                                        <button type="button" class="status-btn ${item.VerificationStatus === 'Verified Not Complete' ? 'selected-not-complete' : ''}" 
+                                                onclick="selectStatus(${item.Id}, 'Verified Not Complete')" id="btn-not-complete-${item.Id}">
+                                            <span class="icon">❌</span>
+                                            <span>Not Complete</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Verification Photo</label>
+                                        <div class="file-upload" onclick="document.getElementById('file-${item.Id}').click()">
+                                            <input type="file" id="file-${item.Id}" accept="image/*" onchange="handleFileUpload(${item.Id}, this)">
+                                            <div>📷 Click to upload verification photo</div>
+                                            ${item.VerificationPictureUrl ? `<img src="${item.VerificationPictureUrl}" class="file-upload-preview" id="preview-${item.Id}">` : `<img class="file-upload-preview" id="preview-${item.Id}" style="display:none">`}
+                                        </div>
+                                        <input type="hidden" id="picture-url-${item.Id}" value="${item.VerificationPictureUrl || ''}">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Verification Notes</label>
+                                        <textarea id="notes-${item.Id}" placeholder="Add any notes about your verification...">${item.VerificationNotes || ''}</textarea>
+                                    </div>
+                                </div>
+
+                                <div class="verification-actions">
+                                    <button class="btn btn-primary" onclick="submitVerification(${item.Id})" id="submit-${item.Id}">
+                                        💾 ${isVerified ? 'Update Verification' : 'Save Verification'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateProgress() {
+            const total = actionItems.length;
+            const verified = actionItems.filter(item => item.VerificationId !== null).length;
+            const complete = actionItems.filter(item => item.VerificationStatus === 'Verified Complete').length;
+            const notComplete = actionItems.filter(item => item.VerificationStatus === 'Verified Not Complete').length;
+            const pending = total - verified;
+            
+            const percent = total > 0 ? Math.round((verified / total) * 100) : 0;
+            
+            document.getElementById('progressPercent').textContent = percent + '%';
+            document.getElementById('progressBar').style.width = percent + '%';
+            document.getElementById('verifiedComplete').textContent = complete;
+            document.getElementById('verifiedNotComplete').textContent = notComplete;
+            document.getElementById('pendingItems').textContent = pending;
+        }
+
+        function selectStatus(itemId, status) {
+            // Update button styles
+            const completeBtn = document.getElementById(`btn-complete-${itemId}`);
+            const notCompleteBtn = document.getElementById(`btn-not-complete-${itemId}`);
+            
+            completeBtn.classList.remove('selected-complete');
+            notCompleteBtn.classList.remove('selected-not-complete');
+            
+            if (status === 'Verified Complete') {
+                completeBtn.classList.add('selected-complete');
+            } else {
+                notCompleteBtn.classList.add('selected-not-complete');
+            }
+            
+            // Store selected status
+            completeBtn.dataset.selected = status === 'Verified Complete';
+            notCompleteBtn.dataset.selected = status === 'Verified Not Complete';
+        }
+
+        async function handleFileUpload(itemId, input) {
+            if (!input.files || !input.files[0]) return;
+            
+            const file = input.files[0];
+            const formData = new FormData();
+            formData.append('picture', file);
+            
+            try {
+                const response = await fetch('/oe-inspection/api/verification/upload-picture', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById(`picture-url-${itemId}`).value = data.url;
+                    const preview = document.getElementById(`preview-${itemId}`);
+                    preview.src = data.url;
+                    preview.style.display = 'block';
+                } else {
+                    alert('Error uploading file: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error uploading file:', error);
+                alert('Error uploading file');
+            }
+        }
+
+        async function submitVerification(itemId) {
+            const completeBtn = document.getElementById(`btn-complete-${itemId}`);
+            const notCompleteBtn = document.getElementById(`btn-not-complete-${itemId}`);
+            
+            let status = null;
+            if (completeBtn.classList.contains('selected-complete')) {
+                status = 'Verified Complete';
+            } else if (notCompleteBtn.classList.contains('selected-not-complete')) {
+                status = 'Verified Not Complete';
+            }
+            
+            if (!status) {
+                alert('Please select a verification status');
+                return;
+            }
+            
+            const notes = document.getElementById(`notes-${itemId}`).value;
+            const pictureUrl = document.getElementById(`picture-url-${itemId}`).value;
+            
+            const submitBtn = document.getElementById(`submit-${itemId}`);
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ Saving...';
+            
+            try {
+                const response = await fetch('/oe-inspection/api/verification/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        actionItemId: itemId,
+                        inspectionId: parseInt(inspectionId),
+                        verificationStatus: status,
+                        verificationNotes: notes,
+                        verificationPictureUrl: pictureUrl
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    // Update local data
+                    const item = actionItems.find(i => i.Id === itemId);
+                    if (item) {
+                        item.VerificationId = 1; // Just needs to be truthy
+                        item.VerificationStatus = status;
+                        item.VerificationNotes = notes;
+                        item.VerificationPictureUrl = pictureUrl;
+                    }
+                    
+                    updateProgress();
+                    submitBtn.textContent = '✅ Saved!';
+                    setTimeout(() => {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = '💾 Update Verification';
+                    }, 2000);
+                } else {
+                    alert('Error: ' + data.error);
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '💾 Save Verification';
+                }
+            } catch (error) {
+                console.error('Error submitting verification:', error);
+                alert('Error saving verification');
+                submitBtn.disabled = false;
+                submitBtn.textContent = '💾 Save Verification';
+            }
+        }
+
+        function openImageModal(url) {
+            event.stopPropagation();
+            document.getElementById('modalImage').src = url;
+            document.getElementById('imageModal').classList.add('active');
+        }
+
+        function closeImageModal() {
+            document.getElementById('imageModal').classList.remove('active');
+        }
+
+        // Toggle card collapse/expand
+        function toggleCard(itemId) {
+            const body = document.getElementById(`body-${itemId}`);
+            const header = body.previousElementSibling;
+            const icon = document.getElementById(`icon-${itemId}`);
+            
+            body.classList.toggle('collapsed');
+            header.classList.toggle('collapsed');
+        }
+
+        // Collapse all cards
+        function collapseAll() {
+            actionItems.forEach(item => {
+                const body = document.getElementById(`body-${item.Id}`);
+                const header = body.previousElementSibling;
+                if (body && !body.classList.contains('collapsed')) {
+                    body.classList.add('collapsed');
+                    header.classList.add('collapsed');
+                }
+            });
+        }
+
+        // Expand all cards
+        function expandAll() {
+            actionItems.forEach(item => {
+                const body = document.getElementById(`body-${item.Id}`);
+                const header = body.previousElementSibling;
+                if (body && body.classList.contains('collapsed')) {
+                    body.classList.remove('collapsed');
+                    header.classList.remove('collapsed');
+                }
+            });
+        }
+
+        // Close modal on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeImageModal();
+            }
+        });
+    </script>
+</body>
+</html>
