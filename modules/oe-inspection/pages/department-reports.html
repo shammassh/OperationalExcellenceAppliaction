@@ -363,12 +363,13 @@
                 const data = await response.json();
                 if (data.authenticated) {
                     currentUser = data.user;
-                    document.getElementById('userInfo').textContent = `${data.user.name} (${data.user.role})`;
+                    document.getElementById('userInfo').textContent = `${data.user.displayName || data.user.name} (${data.user.roleName || data.user.role})`;
                 } else {
-                    window.location.href = '/login';
+                    window.location.href = '/auth/login';
                 }
             } catch (error) {
-                window.location.href = '/login';
+                console.error('Auth check failed:', error);
+                // Don't redirect on error - user might still be authenticated
             }
         }
 
