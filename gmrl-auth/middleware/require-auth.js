@@ -20,9 +20,12 @@ async function requireAuth(req, res, next) {
         const sessionToken = req.cookies.auth_token;
         
         if (!sessionToken) {
-            console.log('❌ No session token found');
+            console.log('❌ No session token found in cookies');
             return redirectToLogin(req, res);
         }
+        
+        // Log the token being used (first 8 chars for security)
+        console.log(`🔐 [AUTH-MW] Checking token: ${sessionToken.substring(0, 8)}... for ${req.path}`);
         
         // Validate token format
         if (!SessionManager.isValidTokenFormat(sessionToken)) {

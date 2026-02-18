@@ -265,6 +265,10 @@ function requireFormAccess(options = {}) {
             
             // System Administrators always have access (but NOT when impersonating another user)
             const isImpersonating = req.currentUser.isImpersonating === true;
+            
+            // DEBUG: Log who is making this request
+            console.log(`[FORM-ACCESS] Request from: ${req.currentUser.email} (ID: ${req.currentUser.id}) | Impersonating: ${isImpersonating} | Token: ${req.sessionToken?.substring(0, 8)}...`);
+            
             if (!isImpersonating && req.currentUser.hasRole && req.currentUser.hasRole('System Administrator')) {
                 if (logAccess) {
                     console.log(`[FORM-ACCESS] ✅ System Administrator bypass: ${req.currentUser.email}`);
@@ -311,8 +315,8 @@ function requireFormAccess(options = {}) {
                 return next();
             }
             
-            // Access denied
-            console.log(`[FORM-ACCESS] ❌ DENIED: ${req.currentUser.email} -> ${matchedForm.FormCode} (${action})`);
+            // Access denied - include user ID for debugging
+            console.log(`[FORM-ACCESS] ❌ DENIED: ${req.currentUser.email} (ID:${req.currentUser.id}) -> ${matchedForm.FormCode} (${action}) | Token: ${req.sessionToken?.substring(0,8)}...`);
             
             // Return JSON for API requests
             if (url.includes('/api/')) {

@@ -26,12 +26,15 @@ class LogoutHandler {
                 });
             }
             
-            // Clear cookie
+            // Clear cookies (auth_token AND impersonation cookie)
             res.clearCookie('auth_token', {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
                 sameSite: 'lax'
             });
+            res.clearCookie('impersonate_user_id', { path: '/' });
+            
+            console.log('[LOGOUT] Cleared all session cookies');
             
             // Redirect to login with logout message
             res.redirect('/auth/login?message=logged_out');
@@ -39,8 +42,9 @@ class LogoutHandler {
         } catch (error) {
             console.error('[LOGOUT] Error during logout:', error);
             
-            // Even if there's an error, clear the cookie and redirect
+            // Even if there's an error, clear all cookies and redirect
             res.clearCookie('auth_token');
+            res.clearCookie('impersonate_user_id', { path: '/' });
             res.redirect('/auth/login?error=logout_error');
         }
     }
@@ -50,12 +54,13 @@ class LogoutHandler {
      */
     static async forceLogout(req, res, reason = 'session_expired') {
         try {
-            // Clear cookie
+            // Clear all session cookies
             res.clearCookie('auth_token', {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
                 sameSite: 'lax'
             });
+            res.clearCookie('impersonate_user_id', { path: '/' });
             
             console.log('[LOGOUT] Force logout triggered:', {
                 timestamp: new Date().toISOString(),
@@ -69,6 +74,7 @@ class LogoutHandler {
         } catch (error) {
             console.error('[LOGOUT] Error during force logout:', error);
             res.clearCookie('auth_token');
+            res.clearCookie('impersonate_user_id', { path: '/' });
             res.redirect('/auth/login?error=logout_error');
         }
     }

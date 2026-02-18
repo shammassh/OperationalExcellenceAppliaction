@@ -93,14 +93,22 @@ class OAuthCallbackHandler {
             res.locals.returnUrl = returnUrl;
             
             // Set session cookie (SessionId is the column name in the database)
+            console.log(`🍪 [AUTH] Setting cookie auth_token=${session.SessionId.substring(0, 8)}... for user ${user.email}`);
             res.cookie('auth_token', session.SessionId, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
-                maxAge: 24 * 60 * 60 * 1000 // 24 hours
+                maxAge: 24 * 60 * 60 * 1000, // 24 hours
+                path: '/' // Ensure cookie is set for all paths
             });
+            
+            // IMPORTANT: Clear any impersonation cookie on fresh login
+            // This prevents session confusion when a user logs in after an admin was impersonating
+            res.clearCookie('impersonate_user_id', { path: '/' });
+            console.log(`🧹 [AUTH] Cleared impersonation cookie on fresh login`);
             
             // Log login action
             await this.logAuditAction(user.id, 'LOGIN', req);
+            console.log(`✅ [AUTH] Login complete for ${user.email}, redirecting...`);
             
             // Redirect to returnUrl if present, otherwise redirect based on role
             if (res.locals.returnUrl) {

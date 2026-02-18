@@ -294,8 +294,16 @@ function initializeAuth(app) {
         res.redirect(authUrl);
     });
     
-    // OAuth callback
+    // OAuth callback - NEVER CACHE THIS!
     app.get('/auth/callback', async (req, res) => {
+        // Prevent caching of auth responses
+        res.set({
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'Surrogate-Control': 'no-store'
+        });
+        
         const { code, error } = req.query;
         
         if (error) {
@@ -375,6 +383,52 @@ function initializeAuth(app) {
                 const roleNames = roles.map(r => r.RoleName);
                 const displayRole = roleNames.length > 0 ? roleNames.join(', ') : legacyRoleName;
                 
+                // Load user's form permissions from UserFormAccess
+                const userPermResult = await pool.request()
+                    .input('userId', sql.Int, user.Id)
+                    .query(`SELECT FormCode, CanView, CanCreate, CanEdit, CanDelete FROM UserFormAccess WHERE UserId = @userId`);
+                
+                const permissions = {};
+                userPermResult.recordset.forEach(p => {
+                    permissions[p.FormCode] = { 
+                        canView: p.CanView, 
+                        canCreate: p.CanCreate, 
+                        canEdit: p.CanEdit, 
+                        canDelete: p.CanDelete,
+                        source: 'user'
+                    };
+                });
+                
+                // Also load role-based permissions from RoleFormAccess
+                const roleIds = roles.map(r => r.Id);
+                if (roleIds.length > 0) {
+                    const rolePermResult = await pool.request()
+                        .query(`
+                            SELECT DISTINCT FormCode, 
+                                   MAX(CAST(CanView AS INT)) as CanView,
+                                   MAX(CAST(CanCreate AS INT)) as CanCreate,
+                                   MAX(CAST(CanEdit AS INT)) as CanEdit,
+                                   MAX(CAST(CanDelete AS INT)) as CanDelete
+                            FROM RoleFormAccess 
+                            WHERE RoleId IN (${roleIds.join(',')}) 
+                            GROUP BY FormCode
+                        `);
+                    
+                    rolePermResult.recordset.forEach(p => {
+                        if (!permissions[p.FormCode]) {
+                            permissions[p.FormCode] = { 
+                                canView: p.CanView === 1, 
+                                canCreate: p.CanCreate === 1, 
+                                canEdit: p.CanEdit === 1, 
+                                canDelete: p.CanDelete === 1,
+                                source: 'role'
+                            };
+                        }
+                    });
+                }
+                
+                console.log(`✅ [AUTH] Loaded ${Object.keys(permissions).length} permissions for ${user.Email}`);
+                
                 // Create session with user ID embedded in token
                 const sessionId = generateSessionId(user.Id);
                 const sessionData = {
@@ -385,6 +439,7 @@ function initializeAuth(app) {
                     roleId: user.RoleId,
                     roles: roles,
                     roleNames: roleNames,
+                    permissions: permissions,  // Include permissions in session!
                     accessToken: response.accessToken,
                     isApproved: user.IsApproved,
                     isActive: user.IsActive,
@@ -394,12 +449,22 @@ function initializeAuth(app) {
                 // Store session in SQL database (removes existing sessions for user)
                 await SessionStore.create(user.Id, sessionId, sessionData);
                 
-                // Set session cookie
+                // IMPORTANT: Clear old session cookie FIRST before setting new one
+                res.clearCookie('session_id', { path: '/' });
+                
+                // Set session cookie with explicit path
                 res.cookie('session_id', sessionId, {
                     httpOnly: true,
-                    secure: process.env.APP_URL?.startsWith('https'),
+                    secure: true,  // Always secure for HTTPS
+                    sameSite: 'lax',
+                    path: '/',
                     maxAge: 24 * 60 * 60 * 1000 // 24 hours
                 });
+                
+                // Clear any impersonation cookie on fresh login
+                res.clearCookie('impersonate_user_id', { path: '/' });
+                
+                console.log(`🍪 [AUTH] Cookie set: session_id=${sessionId.substring(0, 20)}... for ${user.Email}`);
                 
                 // Check if user is approved
                 if (!user.IsApproved) {
@@ -580,6 +645,9 @@ function initializeAuth(app) {
 async function requireAuth(req, res, next) {
     const sessionId = req.cookies?.session_id;
     
+    // DEBUG: Log session ID being used
+    console.log(`🔐 [AUTH] Session check: ${sessionId ? sessionId.substring(0, 20) + '...' : 'NO SESSION'} for ${req.path}`);
+    
     // Helper to check if request is an API/AJAX call
     const isApiRequest = req.path.includes('/api/') || 
                          req.xhr || 
@@ -621,6 +689,9 @@ async function requireAuth(req, res, next) {
         }
         return res.redirect('/auth/pending-approval');
     }
+    
+    // DEBUG: Log what user was found in session
+    console.log(`✅ [AUTH] Session resolved to: ${session.email} (ID: ${session.userId})`);
     
     // Attach user to request
     req.currentUser = { ...session };

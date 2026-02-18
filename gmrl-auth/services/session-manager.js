@@ -44,6 +44,9 @@ class SessionManager {
     static async getSession(sessionToken) {
         const pool = await sql.connect(config.database);
         
+        // Log the token being looked up (first 8 chars for security)
+        console.log(`🔍 [SESSION] Looking up session: ${sessionToken.substring(0, 8)}...`);
+        
         // Get main session and user info
         const result = await pool.request()
             .input('sessionToken', sql.NVarChar, sessionToken)
@@ -73,10 +76,12 @@ class SessionManager {
             `);
         
         if (!result.recordset[0]) {
+            console.log(`❌ [SESSION] No session found for token: ${sessionToken.substring(0, 8)}...`);
             return null;
         }
         
         const session = result.recordset[0];
+        console.log(`✅ [SESSION] Found session for user: ${session.email} (ID: ${session.user_db_id})`);
         session.role_id = session.user_db_id ? (await pool.request().input('userId', sql.Int, session.user_db_id).query('SELECT RoleId FROM Users WHERE Id = @userId')).recordset[0]?.RoleId : null;
         
         // Get all user roles (multi-role support)
