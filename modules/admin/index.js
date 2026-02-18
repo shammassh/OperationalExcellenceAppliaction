@@ -1260,6 +1260,41 @@ router.get('/roles/:roleId/permissions', async (req, res) => {
                     .quick-actions button:hover { background: #f5f5f5; }
                     .alert { padding: 15px; border-radius: 8px; margin-bottom: 20px; }
                     .alert-info { background: #e3f2fd; color: #1565c0; }
+                    .search-box {
+                        padding: 12px 15px;
+                        border: 2px solid #e0e0e0;
+                        border-radius: 8px;
+                        font-size: 14px;
+                        width: 300px;
+                        margin-bottom: 15px;
+                        transition: border-color 0.3s;
+                    }
+                    .search-box:focus {
+                        outline: none;
+                        border-color: #6f42c1;
+                    }
+                    .filter-row {
+                        display: flex;
+                        gap: 15px;
+                        align-items: center;
+                        margin-bottom: 15px;
+                        flex-wrap: wrap;
+                    }
+                    .filter-row label {
+                        font-weight: 500;
+                        color: #555;
+                    }
+                    .module-filter {
+                        padding: 10px 15px;
+                        border: 2px solid #e0e0e0;
+                        border-radius: 8px;
+                        font-size: 14px;
+                        min-width: 200px;
+                    }
+                    .results-count {
+                        color: #666;
+                        font-size: 14px;
+                    }
                 </style>
             </head>
             <body>
@@ -1287,6 +1322,16 @@ router.get('/roles/:roleId/permissions', async (req, res) => {
                     <div class="card">
                         <div class="card-header">
                             <div class="card-title">Form Permissions for this Role</div>
+                        </div>
+                        
+                        <div class="filter-row">
+                            <label>🔍 Search:</label>
+                            <input type="text" class="search-box" id="searchForms" placeholder="Search by form name, module, or code..." oninput="filterForms()">
+                            <label>📁 Module:</label>
+                            <select class="module-filter" id="moduleFilter" onchange="filterForms()">
+                                <option value="">All Modules</option>
+                            </select>
+                            <span class="results-count" id="resultsCount"></span>
                         </div>
                         
                         <div class="quick-actions">
@@ -1323,19 +1368,61 @@ router.get('/roles/:roleId/permissions', async (req, res) => {
                 </div>
                 
                 <script>
+                    // Populate module filter dropdown
+                    document.addEventListener('DOMContentLoaded', function() {
+                        const modules = new Set();
+                        document.querySelectorAll('.module-badge').forEach(badge => {
+                            modules.add(badge.textContent.trim());
+                        });
+                        const select = document.getElementById('moduleFilter');
+                        Array.from(modules).sort().forEach(mod => {
+                            const option = document.createElement('option');
+                            option.value = mod;
+                            option.textContent = mod;
+                            select.appendChild(option);
+                        });
+                        updateResultsCount();
+                    });
+
+                    function filterForms() {
+                        const searchTerm = document.getElementById('searchForms').value.toLowerCase();
+                        const moduleFilter = document.getElementById('moduleFilter').value;
+                        const rows = document.querySelectorAll('tbody tr');
+                        
+                        rows.forEach(row => {
+                            const module = row.querySelector('.module-badge')?.textContent.toLowerCase() || '';
+                            const formName = row.querySelector('td:nth-child(2)')?.textContent.toLowerCase() || '';
+                            
+                            const matchesSearch = !searchTerm || 
+                                module.includes(searchTerm) || 
+                                formName.includes(searchTerm);
+                            const matchesModule = !moduleFilter || module.includes(moduleFilter.toLowerCase());
+                            
+                            row.style.display = (matchesSearch && matchesModule) ? '' : 'none';
+                        });
+                        updateResultsCount();
+                    }
+
+                    function updateResultsCount() {
+                        const total = document.querySelectorAll('tbody tr').length;
+                        const visible = document.querySelectorAll('tbody tr:not([style*="display: none"])').length;
+                        document.getElementById('resultsCount').textContent = 
+                            visible === total ? \`Showing all \${total} forms\` : \`Showing \${visible} of \${total} forms\`;
+                    }
+
                     function selectAll() {
-                        document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+                        document.querySelectorAll('tbody tr:not([style*="display: none"]) input[type="checkbox"]').forEach(cb => cb.checked = true);
                     }
                     function deselectAll() {
-                        document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+                        document.querySelectorAll('tbody tr:not([style*="display: none"]) input[type="checkbox"]').forEach(cb => cb.checked = false);
                     }
                     function selectViewOnly() {
                         deselectAll();
-                        document.querySelectorAll('input[name*="[canView]"]').forEach(cb => cb.checked = true);
+                        document.querySelectorAll('tbody tr:not([style*="display: none"]) input[name*="[canView]"]').forEach(cb => cb.checked = true);
                     }
                     function selectViewCreate() {
                         deselectAll();
-                        document.querySelectorAll('input[name*="[canView]"], input[name*="[canCreate]"]').forEach(cb => cb.checked = true);
+                        document.querySelectorAll('tbody tr:not([style*="display: none"]) input[name*="[canView]"], tbody tr:not([style*="display: none"]) input[name*="[canCreate]"]').forEach(cb => cb.checked = true);
                     }
                     function selectFullAccess() {
                         selectAll();
