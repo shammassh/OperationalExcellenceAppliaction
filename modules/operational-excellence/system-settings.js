@@ -103,30 +103,101 @@ router.get('/', (req, res) => {
                 }
                 .header-nav a:hover { background: rgba(255,255,255,0.2); }
                 
-                .container {
-                    max-width: 1400px;
-                    margin: 0 auto;
-                    padding: 30px;
+                .main-layout {
+                    display: flex;
+                    min-height: calc(100vh - 60px);
                 }
                 
-                .page-title {
-                    margin-bottom: 30px;
+                .sidebar {
+                    width: 260px;
+                    background: white;
+                    border-right: 1px solid #e0e0e0;
+                    padding: 20px 0;
+                    overflow-y: auto;
+                    flex-shrink: 0;
                 }
-                .page-title h2 {
-                    font-size: 28px;
+                
+                .sidebar-title {
+                    padding: 0 20px 15px;
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: #999;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                
+                .sidebar-menu {
+                    list-style: none;
+                    padding: 0;
+                    margin: 0;
+                }
+                
+                .sidebar-menu li {
+                    margin-bottom: 2px;
+                }
+                
+                .sidebar-menu a {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 12px 20px;
+                    color: #555;
+                    text-decoration: none;
+                    font-size: 14px;
+                    transition: all 0.2s;
+                    cursor: pointer;
+                    border-left: 3px solid transparent;
+                }
+                
+                .sidebar-menu a:hover {
+                    background: #f5f5f5;
+                    color: #667eea;
+                }
+                
+                .sidebar-menu a.active {
+                    background: linear-gradient(90deg, rgba(102,126,234,0.1) 0%, rgba(255,255,255,0) 100%);
+                    color: #667eea;
+                    font-weight: 600;
+                    border-left-color: #667eea;
+                }
+                
+                .sidebar-menu .menu-icon {
+                    font-size: 16px;
+                    width: 24px;
+                    text-align: center;
+                }
+                
+                .sidebar-divider {
+                    height: 1px;
+                    background: #e0e0e0;
+                    margin: 15px 20px;
+                }
+                
+                .content-area {
+                    flex: 1;
+                    padding: 25px 30px;
+                    background: #f5f5f5;
+                    overflow-y: auto;
+                }
+                
+                .content-header {
+                    margin-bottom: 25px;
+                }
+                
+                .content-header h2 {
+                    font-size: 24px;
                     color: #333;
                     margin-bottom: 5px;
                 }
-                .page-title p {
+                
+                .content-header p {
                     color: #666;
+                    font-size: 14px;
                 }
                 
+                /* Hide old tabs - keep for JS compatibility */
                 .tabs {
-                    display: flex;
-                    gap: 10px;
-                    margin-bottom: 25px;
-                    border-bottom: 2px solid #e0e0e0;
-                    padding-bottom: 0;
+                    display: none;
                 }
                 
                 .tab {
@@ -348,30 +419,64 @@ router.get('/', (req, res) => {
                 </div>
             </div>
             
-            <div class="container">
-                <div class="page-title">
-                    <h2>System Settings</h2>
-                    <p>Manage global settings used across all modules</p>
+            <div class="main-layout">
+                <!-- Sidebar Menu -->
+                <div class="sidebar">
+                    <div class="sidebar-title">General Settings</div>
+                    <ul class="sidebar-menu">
+                        <li><a class="active" data-tab="stores"><span class="menu-icon">🏪</span> Stores</a></li>
+                        <li><a data-tab="categories"><span class="menu-icon">📁</span> Cleaning Categories</a></li>
+                        <li><a data-tab="providers"><span class="menu-icon">🏢</span> Third Party Providers</a></li>
+                    </ul>
+                    
+                    <div class="sidebar-divider"></div>
+                    <div class="sidebar-title">Production</div>
+                    <ul class="sidebar-menu">
+                        <li><a data-tab="schemes"><span class="menu-icon">🏭</span> Outlet Schemes</a></li>
+                        <li><a data-tab="outlets"><span class="menu-icon">🏬</span> Outlets</a></li>
+                        <li><a data-tab="locations"><span class="menu-icon">📍</span> Locations</a></li>
+                        <li><a data-tab="prodcategories"><span class="menu-icon">📂</span> Categories</a></li>
+                        <li><a data-tab="thirdparties"><span class="menu-icon">🤝</span> Third Parties</a></li>
+                        <li><a data-tab="shifts"><span class="menu-icon">⏰</span> Shifts</a></li>
+                        <li><a data-tab="unitcosts"><span class="menu-icon">💰</span> Unit Costs</a></li>
+                    </ul>
+                    
+                    <div class="sidebar-divider"></div>
+                    <div class="sidebar-title">Workflows</div>
+                    <ul class="sidebar-menu">
+                        <li><a data-tab="approvalrules"><span class="menu-icon">📋</span> Approval Rules</a></li>
+                        <li><a data-tab="complaints"><span class="menu-icon">📝</span> Complaint Settings</a></li>
+                    </ul>
+                    
+                    <div class="sidebar-divider"></div>
+                    <div class="sidebar-title">Escalation</div>
+                    <ul class="sidebar-menu">
+                        <li><a data-tab="escalation"><span class="menu-icon">⏰</span> Escalation Settings</a></li>
+                        <li><a data-tab="storeresponsibles"><span class="menu-icon">👤</span> Store Responsibles</a></li>
+                    </ul>
                 </div>
                 
-                <div class="tabs">
-                    <button class="tab active" data-tab="stores">🏪 Stores</button>
-                    <button class="tab" data-tab="categories">📁 Cleaning Categories</button>
-                    <button class="tab" data-tab="providers">🏢 Third Party Providers</button>
-                    <button class="tab" data-tab="schemes">🏭 Outlet Schemes</button>
-                    <button class="tab" data-tab="outlets">🏬 Outlets</button>
-                    <button class="tab" data-tab="locations">📍 Locations</button>
-                    <button class="tab" data-tab="prodcategories">📂 Prod Categories</button>
-                    <button class="tab" data-tab="thirdparties">🤝 Third Parties</button>
-                    <button class="tab" data-tab="shifts">⏰ Shifts</button>
-                    <button class="tab" data-tab="unitcosts">💰 Unit Costs</button>
-                    <button class="tab" data-tab="approvalrules">📋 Approval Rules</button>
-                    <button class="tab" data-tab="complaints">📝 Complaint Settings</button>
-                    <button class="tab" data-tab="escalation">⏰ Escalation Settings</button>
-                    <button class="tab" data-tab="storeresponsibles">👤 Store Responsibles</button>
-                </div>
-                
-                <!-- Stores Tab -->
+                <!-- Content Area -->
+                <div class="content-area">
+                    <!-- Hidden tabs for JS compatibility -->
+                    <div class="tabs" style="display:none;">
+                        <button class="tab active" data-tab="stores">Stores</button>
+                        <button class="tab" data-tab="categories">Categories</button>
+                        <button class="tab" data-tab="providers">Providers</button>
+                        <button class="tab" data-tab="schemes">Schemes</button>
+                        <button class="tab" data-tab="outlets">Outlets</button>
+                        <button class="tab" data-tab="locations">Locations</button>
+                        <button class="tab" data-tab="prodcategories">Prod Categories</button>
+                        <button class="tab" data-tab="thirdparties">Third Parties</button>
+                        <button class="tab" data-tab="shifts">Shifts</button>
+                        <button class="tab" data-tab="unitcosts">Unit Costs</button>
+                        <button class="tab" data-tab="approvalrules">Approval Rules</button>
+                        <button class="tab" data-tab="complaints">Complaints</button>
+                        <button class="tab" data-tab="escalation">Escalation</button>
+                        <button class="tab" data-tab="storeresponsibles">Store Responsibles</button>
+                    </div>
+                    
+                    <!-- Stores Tab -->
                 <div id="stores-tab" class="tab-content active">
                     <div class="section-header">
                         <div class="section-title">Manage Stores</div>
@@ -681,6 +786,8 @@ router.get('/', (req, res) => {
                         <div class="loading">Loading store assignments...</div>
                     </div>
                 </div>
+                </div><!-- End content-area -->
+            </div><!-- End main-layout -->
             
             <!-- Store Modal -->
             <div id="storeModal" class="modal">
@@ -1248,13 +1355,35 @@ router.get('/', (req, res) => {
             </div>
             
             <script>
-                // Tab switching
+                // Tab switching - support both old tabs and new sidebar menu
+                function switchTab(tabName) {
+                    // Update sidebar menu
+                    document.querySelectorAll('.sidebar-menu a').forEach(a => a.classList.remove('active'));
+                    const activeMenu = document.querySelector('.sidebar-menu a[data-tab="' + tabName + '"]');
+                    if (activeMenu) activeMenu.classList.add('active');
+                    
+                    // Update hidden tabs (for compatibility)
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    const activeTab = document.querySelector('.tab[data-tab="' + tabName + '"]');
+                    if (activeTab) activeTab.classList.add('active');
+                    
+                    // Update content
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    const content = document.getElementById(tabName + '-tab');
+                    if (content) content.classList.add('active');
+                }
+                
+                // Sidebar menu click handler
+                document.querySelectorAll('.sidebar-menu a').forEach(menuItem => {
+                    menuItem.addEventListener('click', () => {
+                        switchTab(menuItem.dataset.tab);
+                    });
+                });
+                
+                // Old tab click handler (for compatibility)
                 document.querySelectorAll('.tab').forEach(tab => {
                     tab.addEventListener('click', () => {
-                        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                        tab.classList.add('active');
-                        document.getElementById(tab.dataset.tab + '-tab').classList.add('active');
+                        switchTab(tab.dataset.tab);
                     });
                 });
                 
