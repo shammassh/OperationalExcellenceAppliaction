@@ -1407,6 +1407,13 @@ router.get('/', (req, res) => {
                         
                         // Sixth batch - escalation settings
                         await Promise.all([loadEscalationSettings(), loadStoreResponsibles(), loadAreaManagers()]);
+                        
+                        // Seventh batch - approval settings (loaded after other functions are defined)
+                        if (typeof loadApprovalSettings === 'function') await loadApprovalSettings();
+                        if (typeof loadApprovalRules === 'function') await loadApprovalRules();
+                        
+                        // Eighth batch - complaint categories
+                        if (typeof loadComplaintCategories === 'function') await loadComplaintCategories();
                     } catch (err) {
                         console.error('Error initializing data:', err);
                     }
@@ -2521,9 +2528,7 @@ router.get('/', (req, res) => {
                 let approvalSettingsData = [];
                 let approvalRulesData = [];
                 
-                // Load approval settings on page load
-                loadApprovalSettings();
-                loadApprovalRules();
+                // Note: loadApprovalSettings() and loadApprovalRules() are called from initializeData()
                 
                 async function loadApprovalSettings() {
                     try {
@@ -2697,8 +2702,7 @@ router.get('/', (req, res) => {
                 let selectedCategoryId = null;
                 let selectedTypeId = null;
                 
-                // Load complaint categories on page load
-                loadComplaintCategories();
+                // Note: loadComplaintCategories() is called from initializeData()
                 
                 async function loadComplaintCategories() {
                     try {
