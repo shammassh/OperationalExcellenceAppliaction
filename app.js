@@ -35,6 +35,9 @@ const securityServicesModule = require('./modules/security-services');
 const securityModule = require('./modules/security');
 const escalationModule = require('./modules/escalation');
 
+// Import escalation service for scheduled tasks
+const actionPlanEscalation = require('./services/action-plan-escalation');
+
 const app = express();
 const PORT = process.env.PORT || 3010;
 
@@ -482,6 +485,9 @@ if (USE_HTTPS) {
         console.log(`✅ Server running on ${APP_URL}`);
         console.log(`🔒 SSL Certificate: ${SSL_CERT_PATH}`);
         console.log('='.repeat(60));
+        
+        // Start escalation scheduler
+        startEscalationScheduler();
     });
 } else {
     http.createServer(app).listen(PORT, () => {
@@ -493,7 +499,38 @@ if (USE_HTTPS) {
         if (SSL_KEY_PATH) console.log(`   Key path: ${SSL_KEY_PATH} (exists: ${fs.existsSync(SSL_KEY_PATH)})`);
         if (SSL_CERT_PATH) console.log(`   Cert path: ${SSL_CERT_PATH} (exists: ${fs.existsSync(SSL_CERT_PATH)})`);
         console.log('='.repeat(60));
+        
+        // Start escalation scheduler
+        startEscalationScheduler();
     });
+}
+
+// ==========================================
+// Escalation Scheduler
+// ==========================================
+function startEscalationScheduler() {
+    console.log('[Escalation Scheduler] Starting action plan escalation scheduler...');
+    
+    // Run immediately on startup
+    setTimeout(async () => {
+        try {
+            await actionPlanEscalation.sendDeadlineReminders();
+            await actionPlanEscalation.checkOverdueActionPlans();
+        } catch (err) {
+            console.error('[Escalation Scheduler] Initial run error:', err.message);
+        }
+    }, 10000); // Wait 10 seconds after startup
+    
+    // Run every hour
+    setInterval(async () => {
+        try {
+            console.log('[Escalation Scheduler] Running scheduled escalation check...');
+            await actionPlanEscalation.sendDeadlineReminders();
+            await actionPlanEscalation.checkOverdueActionPlans();
+        } catch (err) {
+            console.error('[Escalation Scheduler] Scheduled run error:', err.message);
+        }
+    }, 60 * 60 * 1000); // Every hour
 }
 
 module.exports = app;

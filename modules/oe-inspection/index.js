@@ -2326,6 +2326,27 @@ router.post('/api/audits/:auditId/complete', async (req, res) => {
             }
         }
         
+        // If action items were created, set the ActionPlanDeadline based on escalation settings
+        if (actionItemsCreated > 0) {
+            try {
+                const settingsResult = await pool.request()
+                    .query("SELECT SettingValue FROM OE_EscalationSettings WHERE SettingKey = 'DeadlineDays'");
+                const deadlineDays = settingsResult.recordset.length > 0 ? parseInt(settingsResult.recordset[0].SettingValue) || 7 : 7;
+                
+                await pool.request()
+                    .input('auditId', sql.Int, auditId)
+                    .input('days', sql.Int, deadlineDays)
+                    .query(`
+                        UPDATE OE_Inspections 
+                        SET ActionPlanDeadline = DATEADD(DAY, @days, GETDATE())
+                        WHERE Id = @auditId
+                    `);
+            } catch (err) {
+                console.error('Error setting action plan deadline:', err);
+                // Non-critical, continue
+            }
+        }
+        
         await pool.close();
         res.json({ success: true, data: { totalScore, actionItemsCreated } });
     } catch (error) {
@@ -2511,6 +2532,41 @@ router.post('/api/action-plan/save', async (req, res) => {
                              @action, @responsible, @deadline, @priority, @status, GETDATE())
                     `);
             }
+        }
+        
+        // Check if all action items are now completed (Completed status)
+        const completionCheck = await pool.request()
+            .input('inspectionId', sql.Int, inspectionId)
+            .query(`
+                SELECT 
+                    COUNT(*) as TotalItems,
+                    SUM(CASE WHEN Status = 'Completed' THEN 1 ELSE 0 END) as CompletedItems
+                FROM OE_InspectionActionItems 
+                WHERE InspectionId = @inspectionId
+            `);
+        
+        const { TotalItems, CompletedItems } = completionCheck.recordset[0];
+        
+        // If all items are completed, mark the action plan as completed
+        if (TotalItems > 0 && TotalItems === CompletedItems) {
+            await pool.request()
+                .input('inspectionId', sql.Int, inspectionId)
+                .query(`
+                    UPDATE OE_Inspections 
+                    SET ActionPlanCompletedAt = GETDATE()
+                    WHERE Id = @inspectionId AND ActionPlanCompletedAt IS NULL
+                `);
+            
+            // Resolve any pending escalations
+            await pool.request()
+                .input('inspectionId', sql.Int, inspectionId)
+                .query(`
+                    UPDATE OE_ActionPlanEscalations 
+                    SET Status = 'Resolved', ResolvedAt = GETDATE()
+                    WHERE InspectionId = @inspectionId AND Status = 'Pending'
+                `);
+            
+            console.log(`[Action Plan] All items completed for inspection ${inspectionId}, marked as completed`);
         }
         
         await pool.close();

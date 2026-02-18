@@ -18,9 +18,10 @@ const dbConfig = {
         trustServerCertificate: process.env.SQL_TRUST_CERT === 'true'
     },
     pool: {
-        max: 20,
-        min: 2,
-        idleTimeoutMillis: 60000
+        max: 50,
+        min: 5,
+        idleTimeoutMillis: 60000,
+        acquireTimeoutMillis: 30000
     }
 };
 
@@ -366,6 +367,8 @@ router.get('/', (req, res) => {
                     <button class="tab" data-tab="unitcosts">💰 Unit Costs</button>
                     <button class="tab" data-tab="approvalrules">📋 Approval Rules</button>
                     <button class="tab" data-tab="complaints">📝 Complaint Settings</button>
+                    <button class="tab" data-tab="escalation">⏰ Escalation Settings</button>
+                    <button class="tab" data-tab="storeresponsibles">👤 Store Responsibles</button>
                 </div>
                 
                 <!-- Stores Tab -->
@@ -598,6 +601,84 @@ router.get('/', (req, res) => {
                                 <div style="color: #ccc; text-align: center; padding: 30px;">👈 Select a type</div>
                             </div>
                         </div>
+                    </div>
+                </div>
+                
+                <!-- Escalation Settings Tab -->
+                <div id="escalation-tab" class="tab-content">
+                    <div style="background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                        <h3 style="color: #667eea; margin-bottom: 20px;">⏰ Action Plan Escalation Settings</h3>
+                        <p style="color: #666; margin-bottom: 25px;">Configure automatic escalation when Store Managers don't complete action plans on time.</p>
+                        
+                        <form id="escalationSettingsForm">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px;">
+                                <div class="form-group">
+                                    <label style="font-weight: 600; margin-bottom: 8px; display: block;">Action Plan Deadline (Days)</label>
+                                    <input type="number" id="escalationDeadlineDays" min="1" max="30" value="7" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px;">
+                                    <small style="color: #888; display: block; margin-top: 5px;">Number of days Store Manager has to complete action plan after inspection</small>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label style="font-weight: 600; margin-bottom: 8px; display: block;">Send Reminder Before (Days)</label>
+                                    <input type="text" id="escalationReminderDays" value="3,1" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px;">
+                                    <small style="color: #888; display: block; margin-top: 5px;">Comma-separated days before deadline to send reminder (e.g., 3,1)</small>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label style="font-weight: 600; margin-bottom: 8px; display: block;">Enable Auto-Escalation</label>
+                                    <select id="escalationEnabled" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px;">
+                                        <option value="true">✅ Enabled</option>
+                                        <option value="false">❌ Disabled</option>
+                                    </select>
+                                    <small style="color: #888; display: block; margin-top: 5px;">Automatically escalate to Area Manager when deadline passes</small>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label style="font-weight: 600; margin-bottom: 8px; display: block;">Email Notifications</label>
+                                    <select id="escalationEmailEnabled" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px;">
+                                        <option value="true">✅ Enabled</option>
+                                        <option value="false">❌ Disabled</option>
+                                    </select>
+                                    <small style="color: #888; display: block; margin-top: 5px;">Send email notifications for escalations</small>
+                                </div>
+                            </div>
+                            
+                            <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #eee;">
+                                <button type="submit" class="btn btn-success">💾 Save Escalation Settings</button>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <div style="background: #fff3cd; border-radius: 10px; padding: 20px; margin-top: 20px; border-left: 4px solid #ffc107;">
+                        <h4 style="color: #856404; margin-bottom: 10px;">💡 How Escalation Works</h4>
+                        <ol style="color: #856404; padding-left: 20px; line-height: 1.8;">
+                            <li>Inspector completes inspection → Action Plan generated</li>
+                            <li>Store Manager receives notification to complete action plan</li>
+                            <li>If not completed within deadline → Assigned Area Manager is notified</li>
+                            <li>Area Manager can contact Store Manager to resolve</li>
+                        </ol>
+                    </div>
+                </div>
+                
+                <!-- Store Responsibles Tab -->
+                <div id="storeresponsibles-tab" class="tab-content">
+                    <div class="section-header">
+                        <div class="section-title">👤 Assign Area Managers to Stores</div>
+                        <button class="btn btn-primary" onclick="openStoreResponsibleModal()">+ Assign Manager</button>
+                    </div>
+                    <p style="color: #666; margin-bottom: 20px;">Assign which Area Manager is responsible for each store. This determines who receives escalation notifications.</p>
+                    
+                    <div style="margin-bottom: 20px; display: flex; gap: 15px; align-items: center;">
+                        <input type="text" id="storeResponsibleSearch" placeholder="🔍 Search stores..." style="padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 8px; width: 300px;">
+                        <select id="storeResponsibleFilter" style="padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                            <option value="">All Stores</option>
+                            <option value="assigned">Assigned Only</option>
+                            <option value="unassigned">Unassigned Only</option>
+                        </select>
+                    </div>
+                    
+                    <div id="storeresponsibles-table">
+                        <div class="loading">Loading store assignments...</div>
                     </div>
                 </div>
             
@@ -1127,6 +1208,45 @@ router.get('/', (req, res) => {
                 </div>
             </div>
             
+            <!-- Store Responsible Modal -->
+            <div id="storeResponsibleModal" class="modal">
+                <div class="modal-content" style="max-width: 500px;">
+                    <div class="modal-header">
+                        <div class="modal-title" id="storeResponsibleModalTitle">Assign Managers to Store</div>
+                        <button class="modal-close" onclick="closeStoreResponsibleModal()">&times;</button>
+                    </div>
+                    <form id="storeResponsibleForm">
+                        <input type="hidden" id="storeResponsibleId" value="">
+                        <div class="form-group">
+                            <label>Store *</label>
+                            <select id="srStoreId" required style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                                <option value="">Select Store...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Area Manager *</label>
+                            <select id="srAreaManagerId" required style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                                <option value="">Loading...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Head of Operations</label>
+                            <select id="srHeadOfOpsId" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                                <option value="">Select Head of Operations (Optional)...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Notes (Optional)</label>
+                            <textarea id="srNotes" rows="3" placeholder="Additional notes..." style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; resize: vertical;"></textarea>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="closeStoreResponsibleModal()">Cancel</button>
+                            <button type="submit" class="btn btn-success">💾 Save Assignment</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
             <script>
                 // Tab switching
                 document.querySelectorAll('.tab').forEach(tab => {
@@ -1138,17 +1258,31 @@ router.get('/', (req, res) => {
                     });
                 });
                 
-                // Load all data on page load
-                loadStores();
-                loadCategories();
-                loadProviders();
-                loadSchemes();
-                loadOutlets();
-                loadLocations();
-                loadProdCategories();
-                loadThirdParties();
-                loadShifts();
-                loadUnitCosts();
+                // Load all data on page load - staggered to prevent connection pool exhaustion
+                async function initializeData() {
+                    try {
+                        // First batch - critical data
+                        await Promise.all([loadStores(), loadCategories()]);
+                        
+                        // Second batch
+                        await Promise.all([loadProviders(), loadSchemes()]);
+                        
+                        // Third batch
+                        await Promise.all([loadOutlets(), loadLocations()]);
+                        
+                        // Fourth batch
+                        await Promise.all([loadProdCategories(), loadThirdParties()]);
+                        
+                        // Fifth batch
+                        await Promise.all([loadShifts(), loadUnitCosts()]);
+                        
+                        // Sixth batch - escalation settings
+                        await Promise.all([loadEscalationSettings(), loadStoreResponsibles(), loadAreaManagers()]);
+                    } catch (err) {
+                        console.error('Error initializing data:', err);
+                    }
+                }
+                initializeData();
                 
                 // Modal functions
                 function openModal(type) {
@@ -2717,6 +2851,290 @@ router.get('/', (req, res) => {
                         showToast('Error deleting ' + type, 'error');
                     }
                 }
+                
+                // ========== ESCALATION SETTINGS ==========
+                async function loadEscalationSettings() {
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/escalation-settings?t=' + Date.now());
+                        const settings = await res.json();
+                        
+                        settings.forEach(s => {
+                            if (s.SettingKey === 'DeadlineDays') {
+                                document.getElementById('escalationDeadlineDays').value = s.SettingValue;
+                            } else if (s.SettingKey === 'ReminderDays') {
+                                document.getElementById('escalationReminderDays').value = s.SettingValue;
+                            } else if (s.SettingKey === 'AutoEscalationEnabled') {
+                                document.getElementById('escalationEnabled').value = s.SettingValue;
+                            } else if (s.SettingKey === 'EmailNotificationEnabled') {
+                                document.getElementById('escalationEmailEnabled').value = s.SettingValue;
+                            }
+                        });
+                    } catch (err) {
+                        console.error('Error loading escalation settings:', err);
+                    }
+                }
+                
+                document.getElementById('escalationSettingsForm').addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    try {
+                        const settings = {
+                            DeadlineDays: document.getElementById('escalationDeadlineDays').value,
+                            ReminderDays: document.getElementById('escalationReminderDays').value,
+                            AutoEscalationEnabled: document.getElementById('escalationEnabled').value,
+                            EmailNotificationEnabled: document.getElementById('escalationEmailEnabled').value
+                        };
+                        
+                        const res = await fetch('/operational-excellence/system-settings/api/escalation-settings', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(settings)
+                        });
+                        
+                        if (res.ok) {
+                            showToast('Escalation settings saved!', 'success');
+                        } else {
+                            showToast('Error saving settings', 'error');
+                        }
+                    } catch (err) {
+                        console.error('Error saving escalation settings:', err);
+                        showToast('Error saving settings', 'error');
+                    }
+                });
+                
+                // ========== STORE RESPONSIBLES ==========
+                let storeResponsiblesData = [];
+                let areaManagersData = [];
+                
+                async function loadStoreResponsibles() {
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/store-responsibles?t=' + Date.now());
+                        storeResponsiblesData = await res.json();
+                        renderStoreResponsiblesTable();
+                    } catch (err) {
+                        console.error('Error loading store responsibles:', err);
+                        document.getElementById('storeresponsibles-table').innerHTML = '<div class="empty-state"><div class="icon">❌</div><p>Error loading data</p></div>';
+                    }
+                }
+                
+                function renderStoreResponsiblesTable() {
+                    const searchTerm = (document.getElementById('storeResponsibleSearch')?.value || '').toLowerCase();
+                    const filter = document.getElementById('storeResponsibleFilter')?.value || '';
+                    
+                    // Create a map of assigned stores
+                    const assignedStoreIds = new Set(storeResponsiblesData.map(sr => sr.StoreId));
+                    
+                    // Build combined list - assigned stores + unassigned stores
+                    const combinedData = storeResponsiblesData.map(sr => ({
+                        ...sr,
+                        isAssigned: true
+                    }));
+                    
+                    // Add unassigned stores
+                    storesData.filter(s => !assignedStoreIds.has(s.Id)).forEach(s => {
+                        combinedData.push({
+                            StoreId: s.Id,
+                            StoreName: s.StoreName,
+                            StoreCode: s.StoreCode,
+                            AreaManagerId: null,
+                            AreaManagerName: null,
+                            HeadOfOpsId: null,
+                            HeadOfOpsName: null,
+                            isAssigned: false
+                        });
+                    });
+                    
+                    let filtered = combinedData;
+                    
+                    // Apply search filter
+                    if (searchTerm) {
+                        filtered = filtered.filter(sr => 
+                            (sr.StoreName || '').toLowerCase().includes(searchTerm) ||
+                            (sr.StoreCode || '').toLowerCase().includes(searchTerm) ||
+                            (sr.AreaManagerName || '').toLowerCase().includes(searchTerm) ||
+                            (sr.HeadOfOpsName || '').toLowerCase().includes(searchTerm)
+                        );
+                    }
+                    
+                    // Apply assignment filter
+                    if (filter === 'assigned') {
+                        filtered = filtered.filter(sr => sr.isAssigned);
+                    } else if (filter === 'unassigned') {
+                        filtered = filtered.filter(sr => !sr.isAssigned);
+                    }
+                    
+                    if (filtered.length === 0) {
+                        document.getElementById('storeresponsibles-table').innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>No stores found</p></div>';
+                        return;
+                    }
+                    
+                    let html = '<table class="data-table"><thead><tr><th>Store</th><th>Code</th><th>Area Manager</th><th>Head of Operations</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+                    
+                    filtered.forEach(sr => {
+                        const statusBadge = sr.isAssigned 
+                            ? '<span style="background: #d4edda; color: #155724; padding: 4px 10px; border-radius: 12px; font-size: 12px;">✅ Assigned</span>'
+                            : '<span style="background: #fff3cd; color: #856404; padding: 4px 10px; border-radius: 12px; font-size: 12px;">⚠️ Unassigned</span>';
+                        
+                        html += '<tr>';
+                        html += '<td><strong>' + (sr.StoreName || '') + '</strong></td>';
+                        html += '<td>' + (sr.StoreCode || '-') + '</td>';
+                        html += '<td>' + (sr.AreaManagerName || '<span style="color: #aaa;">-</span>') + '</td>';
+                        html += '<td>' + (sr.HeadOfOpsName || '<span style="color: #aaa;">-</span>') + '</td>';
+                        html += '<td>' + statusBadge + '</td>';
+                        html += '<td>';
+                        if (sr.isAssigned) {
+                            html += '<button class="btn btn-sm" onclick="editStoreResponsible(' + sr.Id + ')" title="Edit">✏️</button> ';
+                            html += '<button class="btn btn-sm btn-danger" onclick="deleteStoreResponsible(' + sr.Id + ')" title="Remove">🗑️</button>';
+                        } else {
+                            html += '<button class="btn btn-sm btn-primary" onclick="assignStoreManager(' + sr.StoreId + ', \\'' + (sr.StoreName || '').replace(/'/g, "\\\\'") + '\\')">+ Assign</button>';
+                        }
+                        html += '</td>';
+                        html += '</tr>';
+                    });
+                    
+                    html += '</tbody></table>';
+                    document.getElementById('storeresponsibles-table').innerHTML = html;
+                }
+                
+                // Search and filter listeners
+                document.getElementById('storeResponsibleSearch')?.addEventListener('input', renderStoreResponsiblesTable);
+                document.getElementById('storeResponsibleFilter')?.addEventListener('change', renderStoreResponsiblesTable);
+                
+                let headOfOpsData = [];
+                
+                async function loadAreaManagers() {
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/area-managers?t=' + Date.now());
+                        areaManagersData = await res.json();
+                        console.log('Loaded area managers:', areaManagersData.length);
+                    } catch (err) {
+                        console.error('Error loading area managers:', err);
+                        areaManagersData = [];
+                    }
+                }
+                
+                async function loadHeadOfOps() {
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/head-of-operations?t=' + Date.now());
+                        headOfOpsData = await res.json();
+                        console.log('Loaded head of operations:', headOfOpsData.length);
+                    } catch (err) {
+                        console.error('Error loading head of operations:', err);
+                        headOfOpsData = [];
+                    }
+                }
+                
+                async function openStoreResponsibleModal(id = null) {
+                    document.getElementById('storeResponsibleId').value = '';
+                    document.getElementById('storeResponsibleForm').reset();
+                    document.getElementById('storeResponsibleModalTitle').textContent = id ? 'Edit Assignment' : 'Assign Managers to Store';
+                    
+                    // Load data if not already loaded
+                    if (!areaManagersData || areaManagersData.length === 0) {
+                        await loadAreaManagers();
+                    }
+                    if (!headOfOpsData || headOfOpsData.length === 0) {
+                        await loadHeadOfOps();
+                    }
+                    
+                    // Populate stores dropdown
+                    const storeSelect = document.getElementById('srStoreId');
+                    storeSelect.innerHTML = '<option value="">Select Store...</option>';
+                    storesData.forEach(s => {
+                        storeSelect.innerHTML += '<option value="' + s.Id + '">' + s.StoreName + (s.StoreCode ? ' (' + s.StoreCode + ')' : '') + '</option>';
+                    });
+                    
+                    // Populate area managers dropdown
+                    const managerSelect = document.getElementById('srAreaManagerId');
+                    managerSelect.innerHTML = '<option value="">Select Area Manager...</option>';
+                    areaManagersData.forEach(m => {
+                        managerSelect.innerHTML += '<option value="' + m.Id + '">' + m.DisplayName + '</option>';
+                    });
+                    
+                    // Populate head of operations dropdown
+                    const headOfOpsSelect = document.getElementById('srHeadOfOpsId');
+                    headOfOpsSelect.innerHTML = '<option value="">Select Head of Operations (Optional)...</option>';
+                    headOfOpsData.forEach(m => {
+                        headOfOpsSelect.innerHTML += '<option value="' + m.Id + '">' + m.DisplayName + '</option>';
+                    });
+                    
+                    document.getElementById('storeResponsibleModal').classList.add('show');
+                }
+                
+                function closeStoreResponsibleModal() {
+                    document.getElementById('storeResponsibleModal').classList.remove('show');
+                }
+                
+                async function assignStoreManager(storeId, storeName) {
+                    await openStoreResponsibleModal();
+                    document.getElementById('srStoreId').value = storeId;
+                }
+                
+                async function editStoreResponsible(id) {
+                    const sr = storeResponsiblesData.find(s => s.Id === id);
+                    if (!sr) return;
+                    
+                    await openStoreResponsibleModal(id);
+                    document.getElementById('storeResponsibleId').value = id;
+                    document.getElementById('srStoreId').value = sr.StoreId;
+                    document.getElementById('srAreaManagerId').value = sr.AreaManagerId;
+                    document.getElementById('srHeadOfOpsId').value = sr.HeadOfOpsId || '';
+                    document.getElementById('srNotes').value = sr.Notes || '';
+                }
+                
+                async function deleteStoreResponsible(id) {
+                    if (!confirm('Remove this assignment?')) return;
+                    
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/store-responsibles/' + id, {
+                            method: 'DELETE'
+                        });
+                        if (res.ok) {
+                            showToast('Assignment removed', 'success');
+                            await loadStoreResponsibles();
+                        } else {
+                            showToast('Error removing assignment', 'error');
+                        }
+                    } catch (err) {
+                        console.error('Error deleting store responsible:', err);
+                        showToast('Error removing assignment', 'error');
+                    }
+                }
+                
+                document.getElementById('storeResponsibleForm').addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    const id = document.getElementById('storeResponsibleId').value;
+                    const data = {
+                        storeId: document.getElementById('srStoreId').value,
+                        areaManagerId: document.getElementById('srAreaManagerId').value,
+                        headOfOpsId: document.getElementById('srHeadOfOpsId').value || null,
+                        notes: document.getElementById('srNotes').value
+                    };
+                    
+                    try {
+                        const url = id 
+                            ? '/operational-excellence/system-settings/api/store-responsibles/' + id 
+                            : '/operational-excellence/system-settings/api/store-responsibles';
+                        
+                        const res = await fetch(url, {
+                            method: id ? 'PUT' : 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        });
+                        
+                        if (res.ok) {
+                            showToast(id ? 'Assignment updated!' : 'Managers assigned!', 'success');
+                            closeStoreResponsibleModal();
+                            await loadStoreResponsibles();
+                        } else {
+                            const err = await res.json();
+                            showToast(err.error || 'Error saving', 'error');
+                        }
+                    } catch (err) {
+                        console.error('Error saving store responsible:', err);
+                        showToast('Error saving assignment', 'error');
+                    }
+                });
             </script>
         </body>
         </html>
@@ -3814,6 +4232,172 @@ router.get('/api/complaint-config', async (req, res) => {
     } catch (err) {
         console.error('Error fetching complaint config:', err);
         res.status(500).json({ error: 'Failed to fetch config' });
+    }
+});
+
+// ========== ESCALATION SETTINGS API ==========
+router.get('/api/escalation-settings', async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request().query('SELECT * FROM OE_EscalationSettings');
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error fetching escalation settings:', err);
+        res.status(500).json({ error: 'Failed to fetch settings' });
+    }
+});
+
+router.post('/api/escalation-settings', async (req, res) => {
+    try {
+        const settings = req.body;
+        const pool = await getPool();
+        
+        for (const [key, value] of Object.entries(settings)) {
+            await pool.request()
+                .input('key', sql.NVarChar, key)
+                .input('value', sql.NVarChar, value.toString())
+                .input('updatedBy', sql.NVarChar, req.currentUser?.DisplayName || 'System')
+                .query(`
+                    UPDATE OE_EscalationSettings 
+                    SET SettingValue = @value, UpdatedAt = GETDATE(), UpdatedBy = @updatedBy 
+                    WHERE SettingKey = @key
+                `);
+        }
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error saving escalation settings:', err);
+        res.status(500).json({ error: 'Failed to save settings' });
+    }
+});
+
+// ========== STORE RESPONSIBLES API ==========
+router.get('/api/store-responsibles', async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request().query(`
+            SELECT sr.*, 
+                   s.StoreName, s.StoreCode,
+                   u.DisplayName as AreaManagerName,
+                   h.DisplayName as HeadOfOpsName
+            FROM OE_StoreResponsibles sr
+            INNER JOIN Stores s ON sr.StoreId = s.Id
+            INNER JOIN Users u ON sr.AreaManagerId = u.Id
+            LEFT JOIN Users h ON sr.HeadOfOpsId = h.Id
+            WHERE sr.IsActive = 1
+            ORDER BY s.StoreName
+        `);
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error fetching store responsibles:', err);
+        res.status(500).json({ error: 'Failed to fetch data' });
+    }
+});
+
+router.get('/api/area-managers', async (req, res) => {
+    try {
+        const pool = await getPool();
+        // Get users who have Area Manager role (1) only
+        const result = await pool.request().query(`
+            SELECT DISTINCT u.Id, u.DisplayName, u.Email
+            FROM Users u
+            INNER JOIN UserRoleAssignments ura ON u.Id = ura.UserId
+            WHERE ura.RoleId = 1 AND u.IsActive = 1
+            ORDER BY u.DisplayName
+        `);
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error fetching area managers:', err);
+        res.status(500).json({ error: 'Failed to fetch area managers' });
+    }
+});
+
+router.get('/api/head-of-operations', async (req, res) => {
+    try {
+        const pool = await getPool();
+        // Get users who have Head of Operations role (26)
+        const result = await pool.request().query(`
+            SELECT DISTINCT u.Id, u.DisplayName, u.Email
+            FROM Users u
+            INNER JOIN UserRoleAssignments ura ON u.Id = ura.UserId
+            WHERE ura.RoleId = 26 AND u.IsActive = 1
+            ORDER BY u.DisplayName
+        `);
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error fetching head of operations:', err);
+        res.status(500).json({ error: 'Failed to fetch head of operations' });
+    }
+});
+
+router.post('/api/store-responsibles', async (req, res) => {
+    try {
+        const { storeId, areaManagerId, headOfOpsId, notes } = req.body;
+        const pool = await getPool();
+        
+        // Check if store already has an assignment
+        const existing = await pool.request()
+            .input('storeId', sql.Int, storeId)
+            .query('SELECT Id FROM OE_StoreResponsibles WHERE StoreId = @storeId AND IsActive = 1');
+        
+        if (existing.recordset.length > 0) {
+            return res.status(400).json({ error: 'This store already has a manager assigned. Edit or remove the existing assignment first.' });
+        }
+        
+        await pool.request()
+            .input('storeId', sql.Int, storeId)
+            .input('areaManagerId', sql.Int, areaManagerId)
+            .input('headOfOpsId', sql.Int, headOfOpsId || null)
+            .input('notes', sql.NVarChar, notes || null)
+            .input('createdBy', sql.NVarChar, req.currentUser?.DisplayName || 'System')
+            .query(`
+                INSERT INTO OE_StoreResponsibles (StoreId, AreaManagerId, HeadOfOpsId, Notes, CreatedBy, CreatedAt, IsActive)
+                VALUES (@storeId, @areaManagerId, @headOfOpsId, @notes, @createdBy, GETDATE(), 1)
+            `);
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error creating store responsible:', err);
+        res.status(500).json({ error: 'Failed to save assignment' });
+    }
+});
+
+router.put('/api/store-responsibles/:id', async (req, res) => {
+    try {
+        const { storeId, areaManagerId, headOfOpsId, notes } = req.body;
+        const pool = await getPool();
+        
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .input('storeId', sql.Int, storeId)
+            .input('areaManagerId', sql.Int, areaManagerId)
+            .input('headOfOpsId', sql.Int, headOfOpsId || null)
+            .input('notes', sql.NVarChar, notes || null)
+            .input('updatedBy', sql.NVarChar, req.currentUser?.DisplayName || 'System')
+            .query(`
+                UPDATE OE_StoreResponsibles 
+                SET StoreId = @storeId, AreaManagerId = @areaManagerId, HeadOfOpsId = @headOfOpsId, Notes = @notes, 
+                    UpdatedBy = @updatedBy, UpdatedAt = GETDATE()
+                WHERE Id = @id
+            `);
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating store responsible:', err);
+        res.status(500).json({ error: 'Failed to update assignment' });
+    }
+});
+
+router.delete('/api/store-responsibles/:id', async (req, res) => {
+    try {
+        const pool = await getPool();
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query('UPDATE OE_StoreResponsibles SET IsActive = 0 WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting store responsible:', err);
+        res.status(500).json({ error: 'Failed to remove assignment' });
     }
 });
 
