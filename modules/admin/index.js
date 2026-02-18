@@ -3120,4 +3120,463 @@ router.get('/impersonate/stop', (req, res) => {
     res.redirect('/admin/impersonate');
 });
 
+// ==========================================
+// Broadcast Routes
+// ==========================================
+
+// Broadcast page
+router.get('/broadcast', requireSysAdmin, async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        // Get available roles
+        const rolesResult = await pool.request().query(`
+            SELECT Id, RoleName FROM UserRoles ORDER BY RoleName
+        `);
+        
+        // Get recent broadcasts
+        const broadcastsResult = await pool.request().query(`
+            SELECT TOP 20 
+                b.Id, b.Title, b.Message, b.TargetRoles, b.Priority,
+                b.CreatedAt, b.ExpiresAt, b.IsActive,
+                u.DisplayName as CreatedByName,
+                (SELECT COUNT(*) FROM BroadcastReadStatus brs WHERE brs.BroadcastId = b.Id) as ReadCount
+            FROM Broadcasts b
+            JOIN Users u ON b.CreatedBy = u.Id
+            ORDER BY b.CreatedAt DESC
+        `);
+        
+        await pool.close();
+        
+        const roleOptions = rolesResult.recordset.map(r => 
+            `<option value="${r.RoleName}">${r.RoleName}</option>`
+        ).join('');
+        
+        const broadcastRows = broadcastsResult.recordset.map(b => `
+            <tr>
+                <td><strong>${b.Title}</strong></td>
+                <td><span class="role-badges">${b.TargetRoles.split(',').map(r => `<span class="role-badge">${r.trim()}</span>`).join('')}</span></td>
+                <td><span class="priority-${b.Priority.toLowerCase()}">${b.Priority}</span></td>
+                <td>${b.CreatedByName}</td>
+                <td>${new Date(b.CreatedAt).toLocaleString()}</td>
+                <td>${b.ReadCount} read</td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="deleteBroadcast(${b.Id})">Delete</button>
+                </td>
+            </tr>
+        `).join('') || '<tr><td colspan="7" style="text-align:center;color:#666;">No broadcasts yet</td></tr>';
+        
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Send Broadcast - ${process.env.APP_NAME}</title>
+                <style>
+                    * { box-sizing: border-box; margin: 0; padding: 0; }
+                    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f5; min-height: 100vh; }
+                    .header {
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white;
+                        padding: 15px 30px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    }
+                    .header h1 { font-size: 24px; }
+                    .header-nav { display: flex; gap: 15px; }
+                    .header-nav a {
+                        color: white;
+                        text-decoration: none;
+                        padding: 8px 16px;
+                        border-radius: 5px;
+                        background: rgba(255,255,255,0.1);
+                    }
+                    .container { max-width: 1200px; margin: 0 auto; padding: 30px; }
+                    .card {
+                        background: white;
+                        border-radius: 12px;
+                        padding: 25px;
+                        margin-bottom: 25px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+                    }
+                    .card-title { font-size: 20px; font-weight: 600; margin-bottom: 20px; color: #333; }
+                    .form-group { margin-bottom: 20px; }
+                    .form-group label { display: block; margin-bottom: 8px; font-weight: 500; color: #333; }
+                    .form-group input, .form-group select, .form-group textarea {
+                        width: 100%;
+                        padding: 12px;
+                        border: 1px solid #ddd;
+                        border-radius: 8px;
+                        font-size: 14px;
+                    }
+                    .form-group textarea { min-height: 120px; resize: vertical; }
+                    .checkbox-group { display: flex; flex-wrap: wrap; gap: 15px; }
+                    .checkbox-item {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        padding: 8px 15px;
+                        background: #f5f5f5;
+                        border-radius: 6px;
+                        cursor: pointer;
+                    }
+                    .checkbox-item:hover { background: #e8e8e8; }
+                    .checkbox-item input { width: auto; }
+                    .btn {
+                        padding: 12px 25px;
+                        border: none;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        font-weight: 500;
+                    }
+                    .btn-primary {
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white;
+                    }
+                    .btn-danger { background: #dc3545; color: white; }
+                    .btn-sm { padding: 6px 12px; font-size: 12px; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+                    th { background: #f8f9fa; font-weight: 600; }
+                    .role-badge {
+                        display: inline-block;
+                        padding: 3px 10px;
+                        background: #e3f2fd;
+                        color: #1976d2;
+                        border-radius: 12px;
+                        font-size: 12px;
+                        margin: 2px;
+                    }
+                    .priority-high { color: #dc3545; font-weight: 600; }
+                    .priority-normal { color: #6c757d; }
+                    .priority-low { color: #28a745; }
+                    .quick-templates { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+                    .template-btn {
+                        padding: 8px 15px;
+                        background: #f0f0f0;
+                        border: 1px solid #ddd;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-size: 13px;
+                    }
+                    .template-btn:hover { background: #e0e0e0; }
+                    .toast {
+                        position: fixed;
+                        bottom: 30px;
+                        right: 30px;
+                        padding: 15px 25px;
+                        border-radius: 8px;
+                        color: white;
+                        z-index: 1000;
+                        display: none;
+                    }
+                    .toast-success { background: #28a745; }
+                    .toast-error { background: #dc3545; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>📢 Send Broadcast</h1>
+                    <div class="header-nav">
+                        <a href="/admin">← Admin Panel</a>
+                        <a href="/dashboard">Dashboard</a>
+                    </div>
+                </div>
+                
+                <div class="container">
+                    <div class="card">
+                        <div class="card-title">📤 New Broadcast Message</div>
+                        
+                        <div class="quick-templates">
+                            <span style="color:#666;margin-right:10px;">Quick Templates:</span>
+                            <button class="template-btn" onclick="useTemplate('5days')">📅 5 Days Check Reminder</button>
+                            <button class="template-btn" onclick="useTemplate('inspection')">🔍 Inspection Reminder</button>
+                            <button class="template-btn" onclick="useTemplate('cleaning')">🧹 Cleaning Checklist</button>
+                            <button class="template-btn" onclick="useTemplate('safety')">⚠️ Safety Reminder</button>
+                        </div>
+                        
+                        <form id="broadcastForm" onsubmit="sendBroadcast(event)">
+                            <div class="form-group">
+                                <label>Title *</label>
+                                <input type="text" id="title" required placeholder="Enter broadcast title">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Message *</label>
+                                <textarea id="message" required placeholder="Enter your message..."></textarea>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Target Roles * (Select who should receive this)</label>
+                                <div class="checkbox-group">
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="roles" value="Store Manager"> Store Manager
+                                    </label>
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="roles" value="Inspector"> Inspector
+                                    </label>
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="roles" value="Senior Inspector"> Senior Inspector
+                                    </label>
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="roles" value="Area Manager"> Area Manager
+                                    </label>
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="roles" value="Duty Manager"> Duty Manager
+                                    </label>
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="roles" value="OHS Manager"> OHS Manager
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                                <div class="form-group">
+                                    <label>Priority</label>
+                                    <select id="priority">
+                                        <option value="Normal">Normal</option>
+                                        <option value="High">High - Urgent</option>
+                                        <option value="Low">Low</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Expires At (Optional)</label>
+                                    <input type="datetime-local" id="expiresAt">
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary">📢 Send Broadcast</button>
+                        </form>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-title">📋 Recent Broadcasts</div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Target Roles</th>
+                                    <th>Priority</th>
+                                    <th>Sent By</th>
+                                    <th>Sent At</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="broadcastsTable">
+                                ${broadcastRows}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div id="toast" class="toast"></div>
+                
+                <script>
+                    const templates = {
+                        '5days': {
+                            title: '📅 5 Days Expired Items Check Reminder',
+                            message: 'Dear Team,\\n\\nThis is a friendly reminder to complete the 5 Days Expired Items Check for your store.\\n\\nPlease ensure all products within 5 days of expiry are properly identified and managed.\\n\\nThank you for your cooperation!'
+                        },
+                        'inspection': {
+                            title: '🔍 Inspection Due Reminder',
+                            message: 'Dear Team,\\n\\nPlease be reminded that your store inspection is due soon.\\n\\nKindly prepare all required documentation and ensure all areas are in compliance.\\n\\nThank you!'
+                        },
+                        'cleaning': {
+                            title: '🧹 Cleaning Checklist Reminder',
+                            message: 'Dear Team,\\n\\nPlease ensure the daily cleaning checklist is completed and submitted.\\n\\nMaintaining cleanliness standards is essential for food safety compliance.\\n\\nThank you!'
+                        },
+                        'safety': {
+                            title: '⚠️ Safety Compliance Reminder',
+                            message: 'Dear Team,\\n\\nThis is a reminder to review and ensure all safety protocols are being followed in your store.\\n\\nSafety is our top priority!\\n\\nThank you for your attention to this matter.'
+                        }
+                    };
+                    
+                    function useTemplate(key) {
+                        const template = templates[key];
+                        if (template) {
+                            document.getElementById('title').value = template.title;
+                            document.getElementById('message').value = template.message;
+                        }
+                    }
+                    
+                    async function sendBroadcast(e) {
+                        e.preventDefault();
+                        
+                        const selectedRoles = Array.from(document.querySelectorAll('input[name="roles"]:checked')).map(cb => cb.value);
+                        
+                        if (selectedRoles.length === 0) {
+                            showToast('Please select at least one target role', 'error');
+                            return;
+                        }
+                        
+                        const data = {
+                            title: document.getElementById('title').value,
+                            message: document.getElementById('message').value,
+                            targetRoles: selectedRoles.join(', '),
+                            priority: document.getElementById('priority').value,
+                            expiresAt: document.getElementById('expiresAt').value || null
+                        };
+                        
+                        try {
+                            const response = await fetch('/admin/api/broadcast', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(data)
+                            });
+                            
+                            const result = await response.json();
+                            
+                            if (result.success) {
+                                showToast('Broadcast sent successfully!', 'success');
+                                document.getElementById('broadcastForm').reset();
+                                setTimeout(() => location.reload(), 1500);
+                            } else {
+                                showToast(result.error || 'Failed to send broadcast', 'error');
+                            }
+                        } catch (error) {
+                            showToast('Error sending broadcast', 'error');
+                        }
+                    }
+                    
+                    async function deleteBroadcast(id) {
+                        if (!confirm('Are you sure you want to delete this broadcast?')) return;
+                        
+                        try {
+                            const response = await fetch('/admin/api/broadcast/' + id, { method: 'DELETE' });
+                            const result = await response.json();
+                            
+                            if (result.success) {
+                                showToast('Broadcast deleted', 'success');
+                                setTimeout(() => location.reload(), 1000);
+                            }
+                        } catch (error) {
+                            showToast('Error deleting broadcast', 'error');
+                        }
+                    }
+                    
+                    function showToast(message, type) {
+                        const toast = document.getElementById('toast');
+                        toast.textContent = message;
+                        toast.className = 'toast toast-' + type;
+                        toast.style.display = 'block';
+                        setTimeout(() => toast.style.display = 'none', 3000);
+                    }
+                </script>
+            </body>
+            </html>
+        `);
+    } catch (err) {
+        console.error('Error loading broadcast page:', err);
+        res.status(500).send('Error: ' + err.message);
+    }
+});
+
+// Send broadcast API
+router.post('/api/broadcast', requireSysAdmin, async (req, res) => {
+    try {
+        const { title, message, targetRoles, priority, expiresAt } = req.body;
+        
+        const pool = await sql.connect(dbConfig);
+        
+        await pool.request()
+            .input('title', sql.NVarChar, title)
+            .input('message', sql.NVarChar, message)
+            .input('targetRoles', sql.NVarChar, targetRoles)
+            .input('priority', sql.NVarChar, priority || 'Normal')
+            .input('expiresAt', sql.DateTime, expiresAt || null)
+            .input('createdBy', sql.Int, req.currentUser.userId)
+            .query(`
+                INSERT INTO Broadcasts (Title, Message, TargetRoles, Priority, ExpiresAt, CreatedBy)
+                VALUES (@title, @message, @targetRoles, @priority, @expiresAt, @createdBy)
+            `);
+        
+        await pool.close();
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error sending broadcast:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Delete broadcast API
+router.delete('/api/broadcast/:id', requireSysAdmin, async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query('DELETE FROM BroadcastReadStatus WHERE BroadcastId = @id; DELETE FROM Broadcasts WHERE Id = @id');
+        
+        await pool.close();
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting broadcast:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Get broadcasts for current user (to show on dashboard)
+router.get('/api/broadcasts/my', async (req, res) => {
+    try {
+        const userRole = req.currentUser.role;
+        const userId = req.currentUser.userId;
+        
+        const pool = await sql.connect(dbConfig);
+        
+        const result = await pool.request()
+            .input('userId', sql.Int, userId)
+            .query(`
+                SELECT 
+                    b.Id, b.Title, b.Message, b.Priority, b.CreatedAt, b.TargetRoles,
+                    u.DisplayName as SentBy,
+                    CASE WHEN brs.Id IS NOT NULL THEN 1 ELSE 0 END as IsRead
+                FROM Broadcasts b
+                JOIN Users u ON b.CreatedBy = u.Id
+                LEFT JOIN BroadcastReadStatus brs ON brs.BroadcastId = b.Id AND brs.UserId = @userId
+                WHERE b.IsActive = 1
+                AND (b.ExpiresAt IS NULL OR b.ExpiresAt > GETDATE())
+                ORDER BY b.CreatedAt DESC
+            `);
+        
+        // Filter by user's role
+        const broadcasts = result.recordset.filter(b => {
+            const targetRoles = b.TargetRoles ? b.TargetRoles.split(',').map(r => r.trim().toLowerCase()) : [];
+            return targetRoles.includes(userRole.toLowerCase()) || targetRoles.length === 0;
+        });
+        
+        await pool.close();
+        
+        res.json({ success: true, data: broadcasts });
+    } catch (err) {
+        console.error('Error fetching broadcasts:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Mark broadcast as read
+router.post('/api/broadcasts/:id/read', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        await pool.request()
+            .input('broadcastId', sql.Int, req.params.id)
+            .input('userId', sql.Int, req.currentUser.userId)
+            .query(`
+                IF NOT EXISTS (SELECT 1 FROM BroadcastReadStatus WHERE BroadcastId = @broadcastId AND UserId = @userId)
+                INSERT INTO BroadcastReadStatus (BroadcastId, UserId) VALUES (@broadcastId, @userId)
+            `);
+        
+        await pool.close();
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error marking broadcast as read:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 module.exports = router;

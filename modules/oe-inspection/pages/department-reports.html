@@ -315,9 +315,12 @@
 </head>
 <body>
     <div class="header">
-        <h1>📋 Department Reports</h1>
+        <div style="display: flex; align-items: center; gap: 20px;">
+            <a href="/oe-inspection" style="color: white; text-decoration: none; padding: 8px 16px; background: rgba(255,255,255,0.2); border-radius: 6px; font-size: 14px;">← Back</a>
+            <h1>📋 Department Reports</h1>
+        </div>
         <div class="header-right">
-            <span class="user-info" id="userInfo">Loading...</span>
+            <span class="user-info" id="userInfo"></span>
             <button class="logout-btn" onclick="logout()">🚪 Logout</button>
         </div>
     </div>
@@ -359,12 +362,14 @@
 
         async function checkAuth() {
             try {
-                const response = await fetch('/api/session');
-                const data = await response.json();
-                if (data.authenticated) {
-                    currentUser = data.user;
-                    document.getElementById('userInfo').textContent = `${data.user.displayName || data.user.name} (${data.user.roleName || data.user.role})`;
-                } else {
+                const response = await fetch('/auth/session');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.user) {
+                        currentUser = data.user;
+                        document.getElementById('userInfo').textContent = `${data.user.displayName || data.user.email} (${data.user.role})`;
+                    }
+                } else if (response.status === 401 || response.status === 403) {
                     window.location.href = '/auth/login';
                 }
             } catch (error) {

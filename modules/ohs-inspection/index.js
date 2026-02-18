@@ -336,6 +336,103 @@ router.get('/api/department-reports/list/:department', async (req, res) => {
     }
 });
 
+// Get department reports summary data
+router.get('/api/reports/summary', async (req, res) => {
+    try {
+        const { storeId, fromDate, toDate } = req.query;
+        const pool = await sql.connect(dbConfig);
+        
+        // Build WHERE clauses
+        let whereClause = 'WHERE 1=1';
+        if (storeId) whereClause += ' AND i.StoreId = @storeId';
+        if (fromDate) whereClause += ' AND i.InspectionDate >= @fromDate';
+        if (toDate) whereClause += ' AND i.InspectionDate <= @toDate';
+        
+        const request = pool.request();
+        if (storeId) request.input('storeId', sql.Int, storeId);
+        if (fromDate) request.input('fromDate', sql.Date, fromDate);
+        if (toDate) request.input('toDate', sql.Date, toDate);
+        
+        // Get total inspections and average score
+        const summaryResult = await request.query(`
+            SELECT 
+                COUNT(*) as totalInspections,
+                AVG(CAST(i.OverallScore as FLOAT)) as avgScore
+            FROM OHS_Inspections i
+            ${whereClause}
+        `);
+        
+        // Get store performance
+        const storeRequest = pool.request();
+        if (storeId) storeRequest.input('storeId', sql.Int, storeId);
+        if (fromDate) storeRequest.input('fromDate', sql.Date, fromDate);
+        if (toDate) storeRequest.input('toDate', sql.Date, toDate);
+        
+        const storeResult = await storeRequest.query(`
+            SELECT 
+                i.StoreId,
+                i.StoreName as storeName,
+                COUNT(*) as inspectionCount,
+                AVG(CAST(i.OverallScore as FLOAT)) as avgScore,
+                MAX(i.InspectionDate) as lastInspection,
+                (SELECT COUNT(*) FROM OHS_InspectionItems it 
+                 JOIN OHS_Inspections ins ON it.InspectionId = ins.Id 
+                 WHERE ins.StoreId = i.StoreId AND it.Status NOT IN ('Completed', 'N/A')) as openIssues
+            FROM OHS_Inspections i
+            ${whereClause}
+            GROUP BY i.StoreId, i.StoreName
+            ORDER BY storeName
+        `);
+        
+        // Get section analysis
+        const sectionRequest = pool.request();
+        if (storeId) sectionRequest.input('storeId', sql.Int, storeId);
+        if (fromDate) sectionRequest.input('fromDate', sql.Date, fromDate);
+        if (toDate) sectionRequest.input('toDate', sql.Date, toDate);
+        
+        const sectionResult = await sectionRequest.query(`
+            SELECT 
+                it.SectionName as sectionName,
+                COUNT(*) as totalItems,
+                SUM(CASE WHEN it.SelectedChoice = 'Yes' THEN 1 ELSE 0 END) as passedItems,
+                CAST(SUM(CASE WHEN it.SelectedChoice = 'Yes' THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0) as FLOAT) as avgScore
+            FROM OHS_InspectionItems it
+            JOIN OHS_Inspections i ON it.InspectionId = i.Id
+            ${whereClause}
+            GROUP BY it.SectionName
+            ORDER BY avgScore ASC
+        `);
+        
+        // Calculate open issues total
+        const openIssuesResult = await pool.request().query(`
+            SELECT COUNT(*) as openIssues
+            FROM OHS_InspectionItems it
+            WHERE it.Status NOT IN ('Completed', 'N/A')
+            AND it.SelectedChoice IN ('No', 'Partial')
+        `);
+        
+        // Calculate compliance rate (stores with avg > 80%)
+        const totalStores = storeResult.recordset.length;
+        const compliantStores = storeResult.recordset.filter(s => s.avgScore >= 80).length;
+        const complianceRate = totalStores > 0 ? (compliantStores / totalStores) * 100 : 0;
+        
+        res.json({
+            success: true,
+            data: {
+                totalInspections: summaryResult.recordset[0]?.totalInspections || 0,
+                avgScore: summaryResult.recordset[0]?.avgScore || 0,
+                complianceRate: complianceRate,
+                openIssues: openIssuesResult.recordset[0]?.openIssues || 0,
+                storePerformance: storeResult.recordset,
+                sectionAnalysis: sectionResult.recordset
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching reports summary:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // ==========================================
 // Template Builder API Routes
 // ==========================================

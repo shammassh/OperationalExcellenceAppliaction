@@ -194,7 +194,10 @@ app.get('/dashboard', requireAuth, (req, res) => {
         'HR_DASHBOARD': 'hr',
         
         // Escalation module
-        'ESCALATION_DASHBOARD': 'escalation', 'ESCALATION_MANAGEMENT': 'escalation', 'ESCALATION_ADMIN': 'escalation'
+        'ESCALATION_DASHBOARD': 'escalation', 'ESCALATION_MANAGEMENT': 'escalation', 'ESCALATION_ADMIN': 'escalation',
+        
+        // Broadcast module
+        'BROADCAST_SEND': 'broadcast', 'BROADCAST_VIEW': 'broadcast'
     };
     
     // Calculate which menus user can access based on their form permissions
@@ -213,7 +216,7 @@ app.get('/dashboard', requireAuth, (req, res) => {
     
     // System Administrator always has full access (no SQL check needed)
     if (roleNames.includes('System Administrator')) {
-        ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel', 'escalation'].forEach(m => accessibleMenus.add(m));
+        ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel', 'escalation', 'broadcast'].forEach(m => accessibleMenus.add(m));
     }
     
     // Build menu items based on permissions
@@ -228,7 +231,8 @@ app.get('/dashboard', requireAuth, (req, res) => {
         { id: 'escalation', icon: '🔴', title: 'Escalation', href: '/escalation', desc: 'Escalate & track overdue action items' },
         { id: 'thirdparty', icon: '🤝', title: 'Third-Party Services', href: '/third-party', desc: 'Service providers & compliance' },
         { id: 'security', icon: '🏢', title: 'Facility Management Department', href: '/security', desc: 'Facility incidents & inspections' },
-        { id: 'hr', icon: '👥', title: 'HR & Talent', href: '/hr', desc: 'Employee relations & cases' }
+        { id: 'hr', icon: '👥', title: 'HR & Talent', href: '/hr', desc: 'Employee relations & cases' },
+        { id: 'broadcast', icon: '📢', title: 'Broadcast', href: '/admin/broadcast', desc: 'Send announcements to users' }
     ];
     
     const visibleMenuItems = allMenuItems.filter(item => accessibleMenus.has(item.id));
@@ -373,6 +377,60 @@ app.get('/dashboard', requireAuth, (req, res) => {
                     text-decoration: none;
                     font-weight: 600;
                 }
+                .broadcast-panel {
+                    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+                    border: 1px solid #ffc107;
+                    border-radius: 12px;
+                    padding: 20px;
+                    margin-bottom: 25px;
+                }
+                .broadcast-panel.high-priority {
+                    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+                    border-color: #dc3545;
+                }
+                .broadcast-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 15px;
+                }
+                .broadcast-title {
+                    font-size: 16px;
+                    font-weight: 600;
+                    color: #333;
+                }
+                .broadcast-item {
+                    background: white;
+                    padding: 15px;
+                    border-radius: 8px;
+                    margin-bottom: 10px;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+                }
+                .broadcast-item:last-child { margin-bottom: 0; }
+                .broadcast-item-title {
+                    font-weight: 600;
+                    margin-bottom: 8px;
+                    color: #333;
+                }
+                .broadcast-item-message {
+                    color: #555;
+                    font-size: 14px;
+                    line-height: 1.5;
+                    white-space: pre-wrap;
+                }
+                .broadcast-item-meta {
+                    margin-top: 10px;
+                    font-size: 12px;
+                    color: #888;
+                }
+                .broadcast-dismiss {
+                    background: none;
+                    border: none;
+                    color: #888;
+                    cursor: pointer;
+                    font-size: 18px;
+                }
+                .broadcast-dismiss:hover { color: #333; }
             </style>
         </head>
         <body>
@@ -400,6 +458,9 @@ app.get('/dashboard', requireAuth, (req, res) => {
                     <p><strong>Role:</strong> ${req.currentUser.role}</p>
                 </div>
                 
+                <!-- Broadcasts Panel -->
+                <div id="broadcastPanel" style="display:none;"></div>
+                
                 <h2>Departments</h2>
                 <div class="menu-grid">
                     ${menuHtml || '<div class="no-access">No departments assigned. Please contact your administrator.</div>'}
@@ -424,11 +485,67 @@ app.get('/dashboard', requireAuth, (req, res) => {
                     }
                 }
                 
+                // Load broadcasts
+                async function loadBroadcasts() {
+                    try {
+                        const res = await fetch('/admin/api/broadcasts/my');
+                        const data = await res.json();
+                        const panel = document.getElementById('broadcastPanel');
+                        
+                        if (data.success && data.data && data.data.length > 0) {
+                            const unread = data.data.filter(b => !b.IsRead);
+                            if (unread.length > 0) {
+                                const hasHigh = unread.some(b => b.Priority === 'High');
+                                panel.className = 'broadcast-panel' + (hasHigh ? ' high-priority' : '');
+                                panel.innerHTML = \`
+                                    <div class="broadcast-header">
+                                        <div class="broadcast-title">📢 Announcements (\${unread.length})</div>
+                                    </div>
+                                    \${unread.map(b => \`
+                                        <div class="broadcast-item" id="broadcast-\${b.Id}">
+                                            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                                                <div class="broadcast-item-title">\${b.Title}</div>
+                                                <button class="broadcast-dismiss" onclick="dismissBroadcast(\${b.Id})" title="Mark as read">✕</button>
+                                            </div>
+                                            <div class="broadcast-item-message">\${b.Message}</div>
+                                            <div class="broadcast-item-meta">
+                                                From: \${b.SentBy} • \${new Date(b.CreatedAt).toLocaleString()}
+                                                \${b.Priority === 'High' ? ' • <span style="color:#dc3545;font-weight:600;">⚠️ URGENT</span>' : ''}
+                                            </div>
+                                        </div>
+                                    \`).join('')}
+                                \`;
+                                panel.style.display = 'block';
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Error loading broadcasts:', err);
+                    }
+                }
+                
+                async function dismissBroadcast(id) {
+                    try {
+                        await fetch('/admin/api/broadcasts/' + id + '/read', { method: 'POST' });
+                        const item = document.getElementById('broadcast-' + id);
+                        if (item) item.remove();
+                        
+                        // Check if any broadcasts left
+                        const panel = document.getElementById('broadcastPanel');
+                        if (!panel.querySelector('.broadcast-item')) {
+                            panel.style.display = 'none';
+                        }
+                    } catch (err) {
+                        console.error('Error dismissing broadcast:', err);
+                    }
+                }
+                
                 // Load on page load
                 loadNotificationCount();
+                loadBroadcasts();
                 
                 // Refresh every 60 seconds
                 setInterval(loadNotificationCount, 60000);
+                setInterval(loadBroadcasts, 120000);
             </script>
         </body>
         </html>

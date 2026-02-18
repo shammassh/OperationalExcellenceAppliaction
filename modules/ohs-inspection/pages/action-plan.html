@@ -762,10 +762,10 @@
                 </select>
             </div>
             <div class="filter-group">
-                <label>Escalated</label>
+                <label>Assigned</label>
                 <select id="escalateFilter" onchange="applyFilters()">
                     <option value="">All</option>
-                    <option value="true">Escalated Only</option>
+                    <option value="true">Assigned to Dept Only</option>
                 </select>
             </div>
         </div>
@@ -1013,7 +1013,7 @@
                         <td class="finding-col">
                             <div class="question-title">${item.title}</div>
                             ${item.finding ? `<div class="finding-text">${item.finding}</div>` : ''}
-                            ${item.escalate ? `<span class="escalate-badge">⚠️ Escalated${item.department ? ` to ${item.department}` : ''}</span>` : ''}
+                            ${item.escalate ? `<span class="escalate-badge">📋 Assigned${item.department ? ` to ${item.department}` : ''}</span>` : ''}
                         </td>
                         <td>
                             <span class="priority-badge ${priorityClass}">${item.priority || 'Medium'}</span>

@@ -282,6 +282,23 @@ function initializeAuth(app) {
     // Middleware
     app.use(cookieParser());
     
+    // Session info endpoint
+    app.get('/auth/session', requireAuth, (req, res) => {
+        res.json({
+            user: {
+                id: req.currentUser.userId,
+                email: req.currentUser.email,
+                displayName: req.currentUser.displayName,
+                role: req.currentUser.role,
+                assignedStores: req.currentUser.assignedStores,
+                assignedDepartment: req.currentUser.assignedDepartment,
+                department: req.currentUser.department,
+                isActive: req.currentUser.isActive,
+                isApproved: req.currentUser.isApproved
+            }
+        });
+    });
+    
     // Login page
     app.get('/auth/login', (req, res) => {
         const authUrl = `https://login.microsoftonline.com/${process.env.AZURE_TENANT_ID}/oauth2/v2.0/authorize?` +
