@@ -377,6 +377,7 @@
             transition: all 0.2s;
         }
 
+        .priority-btn.selected-critical { background: #7c3aed; border-color: #7c3aed; color: white; }
         .priority-btn.selected-high { background: #ef4444; border-color: #ef4444; color: white; }
         .priority-btn.selected-medium { background: #f59e0b; border-color: #f59e0b; color: white; }
         .priority-btn.selected-low { background: #3b82f6; border-color: #3b82f6; color: white; }
@@ -1163,6 +1164,8 @@
                         <div class="finding-group">
                             <div class="finding-label">Priority</div>
                             <div class="priority-options">
+                                <button class="priority-btn ${item.priority === 'Critical' ? 'selected-critical' : ''}" 
+                                        onclick="updateFinding(${item.responseId}, 'priority', 'Critical')">🟣 Critical</button>
                                 <button class="priority-btn ${item.priority === 'High' ? 'selected-high' : ''}" 
                                         onclick="updateFinding(${item.responseId}, 'priority', 'High')">🔴 High</button>
                                 <button class="priority-btn ${item.priority === 'Medium' ? 'selected-medium' : ''}" 
@@ -1182,7 +1185,7 @@
                                     id="escalate-${item.responseId}"
                                     ${item.escalate ? 'checked' : ''}
                                     onchange="toggleEscalate(${item.responseId}, this.checked)">
-                                <span class="escalate-label">🚨 Escalate to Department</span>
+                                <span class="escalate-label">Assign to Department</span>
                             </label>
                             <div class="department-dropdown-wrapper ${item.escalate ? 'visible' : ''}" id="dept-wrapper-${item.responseId}">
                                 <div class="department-label">📋 Assign to Department</div>
