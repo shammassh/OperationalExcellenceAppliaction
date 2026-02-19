@@ -1649,6 +1649,7 @@ router.get('/api/audits/:auditId', async (req, res) => {
             const itemsResult = await pool.request()
                 .input('inspectionId', sql.Int, auditId)
                 .input('sectionName', sql.NVarChar, section.sectionName)
+                .input('departmentName', sql.NVarChar, section.departmentName || null)
                 .query(`
                     SELECT 
                         Id as responseId,
@@ -1667,7 +1668,9 @@ router.get('/api/audits/:auditId', async (req, res) => {
                         Department as department,
                         Criteria as criteria
                     FROM OHS_InspectionItems
-                    WHERE InspectionId = @inspectionId AND SectionName = @sectionName
+                    WHERE InspectionId = @inspectionId 
+                        AND SectionName = @sectionName
+                        AND ((@departmentName IS NULL AND DepartmentName IS NULL) OR DepartmentName = @departmentName)
                     ORDER BY ItemOrder
                 `);
             section.items = itemsResult.recordset;
