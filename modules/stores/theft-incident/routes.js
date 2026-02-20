@@ -8,6 +8,7 @@ const sql = require('mssql');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const sharp = require('sharp');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -37,6 +38,56 @@ const upload = multer({
         cb(new Error('Only image files are allowed (JPEG, PNG, GIF, WebP)'));
     }
 });
+
+// Image compression settings
+const COMPRESSION_CONFIG = {
+    maxWidth: 1920,      // Max width in pixels
+    maxHeight: 1080,     // Max height in pixels
+    quality: 80,         // JPEG/WebP quality (1-100)
+    pngCompressionLevel: 8  // PNG compression (0-9)
+};
+
+// Compress and resize image
+async function compressImage(filePath) {
+    try {
+        const ext = path.extname(filePath).toLowerCase();
+        const tempPath = filePath + '.tmp';
+        
+        let sharpInstance = sharp(filePath)
+            .resize(COMPRESSION_CONFIG.maxWidth, COMPRESSION_CONFIG.maxHeight, {
+                fit: 'inside',
+                withoutEnlargement: true
+            });
+        
+        // Apply format-specific compression
+        if (ext === '.jpg' || ext === '.jpeg') {
+            sharpInstance = sharpInstance.jpeg({ quality: COMPRESSION_CONFIG.quality });
+        } else if (ext === '.png') {
+            sharpInstance = sharpInstance.png({ compressionLevel: COMPRESSION_CONFIG.pngCompressionLevel });
+        } else if (ext === '.webp') {
+            sharpInstance = sharpInstance.webp({ quality: COMPRESSION_CONFIG.quality });
+        } else if (ext === '.gif') {
+            // GIF - just resize, limited compression options
+            sharpInstance = sharpInstance.gif();
+        }
+        
+        // Save to temp file then replace original
+        await sharpInstance.toFile(tempPath);
+        
+        // Get compressed file size
+        const compressedStats = fs.statSync(tempPath);
+        
+        // Replace original with compressed version
+        fs.unlinkSync(filePath);
+        fs.renameSync(tempPath, filePath);
+        
+        return compressedStats.size;
+    } catch (err) {
+        console.error('Image compression error:', err);
+        // Return original size if compression fails
+        return fs.statSync(filePath).size;
+    }
+}
 
 // Database configuration
 const dbConfig = {
@@ -585,15 +636,19 @@ router.post('/submit', upload.array('photos', 5), async (req, res) => {
         
         const incidentId = result.recordset[0].Id;
         
-        // Save uploaded photos to database
+        // Compress and save uploaded photos to database
         if (req.files && req.files.length > 0) {
             for (const file of req.files) {
+                // Compress the image and get new file size
+                const fullPath = path.join(__dirname, '../../../uploads/theft-incidents', file.filename);
+                const compressedSize = await compressImage(fullPath);
+                
                 await pool.request()
                     .input('incidentId', sql.Int, incidentId)
                     .input('fileName', sql.NVarChar, file.filename)
                     .input('originalName', sql.NVarChar, file.originalname)
                     .input('filePath', sql.NVarChar, '/uploads/theft-incidents/' + file.filename)
-                    .input('fileSize', sql.Int, file.size)
+                    .input('fileSize', sql.Int, compressedSize)
                     .input('mimeType', sql.NVarChar, file.mimetype)
                     .query(`
                         INSERT INTO TheftIncidentPhotos (IncidentId, FileName, OriginalName, FilePath, FileSize, MimeType, UploadedAt)
