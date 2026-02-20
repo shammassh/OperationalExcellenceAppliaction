@@ -1175,26 +1175,42 @@
             return html;
         }
 
-        function handlePictureUpload(index, files) {
+        async function handlePictureUpload(index, files) {
             const item = filteredItems[index];
             const mainIndex = actionItems.findIndex(i => i.referenceValue === item.referenceValue);
             
             for (const file of files) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const base64 = e.target.result;
+                try {
+                    // Upload to server with compression
+                    const formData = new FormData();
+                    formData.append('picture', file);
                     
-                    if (mainIndex !== -1) {
-                        if (!actionItems[mainIndex].pictures) actionItems[mainIndex].pictures = [];
-                        actionItems[mainIndex].pictures.push(base64);
+                    const response = await fetch('/oe-inspection/api/action-plan/upload-picture', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        // Store file URL instead of base64
+                        if (mainIndex !== -1) {
+                            if (!actionItems[mainIndex].pictures) actionItems[mainIndex].pictures = [];
+                            actionItems[mainIndex].pictures.push(result.url);
+                        }
+                        if (!item.pictures) item.pictures = [];
+                        item.pictures.push(result.url);
+                        
+                        // Update preview
+                        updatePicturePreview(index);
+                    } else {
+                        console.error('Upload failed:', result.error);
+                        alert('Failed to upload picture: ' + (result.error || 'Unknown error'));
                     }
-                    if (!item.pictures) item.pictures = [];
-                    item.pictures.push(base64);
-                    
-                    // Update preview
-                    updatePicturePreview(index);
-                };
-                reader.readAsDataURL(file);
+                } catch (error) {
+                    console.error('Error uploading picture:', error);
+                    alert('Error uploading picture');
+                }
             }
         }
 

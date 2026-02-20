@@ -580,8 +580,8 @@
                         <div>
                             <div style="display: flex; gap: 6px; flex-wrap: wrap;">
                                 ${item.pictures.map(pic => `
-                                    <img src="data:${pic.contentType};base64,${pic.base64}" 
-                                         alt="${pic.fileName}" 
+                                    <img src="${pic.filePath || pic.url}" 
+                                         alt="${pic.fileName || pic.originalName || ''}" 
                                          style="width: 70px; height: 70px; object-fit: cover; border-radius: 4px; border: 1px solid #e5e7eb;" />
                                 `).join('')}
                             </div>
@@ -739,9 +739,8 @@
                             title: item.title,
                             priority: item.priority,
                             finding: item.finding,
-                            base64: pic.base64,
-                            contentType: pic.contentType,
-                            fileName: pic.fileName,
+                            filePath: pic.filePath || pic.url,
+                            fileName: pic.fileName || pic.originalName,
                             pictureType: pic.pictureType
                         });
                     }
@@ -778,7 +777,7 @@
                             <span style="background: #f59e0b; color: white; font-size: 0.7rem; padding: 3px 8px; border-radius: 12px;">${pic.section || ''}</span>
                         </div>
                         <div style="width: 100%; text-align: center; background: #f5f5f5; padding: 10px;">
-                            <img src="data:${pic.contentType};base64,${pic.base64}" 
+                            <img src="${pic.filePath}" 
                                  alt="Finding ${pic.referenceValue}" 
                                  onclick="openImageModal(this.src)"
                                  style="max-width: 100%; max-height: 350px; width: auto; height: auto; border-radius: 6px; cursor: pointer; transition: transform 0.2s;" 
@@ -819,9 +818,8 @@
                             title: item.title,
                             priority: item.priority,
                             comment: item.comment || '',
-                            base64: pic.base64,
-                            contentType: pic.contentType,
-                            fileName: pic.fileName,
+                            filePath: pic.filePath || pic.url,
+                            fileName: pic.fileName || pic.originalName,
                             pictureType: pic.pictureType
                         });
                     }
@@ -847,7 +845,7 @@
                             <span style="background: #10b981; color: white; font-size: 0.7rem; padding: 3px 8px; border-radius: 12px;">${pic.section || ''}</span>
                         </div>
                         <div style="width: 100%; text-align: center; background: #f0fdf4; padding: 10px;">
-                            <img src="data:${pic.contentType};base64,${pic.base64}" 
+                            <img src="${pic.filePath}" 
                                  alt="Good Observation ${pic.referenceValue}" 
                                  onclick="openImageModal(this.src)"
                                  style="max-width: 100%; max-height: 350px; width: auto; height: auto; border-radius: 6px; cursor: pointer; transition: transform 0.2s;" 
@@ -892,9 +890,8 @@
                             priority: item.priority,
                             finding: item.finding,
                             correctiveAction: item.correctiveAction,
-                            base64: pic.base64,
-                            contentType: pic.contentType,
-                            fileName: pic.fileName,
+                            filePath: pic.filePath || pic.url,
+                            fileName: pic.fileName || pic.originalName,
                             pictureType: pic.pictureType
                         });
                     }
@@ -931,7 +928,7 @@
                             ${priorityBadge}
                         </div>
                         <div style="width: 100%; text-align: center; background: #eff6ff; padding: 10px;">
-                            <img src="data:${pic.contentType};base64,${pic.base64}" 
+                            <img src="${pic.filePath}" 
                                  alt="Corrective Action ${pic.referenceValue}" 
                                  onclick="openImageModal(this.src)"
                                  style="max-width: 100%; max-height: 350px; width: auto; height: auto; border-radius: 6px; cursor: pointer; transition: transform 0.2s;" 

@@ -208,7 +208,7 @@ class DataService {
             const result = await this.pool.request()
                 .input('AuditID', sql.Int, auditId)
                 .query(`
-                    SELECT Id as PictureID, ItemId as ResponseID, FileName, FileData, ContentType, PictureType, CreatedAt
+                    SELECT Id as PictureID, ItemId as ResponseID, FileName, OriginalName, FilePath, FileSize, ContentType, PictureType, CreatedAt
                     FROM OE_InspectionPictures
                     WHERE InspectionId = @AuditID
                     ORDER BY ItemId, CreatedAt
@@ -223,18 +223,19 @@ class DataService {
                     pictures[responseId] = [];
                 }
 
-                // FileData is stored as base64 string, not binary
+                // Use FilePath (file URL) instead of FileData (base64)
                 const pic = {
                     pictureId: row.PictureID,
-                    fileName: row.FileName,
+                    fileName: row.OriginalName || row.FileName,
                     contentType: row.ContentType,
                     pictureType: row.PictureType,
                     createdAt: row.CreatedAt,
-                    // FileData is already base64 string
-                    dataUrl: `data:${row.ContentType};base64,${row.FileData}`
+                    // Use file URL instead of base64 data URL
+                    filePath: row.FilePath,
+                    dataUrl: row.FilePath // For backward compatibility in templates
                 };
                 
-                console.log(`   📷 Picture ${row.PictureID}: ResponseID=${responseId}, Type="${row.PictureType}"`);
+                console.log(`   📷 Picture ${row.PictureID}: ResponseID=${responseId}, Type="${row.PictureType}", Path="${row.FilePath}"`);
                 pictures[responseId].push(pic);
             }
 

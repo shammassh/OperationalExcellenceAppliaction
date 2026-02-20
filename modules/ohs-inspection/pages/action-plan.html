@@ -1112,27 +1112,44 @@
             const file = input.files[0];
             if (!file) return;
 
-            // Convert to base64 for now (in production, upload to server)
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                if (!filteredItems[index].pictures) {
-                    filteredItems[index].pictures = [];
-                }
-                filteredItems[index].pictures.push(e.target.result);
+            try {
+                // Upload to server with compression
+                const formData = new FormData();
+                formData.append('picture', file);
                 
-                // Also update in main array
-                const mainIndex = actionItems.findIndex(ai => ai.responseId === filteredItems[index].responseId);
-                if (mainIndex >= 0) {
-                    if (!actionItems[mainIndex].pictures) {
-                        actionItems[mainIndex].pictures = [];
+                const response = await fetch('/ohs-inspection/api/action-plan/upload-picture', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Store file URL instead of base64
+                    if (!filteredItems[index].pictures) {
+                        filteredItems[index].pictures = [];
                     }
-                    actionItems[mainIndex].pictures.push(e.target.result);
+                    filteredItems[index].pictures.push(result.url);
+                    
+                    // Also update in main array
+                    const mainIndex = actionItems.findIndex(ai => ai.responseId === filteredItems[index].responseId);
+                    if (mainIndex >= 0) {
+                        if (!actionItems[mainIndex].pictures) {
+                            actionItems[mainIndex].pictures = [];
+                        }
+                        actionItems[mainIndex].pictures.push(result.url);
+                    }
+                    
+                    // Update preview
+                    document.getElementById(`preview-${index}`).innerHTML = renderPictures(filteredItems[index].pictures, index);
+                } else {
+                    console.error('Upload failed:', result.error);
+                    alert('Failed to upload picture: ' + (result.error || 'Unknown error'));
                 }
-                
-                // Update preview
-                document.getElementById(`preview-${index}`).innerHTML = renderPictures(filteredItems[index].pictures, index);
-            };
-            reader.readAsDataURL(file);
+            } catch (error) {
+                console.error('Error uploading picture:', error);
+                alert('Error uploading picture');
+            }
             
             // Clear input
             input.value = '';

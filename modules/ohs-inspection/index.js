@@ -9,6 +9,77 @@ const router = express.Router();
 const path = require('path');
 const sql = require('mssql');
 const fs = require('fs');
+const multer = require('multer');
+const sharp = require('sharp');
+
+// Configure multer for OHS inspection photo uploads
+const ohsUploadDir = path.join(__dirname, '..', '..', 'uploads', 'ohs-inspection');
+if (!fs.existsSync(ohsUploadDir)) {
+    fs.mkdirSync(ohsUploadDir, { recursive: true });
+}
+
+const ohsStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, ohsUploadDir),
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'ohs-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const ohsUpload = multer({
+    storage: ohsStorage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = /jpeg|jpg|png|gif|webp/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+        if (extname && mimetype) {
+            return cb(null, true);
+        }
+        cb(new Error('Only image files are allowed'));
+    }
+});
+
+// Image compression settings
+const COMPRESSION_CONFIG = {
+    maxWidth: 1920,
+    maxHeight: 1080,
+    quality: 80,
+    pngCompressionLevel: 8
+};
+
+// Compress and resize image
+async function compressImage(filePath) {
+    try {
+        const ext = path.extname(filePath).toLowerCase();
+        const tempPath = filePath + '.tmp';
+        
+        let sharpInstance = sharp(filePath)
+            .resize(COMPRESSION_CONFIG.maxWidth, COMPRESSION_CONFIG.maxHeight, {
+                fit: 'inside',
+                withoutEnlargement: true
+            });
+        
+        if (ext === '.jpg' || ext === '.jpeg') {
+            sharpInstance = sharpInstance.jpeg({ quality: COMPRESSION_CONFIG.quality });
+        } else if (ext === '.png') {
+            sharpInstance = sharpInstance.png({ compressionLevel: COMPRESSION_CONFIG.pngCompressionLevel });
+        } else if (ext === '.webp') {
+            sharpInstance = sharpInstance.webp({ quality: COMPRESSION_CONFIG.quality });
+        } else if (ext === '.gif') {
+            sharpInstance = sharpInstance.gif();
+        }
+        
+        await sharpInstance.toFile(tempPath);
+        fs.unlinkSync(filePath);
+        fs.renameSync(tempPath, filePath);
+        
+        return true;
+    } catch (err) {
+        console.error('Image compression error:', err);
+        return false;
+    }
+}
 
 // Database config
 const dbConfig = {
@@ -1852,24 +1923,38 @@ router.put('/api/audits/response/:responseId', async (req, res) => {
     }
 });
 
-// Upload picture for audit item
-router.post('/api/audits/pictures', async (req, res) => {
+// Upload picture for audit item (file storage with compression)
+router.post('/api/audits/pictures', ohsUpload.single('picture'), async (req, res) => {
     try {
-        const { responseId, auditId, fileName, contentType, pictureType, fileData } = req.body;
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: 'No file uploaded' });
+        }
+        
+        const { responseId, auditId, pictureType } = req.body;
+        
+        // Compress the uploaded image
+        const fullPath = path.join(ohsUploadDir, req.file.filename);
+        await compressImage(fullPath);
+        
+        // Get compressed file size
+        const stats = fs.statSync(fullPath);
+        const filePath = '/uploads/ohs-inspection/' + req.file.filename;
         
         const pool = await sql.connect(dbConfig);
         
         const result = await pool.request()
             .input('responseId', sql.Int, responseId)
             .input('auditId', sql.Int, auditId)
-            .input('fileName', sql.NVarChar, fileName)
-            .input('contentType', sql.NVarChar, contentType)
+            .input('fileName', sql.NVarChar, req.file.filename)
+            .input('originalName', sql.NVarChar, req.file.originalname)
+            .input('contentType', sql.NVarChar, req.file.mimetype)
             .input('pictureType', sql.NVarChar, pictureType)
-            .input('fileData', sql.NVarChar(sql.MAX), fileData)
+            .input('filePath', sql.NVarChar, filePath)
+            .input('fileSize', sql.Int, stats.size)
             .query(`
-                INSERT INTO OHS_InspectionPictures (ItemId, InspectionId, FileName, ContentType, PictureType, FileData, CreatedAt)
+                INSERT INTO OHS_InspectionPictures (ItemId, InspectionId, FileName, OriginalName, ContentType, PictureType, FilePath, FileSize, CreatedAt)
                 OUTPUT INSERTED.Id as pictureId
-                VALUES (@responseId, @auditId, @fileName, @contentType, @pictureType, @fileData, GETDATE())
+                VALUES (@responseId, @auditId, @fileName, @originalName, @contentType, @pictureType, @filePath, @fileSize, GETDATE())
             `);
         
         await pool.request()
@@ -1877,14 +1962,14 @@ router.post('/api/audits/pictures', async (req, res) => {
             .query(`UPDATE OHS_InspectionItems SET HasPicture = 1 WHERE Id = @id`);
         
         await pool.close();
-        res.json({ success: true, data: { pictureId: result.recordset[0].pictureId } });
+        res.json({ success: true, data: { pictureId: result.recordset[0].pictureId, filePath: filePath } });
     } catch (error) {
         console.error('Error uploading picture:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// Get pictures for a response
+// Get pictures for a response (returns file URLs, not base64)
 router.get('/api/audits/pictures/:responseId', async (req, res) => {
     try {
         const { responseId } = req.params;
@@ -1893,8 +1978,8 @@ router.get('/api/audits/pictures/:responseId', async (req, res) => {
         const result = await pool.request()
             .input('responseId', sql.Int, responseId)
             .query(`
-                SELECT Id as pictureId, FileName as fileName, ContentType as contentType, 
-                       PictureType as pictureType, FileData as fileData
+                SELECT Id as pictureId, FileName as fileName, OriginalName as originalName,
+                       ContentType as contentType, PictureType as pictureType, FilePath as filePath
                 FROM OHS_InspectionPictures
                 WHERE ItemId = @responseId
                 ORDER BY CreatedAt
@@ -1908,11 +1993,23 @@ router.get('/api/audits/pictures/:responseId', async (req, res) => {
     }
 });
 
-// Delete a picture
+// Delete a picture (also deletes file from disk)
 router.delete('/api/audits/pictures/:pictureId', async (req, res) => {
     try {
         const { pictureId } = req.params;
         const pool = await sql.connect(dbConfig);
+        
+        // Get file path before deleting record
+        const fileResult = await pool.request()
+            .input('id', sql.Int, pictureId)
+            .query(`SELECT FilePath FROM OHS_InspectionPictures WHERE Id = @id`);
+        
+        if (fileResult.recordset.length > 0 && fileResult.recordset[0].FilePath) {
+            const filePath = path.join(__dirname, '..', '..', fileResult.recordset[0].FilePath);
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+        }
         
         await pool.request()
             .input('id', sql.Int, pictureId)
@@ -2091,6 +2188,32 @@ router.post('/api/audits/:auditId/generate-report', async (req, res) => {
         const settingsResult = await pool.request().query(`SELECT SettingValue FROM OHS_InspectionSettings WHERE SettingKey = 'PASSING_SCORE'`);
         const threshold = parseInt(settingsResult.recordset[0]?.SettingValue) || 80;
         
+        // Get pictures for all items
+        const picturesResult = await pool.request()
+            .input('auditId', sql.Int, auditId)
+            .query(`
+                SELECT p.Id, p.ItemId, p.FileName, p.ContentType, p.PictureType, p.FilePath, p.OriginalName, p.FileSize
+                FROM OHS_InspectionPictures p
+                INNER JOIN OHS_InspectionItems i ON p.ItemId = i.Id
+                WHERE i.InspectionId = @auditId
+                ORDER BY p.ItemId, p.Id
+            `);
+        
+        // Group pictures by ItemId
+        const picturesByItem = {};
+        for (const pic of picturesResult.recordset) {
+            if (!picturesByItem[pic.ItemId]) {
+                picturesByItem[pic.ItemId] = [];
+            }
+            picturesByItem[pic.ItemId].push({
+                id: pic.Id,
+                fileName: pic.OriginalName || pic.FileName,
+                contentType: pic.ContentType,
+                pictureType: pic.PictureType || 'issue',
+                dataUrl: pic.FilePath
+            });
+        }
+        
         // Build report data
         const reportData = {
             audit,
@@ -2099,6 +2222,7 @@ router.post('/api/audits/:auditId/generate-report', async (req, res) => {
                 Percentage: s.maxScore > 0 ? Math.round((s.earnedScore / s.maxScore) * 100) : 0
             })),
             findings,
+            pictures: picturesByItem,
             overallScore,
             threshold,
             generatedAt: new Date().toISOString()
@@ -2134,7 +2258,7 @@ router.post('/api/audits/:auditId/generate-report', async (req, res) => {
 
 // Helper function to generate HTML report
 function generateOHSReportHTML(data) {
-    const { audit, sections, findings, overallScore, threshold, generatedAt } = data;
+    const { audit, sections, findings, pictures, overallScore, threshold, generatedAt } = data;
     const passedClass = overallScore >= threshold ? 'pass' : 'fail';
     const passedText = overallScore >= threshold ? 'PASS ✅' : 'FAIL ❌';
     
@@ -2181,6 +2305,9 @@ function generateOHSReportHTML(data) {
         .finding-ref { font-weight: 600; color: #e17055; }
         .finding-question { margin: 5px 0; }
         .finding-detail { color: #64748b; font-size: 14px; }
+        .finding-pictures { margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0; }
+        .picture-group { margin-bottom: 8px; }
+        .pictures-wrapper { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px; }
         .footer { text-align: center; padding: 20px; color: #64748b; font-size: 14px; }
         @media print { body { background: white; } .container { max-width: 100%; padding: 0; } }
     </style>
@@ -2239,13 +2366,24 @@ function generateOHSReportHTML(data) {
         ${findings.length > 0 ? `
         <div class="findings-card">
             <div class="findings-title">⚠️ Findings Summary (${findings.length} items)</div>
-            ${findings.map(f => `
+            ${findings.map(f => {
+                const itemPics = pictures[f.Id] || [];
+                
+                return `
             <div class="finding-item">
                 <div class="finding-ref">[${f.ReferenceValue || 'N/A'}] ${f.SectionName}</div>
                 <div class="finding-question">${f.Question}</div>
                 <div class="finding-detail">Answer: ${f.Answer} | Finding: ${f.Finding || 'N/A'}</div>
+                ${itemPics.length > 0 ? `
+                <div class="finding-pictures">
+                    <strong>Photos (${itemPics.length}):</strong>
+                    <div class="pictures-wrapper">
+                        ${itemPics.map(p => `<img src="${p.dataUrl}" alt="${p.fileName || p.pictureType || 'Photo'}" title="${p.pictureType || 'Photo'}" style="max-width:120px;max-height:90px;margin:4px;border-radius:4px;cursor:pointer;border:2px solid ${p.pictureType === 'Good' || p.pictureType === 'corrective' ? '#10b981' : '#ef4444'};" onclick="window.open(this.src,'_blank')">`).join('')}
+                    </div>
+                </div>
+                ` : ''}
             </div>
-            `).join('')}
+            `}).join('')}
         </div>
         ` : ''}
         
@@ -2776,6 +2914,29 @@ router.post('/api/action-plan/save', async (req, res) => {
         res.json({ success: true, message: 'Action plan saved successfully' });
     } catch (error) {
         console.error('Error saving action plan:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Upload action plan picture (returns file path for use in action-plan.html)
+router.post('/api/action-plan/upload-picture', ohsUpload.single('picture'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: 'No file uploaded' });
+        }
+        
+        // Compress the uploaded image
+        const fullPath = path.join(ohsUploadDir, req.file.filename);
+        await compressImage(fullPath);
+        
+        res.json({ 
+            success: true, 
+            url: `/uploads/ohs-inspection/${req.file.filename}`,
+            fileName: req.file.originalname,
+            fileSize: req.file.size
+        });
+    } catch (error) {
+        console.error('Error uploading action plan picture:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

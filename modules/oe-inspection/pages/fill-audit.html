@@ -2385,7 +2385,7 @@
             document.getElementById('uploadBtn').disabled = !selectedImageFile;
         }
 
-        // Upload image
+        // Upload image (using FormData, not base64)
         async function uploadImage() {
             if (!selectedImageFile || !selectedImageType) {
                 showToast('Please select an image and type', 'error');
@@ -2393,63 +2393,56 @@
             }
             
             try {
-                const reader = new FileReader();
-                reader.onload = async function(e) {
-                    const base64 = e.target.result.split(',')[1];
-                    
-                    const response = await fetch(`/oe-inspection/api/audits/pictures`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            responseId: currentImageResponseId,
-                            auditId: auditData.auditId,
-                            fileName: selectedImageFile.name,
-                            contentType: selectedImageFile.type,
-                            pictureType: selectedImageType,
-                            fileData: base64
-                        })
+                const formData = new FormData();
+                formData.append('picture', selectedImageFile);
+                formData.append('responseId', currentImageResponseId);
+                formData.append('auditId', auditData.auditId);
+                formData.append('pictureType', selectedImageType);
+                
+                const response = await fetch(`/oe-inspection/api/audits/pictures`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                if (!result.success) throw new Error(result.error);
+                
+                showToast('Image uploaded successfully!', 'success');
+                
+                // Update local data
+                const item = findItem(currentImageResponseId);
+                if (item) {
+                    if (selectedImageType === 'Good') {
+                        item.hasGoodPicture = true;
+                    } else {
+                        item.hasPicture = true;
+                    }
+                    if (!item.pictures) item.pictures = [];
+                    item.pictures.push({
+                        pictureId: result.data.pictureId,
+                        pictureType: selectedImageType,
+                        fileName: selectedImageFile.name,
+                        filePath: result.data.filePath
                     });
                     
-                    const result = await response.json();
-                    if (!result.success) throw new Error(result.error);
-                    
-                    showToast('Image uploaded successfully!', 'success');
-                    
-                    // Update local data
-                    const item = findItem(currentImageResponseId);
-                    if (item) {
-                        if (selectedImageType === 'Good') {
-                            item.hasGoodPicture = true;
-                        } else {
-                            item.hasPicture = true;
-                        }
-                        if (!item.pictures) item.pictures = [];
-                        item.pictures.push({
-                            pictureId: result.data.pictureId,
-                            pictureType: selectedImageType,
-                            fileName: selectedImageFile.name
-                        });
-                        
-                        // Update UI button text
-                        renderSection(currentSectionIndex);
-                    }
-                    
-                    // Reload images list
-                    loadExistingImages(currentImageResponseId);
-                    
-                    // Reset upload form
-                    document.getElementById('previewContainer').style.display = 'none';
-                    document.getElementById('typeSelector').style.display = 'none';
-                    document.getElementById('uploadBtn').disabled = true;
-                    document.querySelectorAll('.image-type-btn').forEach(btn => btn.classList.remove('selected'));
-                    document.getElementById('fileInput').value = '';
-                    selectedImageFile = null;
-                    selectedImageType = null;
-                    
-                    // Re-render section to update picture button
+                    // Update UI button text
                     renderSection(currentSectionIndex);
-                };
-                reader.readAsDataURL(selectedImageFile);
+                }
+                
+                // Reload images list
+                loadExistingImages(currentImageResponseId);
+                
+                // Reset upload form
+                document.getElementById('previewContainer').style.display = 'none';
+                document.getElementById('typeSelector').style.display = 'none';
+                document.getElementById('uploadBtn').disabled = true;
+                document.querySelectorAll('.image-type-btn').forEach(btn => btn.classList.remove('selected'));
+                document.getElementById('fileInput').value = '';
+                selectedImageFile = null;
+                selectedImageType = null;
+                
+                // Re-render section to update picture button
+                renderSection(currentSectionIndex);
                 
             } catch (error) {
                 console.error('Error uploading image:', error);
@@ -2457,7 +2450,7 @@
             }
         }
 
-        // Load existing images for a response
+        // Load existing images for a response (using file URLs, not base64)
         async function loadExistingImages(responseId) {
             try {
                 const response = await fetch(`/oe-inspection/api/audits/pictures/${responseId}`);
@@ -2469,10 +2462,10 @@
                 if (result.success && result.data.length > 0) {
                     list.innerHTML = result.data.map(pic => `
                         <div class="existing-image-item">
-                            <img src="data:${pic.contentType};base64,${pic.fileData}" class="existing-image-thumb" alt="${pic.fileName}">
+                            <img src="${pic.filePath}" class="existing-image-thumb" alt="${pic.originalName || pic.fileName}">
                             <div class="existing-image-info">
                                 <div class="existing-image-type type-${pic.pictureType.toLowerCase()}">${getTypeLabel(pic.pictureType)}</div>
-                                <div class="existing-image-name">${pic.fileName}</div>
+                                <div class="existing-image-name">${pic.originalName || pic.fileName}</div>
                             </div>
                             <button class="delete-image-btn" onclick="deleteImage(${pic.pictureId})">🗑️</button>
                         </div>
