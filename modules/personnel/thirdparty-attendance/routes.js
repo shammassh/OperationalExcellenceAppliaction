@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Third-Parties Attendance Routes
  * Personnel can download CSV template and upload attendance data
  */
@@ -73,7 +73,8 @@ router.get('/', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Third-Parties Attendance - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>Third-Parties Attendance - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; }
                     body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
@@ -415,7 +416,8 @@ router.get('/view/:batchId', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>View Upload - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>View Upload - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; }
                     body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }

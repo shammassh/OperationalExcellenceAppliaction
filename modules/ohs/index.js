@@ -1,4 +1,4 @@
-/**
+﻿/**
  * OHS (Occupational Health & Safety) Module
  * Handles OHS incidents and inspections
  */
@@ -36,6 +36,7 @@ router.get('/', (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <title>Occupational Health & Safety - ${process.env.APP_NAME}</title>
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }

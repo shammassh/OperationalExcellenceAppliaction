@@ -685,6 +685,67 @@
                 <div>Loading schemas...</div>
             </div>
         </div>
+
+        <!-- Escalation Settings Section -->
+        <div class="info-banner" style="margin-top: 30px; background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); border-left: 4px solid #f59e0b;">
+            <div class="icon">⏰</div>
+            <div class="text">
+                <h3 style="color: #92400e;">Escalation Settings</h3>
+                <p style="color: #b45309;">Configure automatic escalation when action plans are not completed on time.</p>
+            </div>
+        </div>
+
+        <div style="background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-top: 16px;">
+            <form id="escalationSettingsForm">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-weight: 600; margin-bottom: 8px; display: block; color: #374151;">Action Plan Deadline (Days)</label>
+                        <input type="number" id="escalationDeadlineDays" min="1" max="30" value="7" style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 16px;">
+                        <small style="color: #6b7280; display: block; margin-top: 5px;">Number of days to complete action plan after inspection</small>
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-weight: 600; margin-bottom: 8px; display: block; color: #374151;">Send Reminder Before (Days)</label>
+                        <input type="text" id="escalationReminderDays" value="3,1" style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 16px;">
+                        <small style="color: #6b7280; display: block; margin-top: 5px;">Comma-separated days before deadline (e.g., 3,1)</small>
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-weight: 600; margin-bottom: 8px; display: block; color: #374151;">Enable Auto-Escalation</label>
+                        <select id="escalationEnabled" style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 16px;">
+                            <option value="true">✅ Enabled</option>
+                            <option value="false">❌ Disabled</option>
+                        </select>
+                        <small style="color: #6b7280; display: block; margin-top: 5px;">Automatically escalate to Area Manager when deadline passes</small>
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-weight: 600; margin-bottom: 8px; display: block; color: #374151;">Email Notifications</label>
+                        <select id="escalationEmailEnabled" style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 16px;">
+                            <option value="true">✅ Enabled</option>
+                            <option value="false">❌ Disabled</option>
+                        </select>
+                        <small style="color: #6b7280; display: block; margin-top: 5px;">Send email notifications for escalations</small>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                    <button type="submit" class="btn btn-success" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                        <span>💾</span> Save Escalation Settings
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div style="background: #fef3c7; border-radius: 10px; padding: 20px; margin-top: 16px; border-left: 4px solid #f59e0b;">
+            <h4 style="color: #92400e; margin-bottom: 10px;">💡 How Escalation Works</h4>
+            <ol style="color: #a16207; padding-left: 20px; line-height: 1.8; margin: 0;">
+                <li>Inspector completes OHS inspection → Action Plan generated</li>
+                <li>Store Manager receives notification to complete action plan</li>
+                <li>Reminders sent before deadline (configurable days)</li>
+                <li>If not completed within deadline → Assigned Area Manager is notified</li>
+            </ol>
+        </div>
     </div>
 
     <div class="save-bar" id="saveBar">
@@ -842,7 +903,60 @@
 
         document.addEventListener('DOMContentLoaded', async () => {
             await loadSchemas();
+            await loadEscalationSettings();
+            setupEscalationForm();
         });
+
+        // Escalation Settings Functions
+        async function loadEscalationSettings() {
+            try {
+                const response = await fetch('/ohs-inspection/api/escalation-settings');
+                if (!response.ok) throw new Error('Failed to load escalation settings');
+                
+                const data = await response.json();
+                if (data.success && data.settings) {
+                    const settings = data.settings;
+                    document.getElementById('escalationDeadlineDays').value = settings.ActionPlanDeadlineDays || 7;
+                    document.getElementById('escalationReminderDays').value = settings.ReminderDaysBefore || '3,1';
+                    document.getElementById('escalationEnabled').value = String(settings.EscalationEnabled !== false);
+                    document.getElementById('escalationEmailEnabled').value = String(settings.EmailNotifications !== false);
+                }
+            } catch (error) {
+                console.error('Error loading escalation settings:', error);
+            }
+        }
+
+        function setupEscalationForm() {
+            const form = document.getElementById('escalationSettingsForm');
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const settings = {
+                    ActionPlanDeadlineDays: parseInt(document.getElementById('escalationDeadlineDays').value),
+                    ReminderDaysBefore: document.getElementById('escalationReminderDays').value,
+                    EscalationEnabled: document.getElementById('escalationEnabled').value === 'true',
+                    EmailNotifications: document.getElementById('escalationEmailEnabled').value === 'true'
+                };
+
+                try {
+                    const response = await fetch('/ohs-inspection/api/escalation-settings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(settings)
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        showToast('Escalation settings saved!', 'success');
+                    } else {
+                        throw new Error(result.error || 'Failed to save');
+                    }
+                } catch (error) {
+                    console.error('Error saving escalation settings:', error);
+                    showToast('Failed to save: ' + error.message, 'error');
+                }
+            });
+        }
 
         async function loadSchemas() {
             try {

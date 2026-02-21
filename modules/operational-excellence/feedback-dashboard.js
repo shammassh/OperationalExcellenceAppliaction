@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Weekly Feedback Dashboard
  * View and analyze all weekly third party feedback submissions
  */
@@ -116,7 +116,8 @@ router.get('/', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Weekly Feedback Dashboard - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>Weekly Feedback Dashboard - ${process.env.APP_NAME}</title>
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -302,7 +303,8 @@ router.get('/view/:id', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Feedback Details - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>Feedback Details - ${process.env.APP_NAME}</title>
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }

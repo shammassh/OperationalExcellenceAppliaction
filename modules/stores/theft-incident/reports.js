@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Theft Incident Reports - View All Reports
  */
 
@@ -156,7 +156,8 @@ router.get('/', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Theft Incident Reports - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>Theft Incident Reports - ${process.env.APP_NAME}</title>
                 <style>${getReportsViewerStyles('#dc3545')}</style>
             </head>
             <body>

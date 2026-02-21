@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Patrol Sheet Routes
  * Security Services - Patrol Management
  */
@@ -28,6 +28,7 @@ router.get('/', async (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <title>Patrol Sheet - ${process.env.APP_NAME}</title>
             <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -763,7 +764,8 @@ router.get('/:id', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Patrol Sheet - ${sheetDateFormatted} - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>Patrol Sheet - ${sheetDateFormatted} - ${process.env.APP_NAME}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
                     body { 

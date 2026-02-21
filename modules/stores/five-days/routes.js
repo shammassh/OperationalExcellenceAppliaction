@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 5 Days Expired Items Tracking - Store Manager Module
  * Tracks expired items found during 5-day cycles (2 times per month)
  */
@@ -70,6 +70,7 @@ router.get('/', async (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <title>5 Days - Expired Items Tracking</title>
             <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -489,7 +490,8 @@ router.get('/history', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>5 Days History</title>
+                <meta charset="UTF-8">
+            <title>5 Days History</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
                     body { font-family: 'Segoe UI', Arial; background: #f0f2f5; min-height: 100vh; }

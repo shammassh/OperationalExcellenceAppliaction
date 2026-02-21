@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Employee Attendance Report Form
  * Track employees who come after working hours
  */
@@ -28,6 +28,7 @@ router.get('/', (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <title>Employee Attendance Report - ${process.env.APP_NAME}</title>
             <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -481,7 +482,8 @@ router.get('/:id', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>View Attendance Report - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>View Attendance Report - ${process.env.APP_NAME}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
                     body { 

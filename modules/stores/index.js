@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Stores Module - Main Router
  */
 
@@ -40,6 +40,7 @@ router.get('/', (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <title>Stores - ${process.env.APP_NAME}</title>
             <style>
                 * { box-sizing: border-box; }

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Security Department Module
  * Dashboard for Security Managers to view delivery logs and patrol sheets
  */
@@ -330,7 +330,7 @@ router.get('/', async (req, res) => {
                         </a>
                         
                         <a href="/security/parking-violations" class="dashboard-card violation">
-                            <div class="card-icon">&#127359;</div>
+                            <div class="card-icon">🅿️</div>
                             <div class="card-title">Parking Violations</div>
                             <div class="card-desc">Record and track parking violations with photo evidence</div>
                             <div class="card-stats">
@@ -2261,7 +2261,7 @@ router.get('/parking-violations', async (req, res) => {
             </head>
             <body>
                 <div class="header">
-                    <h1>&#127359; Parking Violations History</h1>
+                    <h1>🅿️ Parking Violations History</h1>
                     <div class="header-nav">
                         <a href="/security-services/parking-violation">+ New Violation</a>
                         <a href="/security">&#8592; Back</a>
@@ -2302,7 +2302,7 @@ router.get('/parking-violations', async (req, res) => {
                                 </table>
                             ` : `
                                 <div class="empty-state">
-                                    <div class="empty-state-icon">&#127359;</div>
+                                    <div class="empty-state-icon">🅿️</div>
                                     <div>No parking violations recorded yet</div>
                                 </div>
                             `}
@@ -2332,7 +2332,7 @@ router.get('/parking-violations', async (req, res) => {
                             const container = document.getElementById('violationsTableContainer');
                             
                             if (data.violations.length === 0) {
-                                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#127359;</div><div>No violations match your filters</div></div>';
+                                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🅿️</div><div>No violations match your filters</div></div>';
                                 return;
                             }
                             

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Extra Cleaning Review Module for Operational Excellence
  * OE team can review and manage all extra cleaning requests
  */
@@ -104,7 +104,8 @@ router.get('/', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Extra Cleaning Review - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>Extra Cleaning Review - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
                     body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f6fa; min-height: 100vh; }

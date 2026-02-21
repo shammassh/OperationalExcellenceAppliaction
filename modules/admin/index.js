@@ -192,12 +192,64 @@ router.get('/roles/download-matrix', async (req, res) => {
     }
 });
 
+// Export Users by Role to CSV
+router.get('/roles/export-users', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        const data = await pool.request().query(`
+            SELECT 
+                r.RoleName,
+                rc.CategoryName,
+                u.DisplayName,
+                u.Email,
+                u.Department,
+                u.JobTitle,
+                CASE WHEN u.IsActive = 1 THEN 'Active' ELSE 'Inactive' END as UserStatus,
+                FORMAT(ura.AssignedAt, 'yyyy-MM-dd') as AssignedDate
+            FROM UserRoles r
+            LEFT JOIN RoleCategories rc ON r.CategoryId = rc.Id
+            LEFT JOIN UserRoleAssignments ura ON r.Id = ura.RoleId
+            LEFT JOIN Users u ON ura.UserId = u.Id
+            ORDER BY rc.CategoryName, r.RoleName, u.DisplayName
+        `);
+        
+        await pool.close();
+        
+        // Generate CSV
+        const headers = ['Role Name', 'Category', 'User Name', 'Email', 'Department', 'Job Title', 'Status', 'Assigned Date'];
+        let csv = headers.join(',') + '\\n';
+        
+        data.recordset.forEach(row => {
+            csv += [
+                '"' + (row.RoleName || '').replace(/"/g, '""') + '"',
+                '"' + (row.CategoryName || 'Uncategorized').replace(/"/g, '""') + '"',
+                '"' + (row.DisplayName || 'No users assigned').replace(/"/g, '""') + '"',
+                '"' + (row.Email || '').replace(/"/g, '""') + '"',
+                '"' + (row.Department || '').replace(/"/g, '""') + '"',
+                '"' + (row.JobTitle || '').replace(/"/g, '""') + '"',
+                row.UserStatus || '',
+                row.AssignedDate || ''
+            ].join(',') + '\\n';
+        });
+        
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename=users-by-role-' + new Date().toISOString().split('T')[0] + '.csv');
+        res.send(csv);
+        
+    } catch (err) {
+        console.error('Error exporting users by role:', err);
+        res.status(500).send('Error: ' + err.message);
+    }
+});
+
 // Admin Dashboard
 router.get('/', (req, res) => {
     res.send(`
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <title>Admin Panel - ${process.env.APP_NAME}</title>
             <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -365,6 +417,7 @@ router.get('/users', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
+                <meta charset="UTF-8">
                 <title>User Management - ${process.env.APP_NAME}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1163,6 +1216,7 @@ router.get('/roles/:roleId/permissions', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
+<meta charset="UTF-8">
                 <title>Edit Role Permissions - ${role.RoleName} - ${process.env.APP_NAME}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1733,6 +1787,7 @@ router.get('/users/:id/forms', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
+<meta charset="UTF-8">
                 <title>Form Access - ${userData.DisplayName} - ${process.env.APP_NAME}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -2073,28 +2128,56 @@ router.post('/users/:id/forms', async (req, res) => {
     }
 });
 
-// Form Registry
+// Form Registry - Full CRUD
 router.get('/forms', async (req, res) => {
     try {
         const pool = await sql.connect(dbConfig);
-        const forms = await pool.request().query('SELECT * FROM Forms ORDER BY ModuleName, FormName');
+        const forms = await pool.request().query(`
+            SELECT f.*, 
+                   (SELECT COUNT(*) FROM RoleFormAccess WHERE FormId = f.Id) as RoleCount
+            FROM Forms f 
+            ORDER BY f.ModuleName, f.FormName
+        `);
+        
+        // Get distinct modules for filter
+        const modules = await pool.request().query('SELECT DISTINCT ModuleName FROM Forms ORDER BY ModuleName');
         await pool.close();
         
+        const successMsg = req.query.success ? '<div class="alert alert-success">✅ ' + (req.query.msg || 'Operation completed successfully!') + '</div>' : '';
+        const errorMsg = req.query.error ? '<div class="alert alert-error">❌ ' + req.query.error + '</div>' : '';
+        
         let formRows = forms.recordset.map(f => `
-            <tr>
-                <td>${f.FormCode}</td>
-                <td>${f.FormName}</td>
+            <tr data-form-id="${f.Id}" data-module="${f.ModuleName}">
+                <td>${f.Id}</td>
+                <td><code style="background:#f0f0f0;padding:3px 8px;border-radius:4px;">${f.FormCode}</code></td>
+                <td><strong>${f.FormName}</strong></td>
                 <td><span class="module-badge">${f.ModuleName}</span></td>
-                <td>${f.FormUrl}</td>
-                <td><span class="status-badge ${f.IsActive ? 'active' : 'inactive'}">${f.IsActive ? 'Active' : 'Inactive'}</span></td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;" title="${f.FormUrl || ''}">${f.FormUrl || '-'}</td>
+                <td><span class="role-count">${f.RoleCount} roles</span></td>
+                <td>
+                    <label class="toggle-switch">
+                        <input type="checkbox" ${f.IsActive ? 'checked' : ''} onchange="toggleFormStatus(${f.Id}, this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </td>
+                <td class="actions-cell">
+                    <button class="btn btn-primary btn-sm" onclick="editForm(${f.Id})">✏️ Edit</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteForm(${f.Id}, '${f.FormCode.replace(/'/g, "\\'")}', ${f.RoleCount})" ${f.RoleCount > 0 ? 'title="Warning: This form has role assignments"' : ''}>🗑️</button>
+                </td>
             </tr>
         `).join('');
+        
+        let moduleOptions = modules.recordset.map(m => 
+            `<option value="${m.ModuleName}">${m.ModuleName}</option>`
+        ).join('');
         
         res.send(`
             <!DOCTYPE html>
             <html>
             <head>
+<meta charset="UTF-8">
                 <title>Form Registry - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
                     body { font-family: 'Segoe UI', Arial; background: #f0f2f5; min-height: 100vh; }
@@ -2107,14 +2190,20 @@ router.get('/forms', async (req, res) => {
                         align-items: center;
                     }
                     .header h1 { font-size: 24px; }
-                    .header-nav a {
+                    .header-nav a, .header-nav button {
                         color: white;
                         text-decoration: none;
-                        margin-left: 20px;
-                        opacity: 0.8;
+                        margin-left: 15px;
+                        opacity: 0.9;
+                        background: rgba(255,255,255,0.15);
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-size: 14px;
                     }
-                    .header-nav a:hover { opacity: 1; }
-                    .container { max-width: 1200px; margin: 0 auto; padding: 30px 20px; }
+                    .header-nav a:hover, .header-nav button:hover { opacity: 1; background: rgba(255,255,255,0.25); }
+                    .container { max-width: 1400px; margin: 0 auto; padding: 30px 20px; }
                     .card {
                         background: white;
                         border-radius: 15px;
@@ -2131,8 +2220,8 @@ router.get('/forms', async (req, res) => {
                     }
                     .card-title { font-size: 20px; font-weight: 600; }
                     table { width: 100%; border-collapse: collapse; }
-                    th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
-                    th { background: #f8f9fa; font-weight: 600; color: #555; }
+                    th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
+                    th { background: #f8f9fa; font-weight: 600; color: #555; font-size: 13px; }
                     tr:hover { background: #f8f9fa; }
                     .module-badge {
                         background: #e8f5e9;
@@ -2141,47 +2230,187 @@ router.get('/forms', async (req, res) => {
                         border-radius: 20px;
                         font-size: 12px;
                     }
-                    .status-badge {
+                    .role-count {
+                        background: #e3f2fd;
+                        color: #1976d2;
                         padding: 5px 12px;
                         border-radius: 20px;
                         font-size: 12px;
                     }
-                    .status-badge.active { background: #e8f5e9; color: #2e7d32; }
-                    .status-badge.inactive { background: #ffebee; color: #c62828; }
                     .btn {
-                        padding: 10px 20px;
+                        padding: 8px 16px;
                         border: none;
-                        border-radius: 8px;
+                        border-radius: 6px;
                         cursor: pointer;
                         text-decoration: none;
-                        font-size: 14px;
+                        font-size: 13px;
+                        display: inline-block;
                     }
+                    .btn-sm { padding: 6px 12px; font-size: 12px; }
                     .btn-primary { background: #0078d4; color: white; }
                     .btn-primary:hover { background: #005a9e; }
+                    .btn-success { background: #28a745; color: white; }
+                    .btn-success:hover { background: #218838; }
+                    .btn-danger { background: #dc3545; color: white; }
+                    .btn-danger:hover { background: #c82333; }
+                    .btn-secondary { background: #6c757d; color: white; }
+                    .alert { padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+                    .alert-success { background: #d4edda; color: #155724; }
+                    .alert-error { background: #f8d7da; color: #721c24; }
+                    .actions-cell { white-space: nowrap; }
+                    .actions-cell .btn { margin-right: 5px; }
+                    
+                    /* Toggle Switch */
+                    .toggle-switch {
+                        position: relative;
+                        display: inline-block;
+                        width: 50px;
+                        height: 26px;
+                    }
+                    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+                    .toggle-slider {
+                        position: absolute;
+                        cursor: pointer;
+                        top: 0; left: 0; right: 0; bottom: 0;
+                        background-color: #ccc;
+                        transition: .3s;
+                        border-radius: 26px;
+                    }
+                    .toggle-slider:before {
+                        position: absolute;
+                        content: "";
+                        height: 20px;
+                        width: 20px;
+                        left: 3px;
+                        bottom: 3px;
+                        background-color: white;
+                        transition: .3s;
+                        border-radius: 50%;
+                    }
+                    input:checked + .toggle-slider { background-color: #28a745; }
+                    input:checked + .toggle-slider:before { transform: translateX(24px); }
+                    
+                    /* Modal */
+                    .modal {
+                        display: none;
+                        position: fixed;
+                        top: 0; left: 0;
+                        width: 100%; height: 100%;
+                        background: rgba(0,0,0,0.5);
+                        justify-content: center;
+                        align-items: center;
+                        z-index: 1000;
+                    }
+                    .modal.show { display: flex; }
+                    .modal-content {
+                        background: white;
+                        padding: 30px;
+                        border-radius: 15px;
+                        width: 600px;
+                        max-width: 90%;
+                        max-height: 90vh;
+                        overflow-y: auto;
+                    }
+                    .modal-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 25px;
+                    }
+                    .modal-title { font-size: 20px; font-weight: 600; }
+                    .modal-close {
+                        background: none;
+                        border: none;
+                        font-size: 24px;
+                        cursor: pointer;
+                        color: #666;
+                    }
+                    .form-group { margin-bottom: 20px; }
+                    .form-group label { display: block; margin-bottom: 8px; font-weight: 500; color: #333; }
+                    .form-group input, .form-group select, .form-group textarea {
+                        width: 100%;
+                        padding: 12px;
+                        border: 1px solid #ddd;
+                        border-radius: 8px;
+                        font-size: 14px;
+                    }
+                    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+                        outline: none;
+                        border-color: #0078d4;
+                    }
+                    .form-row {
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 15px;
+                    }
+                    .modal-actions {
+                        display: flex;
+                        gap: 10px;
+                        justify-content: flex-end;
+                        margin-top: 25px;
+                        padding-top: 20px;
+                        border-top: 1px solid #eee;
+                    }
+                    .help-text { font-size: 12px; color: #666; margin-top: 5px; }
                 </style>
             </head>
             <body>
                 <div class="header">
                     <h1>📋 Form Registry</h1>
                     <div class="header-nav">
+                        <a href="/admin/forms/export" style="background:#28a745;">📥 Export CSV</a>
+                        <button onclick="openCreateModal()">➕ Add New Form</button>
                         <a href="/admin">← Admin Panel</a>
-                        <a href="/dashboard">Dashboard</a>
+                        <a href="/admin/roles">Role Management</a>
                     </div>
                 </div>
                 <div class="container">
+                    ${successMsg}
+                    ${errorMsg}
                     <div class="card">
                         <div class="card-header">
                             <div class="card-title">Available Forms</div>
-                            <button class="btn btn-primary" onclick="alert('Add form functionality coming soon')">+ Add Form</button>
+                            <div>Total: <span id="formCount">${forms.recordset.length}</span> forms</div>
                         </div>
-                        <table>
+                        
+                        <!-- Filter Section -->
+                        <div style="display:flex; gap:15px; margin-bottom:20px; padding:15px; background:#f8f9fa; border-radius:10px; flex-wrap:wrap; align-items:center;">
+                            <div style="flex:1; min-width:200px;">
+                                <input type="text" id="searchFilter" placeholder="🔍 Search form name or code..." 
+                                    style="width:100%; padding:10px 15px; border:1px solid #ddd; border-radius:8px; font-size:14px;"
+                                    onkeyup="filterForms()">
+                            </div>
+                            <div style="min-width:150px;">
+                                <select id="moduleFilter" onchange="filterForms()" 
+                                    style="width:100%; padding:10px 15px; border:1px solid #ddd; border-radius:8px; font-size:14px;">
+                                    <option value="">All Modules</option>
+                                    ${moduleOptions}
+                                </select>
+                            </div>
+                            <div style="min-width:130px;">
+                                <select id="statusFilter" onchange="filterForms()" 
+                                    style="width:100%; padding:10px 15px; border:1px solid #ddd; border-radius:8px; font-size:14px;">
+                                    <option value="">All Status</option>
+                                    <option value="active">Active Only</option>
+                                    <option value="inactive">Inactive Only</option>
+                                </select>
+                            </div>
+                            <button onclick="clearFilters()" style="padding:10px 20px; background:#6c757d; color:white; border:none; border-radius:8px; cursor:pointer;">
+                                ✖ Clear
+                            </button>
+                        </div>
+                        
+                        <table id="formsTable">
                             <thead>
                                 <tr>
+                                    <th>ID</th>
                                     <th>Form Code</th>
                                     <th>Form Name</th>
                                     <th>Module</th>
                                     <th>URL</th>
-                                    <th>Status</th>
+                                    <th>Roles</th>
+                                    <th>Active</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -2190,6 +2419,232 @@ router.get('/forms', async (req, res) => {
                         </table>
                     </div>
                 </div>
+                
+                <!-- Create/Edit Form Modal -->
+                <div class="modal" id="formModal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <div class="modal-title" id="modalTitle">Add New Form</div>
+                            <button class="modal-close" onclick="closeModal()">×</button>
+                        </div>
+                        <form id="formForm">
+                            <input type="hidden" id="formId">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Form Code *</label>
+                                    <input type="text" id="formCode" required placeholder="e.g., OHS_INSPECTION" style="text-transform:uppercase;">
+                                    <div class="help-text">Unique identifier (uppercase, underscores)</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Module Name *</label>
+                                    <input type="text" id="moduleName" required placeholder="e.g., OHS" list="moduleList">
+                                    <datalist id="moduleList">
+                                        ${moduleOptions}
+                                    </datalist>
+                                    <div class="help-text">Module this form belongs to</div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Form Name *</label>
+                                <input type="text" id="formName" required placeholder="e.g., OHS Inspection">
+                            </div>
+                            <div class="form-group">
+                                <label>Form URL</label>
+                                <input type="text" id="formUrl" placeholder="e.g., /ohs-inspection">
+                                <div class="help-text">URL pattern for route matching (optional)</div>
+                            </div>
+                            <div class="form-group">
+                                <label>Description</label>
+                                <textarea id="formDescription" rows="2" placeholder="Brief description of this form"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="formIsActive" checked> Active
+                                </label>
+                            </div>
+                            <div class="modal-actions">
+                                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                                <button type="submit" class="btn btn-success" id="submitBtn">💾 Create Form</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                <script>
+                    let isEditMode = false;
+                    let formsData = ${JSON.stringify(forms.recordset)};
+                    
+                    function filterForms() {
+                        const searchText = document.getElementById('searchFilter').value.toLowerCase();
+                        const moduleFilter = document.getElementById('moduleFilter').value;
+                        const statusFilter = document.getElementById('statusFilter').value;
+                        
+                        const rows = document.querySelectorAll('#formsTable tbody tr');
+                        let visibleCount = 0;
+                        
+                        rows.forEach(row => {
+                            const formCode = row.cells[1].textContent.toLowerCase();
+                            const formName = row.cells[2].textContent.toLowerCase();
+                            const module = row.dataset.module;
+                            const isActive = row.querySelector('input[type="checkbox"]').checked;
+                            
+                            let show = true;
+                            
+                            if (searchText && !formCode.includes(searchText) && !formName.includes(searchText)) {
+                                show = false;
+                            }
+                            if (moduleFilter && module !== moduleFilter) {
+                                show = false;
+                            }
+                            if (statusFilter === 'active' && !isActive) show = false;
+                            if (statusFilter === 'inactive' && isActive) show = false;
+                            
+                            row.style.display = show ? '' : 'none';
+                            if (show) visibleCount++;
+                        });
+                        
+                        document.getElementById('formCount').textContent = visibleCount;
+                    }
+                    
+                    function clearFilters() {
+                        document.getElementById('searchFilter').value = '';
+                        document.getElementById('moduleFilter').value = '';
+                        document.getElementById('statusFilter').value = '';
+                        filterForms();
+                    }
+                    
+                    function openCreateModal() {
+                        isEditMode = false;
+                        document.getElementById('modalTitle').textContent = 'Add New Form';
+                        document.getElementById('submitBtn').textContent = '💾 Create Form';
+                        document.getElementById('formId').value = '';
+                        document.getElementById('formCode').value = '';
+                        document.getElementById('formCode').disabled = false;
+                        document.getElementById('moduleName').value = '';
+                        document.getElementById('formName').value = '';
+                        document.getElementById('formUrl').value = '';
+                        document.getElementById('formDescription').value = '';
+                        document.getElementById('formIsActive').checked = true;
+                        document.getElementById('formModal').classList.add('show');
+                    }
+                    
+                    function editForm(id) {
+                        const form = formsData.find(f => f.Id === id);
+                        if (!form) return;
+                        
+                        isEditMode = true;
+                        document.getElementById('modalTitle').textContent = 'Edit Form';
+                        document.getElementById('submitBtn').textContent = '💾 Save Changes';
+                        document.getElementById('formId').value = id;
+                        document.getElementById('formCode').value = form.FormCode;
+                        document.getElementById('formCode').disabled = true; // Can't change code
+                        document.getElementById('moduleName').value = form.ModuleName;
+                        document.getElementById('formName').value = form.FormName;
+                        document.getElementById('formUrl').value = form.FormUrl || '';
+                        document.getElementById('formDescription').value = form.Description || '';
+                        document.getElementById('formIsActive').checked = form.IsActive;
+                        document.getElementById('formModal').classList.add('show');
+                    }
+                    
+                    function closeModal() {
+                        document.getElementById('formModal').classList.remove('show');
+                    }
+                    
+                    async function toggleFormStatus(id, isActive) {
+                        try {
+                            const response = await fetch('/admin/api/forms/' + id + '/toggle', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ isActive })
+                            });
+                            const data = await response.json();
+                            if (!data.success) {
+                                alert('Error: ' + data.error);
+                                // Revert toggle
+                                document.querySelector('tr[data-form-id="' + id + '"] input[type="checkbox"]').checked = !isActive;
+                            }
+                        } catch (err) {
+                            alert('Error: ' + err.message);
+                        }
+                    }
+                    
+                    document.getElementById('formForm').addEventListener('submit', async function(e) {
+                        e.preventDefault();
+                        
+                        const formId = document.getElementById('formId').value;
+                        const formCode = document.getElementById('formCode').value.trim().toUpperCase();
+                        const moduleName = document.getElementById('moduleName').value.trim();
+                        const formName = document.getElementById('formName').value.trim();
+                        const formUrl = document.getElementById('formUrl').value.trim();
+                        const description = document.getElementById('formDescription').value.trim();
+                        const isActive = document.getElementById('formIsActive').checked;
+                        
+                        if (!formCode || !moduleName || !formName) {
+                            alert('Please fill in all required fields');
+                            return;
+                        }
+                        
+                        const submitBtn = document.getElementById('submitBtn');
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = 'Saving...';
+                        
+                        try {
+                            const url = isEditMode ? '/admin/api/forms/' + formId : '/admin/api/forms';
+                            const method = isEditMode ? 'PUT' : 'POST';
+                            
+                            const response = await fetch(url, {
+                                method: method,
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ formCode, moduleName, formName, formUrl, description, isActive })
+                            });
+                            
+                            const data = await response.json();
+                            
+                            if (data.success) {
+                                window.location.href = '/admin/forms?success=1&msg=' + encodeURIComponent(data.message);
+                            } else {
+                                alert('Error: ' + (data.error || 'Failed to save form'));
+                                submitBtn.disabled = false;
+                                submitBtn.textContent = isEditMode ? '💾 Save Changes' : '💾 Create Form';
+                            }
+                        } catch (err) {
+                            alert('Error: ' + err.message);
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = isEditMode ? '💾 Save Changes' : '💾 Create Form';
+                        }
+                    });
+                    
+                    async function deleteForm(id, code, roleCount) {
+                        let msg = 'Are you sure you want to delete form "' + code + '"?';
+                        if (roleCount > 0) {
+                            msg += '\\n\\n⚠️ Warning: This form has ' + roleCount + ' role assignments that will also be deleted.';
+                        }
+                        
+                        if (!confirm(msg)) return;
+                        
+                        try {
+                            const response = await fetch('/admin/api/forms/' + id, { method: 'DELETE' });
+                            const data = await response.json();
+                            
+                            if (data.success) {
+                                window.location.href = '/admin/forms?success=1&msg=' + encodeURIComponent('Form deleted successfully');
+                            } else {
+                                alert('Error: ' + (data.error || 'Failed to delete form'));
+                            }
+                        } catch (err) {
+                            alert('Error: ' + err.message);
+                        }
+                    }
+                    
+                    // Auto-uppercase form code
+                    document.getElementById('formCode').addEventListener('input', function() {
+                        this.value = this.value.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+                    });
+                    
+                    document.getElementById('formModal').addEventListener('click', function(e) {
+                        if (e.target === this) closeModal();
+                    });
+                </script>
             </body>
             </html>
         `);
@@ -2245,6 +2700,7 @@ router.get('/roles', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
+<meta charset="UTF-8">
                 <title>Role Management - ${process.env.APP_NAME}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -2397,7 +2853,8 @@ router.get('/roles', async (req, res) => {
                 <div class="header">
                     <h1>🔐 Role Management</h1>
                     <div class="header-nav">
-                        <a href="/admin/roles/download-matrix" style="background:#28a745;">📥 Download Matrix</a>
+                        <a href="/admin/roles/download-matrix" style="background:#28a745;">📥 Permission Matrix</a>
+                        <a href="/admin/roles/export-users" style="background:#17a2b8;">📤 Export Users</a>
                         <button onclick="openCreateModal()">➕ Create New Role</button>
                         <a href="/admin">← Admin Panel</a>
                         <a href="/admin/users">User Management</a>
@@ -2816,6 +3273,205 @@ router.delete('/api/roles/:id', async (req, res) => {
 });
 
 // ==========================================
+// Forms API Endpoints
+// ==========================================
+
+// Create new form
+router.post('/api/forms', async (req, res) => {
+    try {
+        const { formCode, moduleName, formName, formUrl, description, isActive } = req.body;
+        
+        if (!formCode || !moduleName || !formName) {
+            return res.json({ success: false, error: 'Form code, module name, and form name are required' });
+        }
+        
+        const pool = await sql.connect(dbConfig);
+        
+        // Check if form code already exists
+        const existing = await pool.request()
+            .input('formCode', sql.NVarChar, formCode)
+            .query('SELECT Id FROM Forms WHERE FormCode = @formCode');
+        
+        if (existing.recordset.length > 0) {
+            await pool.close();
+            return res.json({ success: false, error: 'A form with this code already exists' });
+        }
+        
+        // Insert new form
+        await pool.request()
+            .input('formCode', sql.NVarChar, formCode)
+            .input('formName', sql.NVarChar, formName)
+            .input('moduleName', sql.NVarChar, moduleName)
+            .input('formUrl', sql.NVarChar, formUrl || null)
+            .input('description', sql.NVarChar, description || null)
+            .input('isActive', sql.Bit, isActive !== false)
+            .query(`
+                INSERT INTO Forms (FormCode, FormName, ModuleName, FormUrl, Description, IsActive, CreatedAt)
+                VALUES (@formCode, @formName, @moduleName, @formUrl, @description, @isActive, GETDATE())
+            `);
+        
+        await pool.close();
+        
+        console.log(`✅ Form created (${formCode}) by ${req.currentUser.email}`);
+        
+        res.json({ success: true, message: 'Form created successfully' });
+        
+    } catch (err) {
+        console.error('Error creating form:', err);
+        res.json({ success: false, error: err.message });
+    }
+});
+
+// Update form
+router.put('/api/forms/:id', async (req, res) => {
+    try {
+        const formId = req.params.id;
+        const { moduleName, formName, formUrl, description, isActive } = req.body;
+        
+        if (!moduleName || !formName) {
+            return res.json({ success: false, error: 'Module name and form name are required' });
+        }
+        
+        const pool = await sql.connect(dbConfig);
+        
+        await pool.request()
+            .input('id', sql.Int, formId)
+            .input('formName', sql.NVarChar, formName)
+            .input('moduleName', sql.NVarChar, moduleName)
+            .input('formUrl', sql.NVarChar, formUrl || null)
+            .input('description', sql.NVarChar, description || null)
+            .input('isActive', sql.Bit, isActive !== false)
+            .query(`
+                UPDATE Forms 
+                SET FormName = @formName, 
+                    ModuleName = @moduleName, 
+                    FormUrl = @formUrl, 
+                    Description = @description, 
+                    IsActive = @isActive,
+                    UpdatedAt = GETDATE()
+                WHERE Id = @id
+            `);
+        
+        await pool.close();
+        
+        console.log(`✅ Form updated (ID: ${formId}) by ${req.currentUser.email}`);
+        
+        res.json({ success: true, message: 'Form updated successfully' });
+        
+    } catch (err) {
+        console.error('Error updating form:', err);
+        res.json({ success: false, error: err.message });
+    }
+});
+
+// Toggle form active status
+router.post('/api/forms/:id/toggle', async (req, res) => {
+    try {
+        const formId = req.params.id;
+        const { isActive } = req.body;
+        
+        const pool = await sql.connect(dbConfig);
+        
+        await pool.request()
+            .input('id', sql.Int, formId)
+            .input('isActive', sql.Bit, isActive)
+            .query('UPDATE Forms SET IsActive = @isActive, UpdatedAt = GETDATE() WHERE Id = @id');
+        
+        await pool.close();
+        
+        console.log(`✅ Form ${isActive ? 'activated' : 'deactivated'} (ID: ${formId}) by ${req.currentUser.email}`);
+        
+        res.json({ success: true });
+        
+    } catch (err) {
+        console.error('Error toggling form status:', err);
+        res.json({ success: false, error: err.message });
+    }
+});
+
+// Delete form
+router.delete('/api/forms/:id', async (req, res) => {
+    try {
+        const formId = req.params.id;
+        
+        const pool = await sql.connect(dbConfig);
+        
+        // Delete role permissions for this form first
+        await pool.request()
+            .input('id', sql.Int, formId)
+            .query('DELETE FROM RoleFormAccess WHERE FormId = @id');
+        
+        // Delete user form access
+        await pool.request()
+            .input('id', sql.Int, formId)
+            .query('DELETE FROM UserFormAccess WHERE FormId = @id');
+        
+        // Delete the form
+        await pool.request()
+            .input('id', sql.Int, formId)
+            .query('DELETE FROM Forms WHERE Id = @id');
+        
+        await pool.close();
+        
+        console.log(`✅ Form deleted (ID: ${formId}) by ${req.currentUser.email}`);
+        
+        res.json({ success: true, message: 'Form deleted successfully' });
+        
+    } catch (err) {
+        console.error('Error deleting form:', err);
+        res.json({ success: false, error: err.message });
+    }
+});
+
+// Export forms to CSV
+router.get('/forms/export', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const forms = await pool.request().query(`
+            SELECT 
+                f.Id,
+                f.FormCode,
+                f.FormName,
+                f.ModuleName,
+                f.FormUrl,
+                f.Description,
+                CASE WHEN f.IsActive = 1 THEN 'Active' ELSE 'Inactive' END as Status,
+                (SELECT COUNT(*) FROM RoleFormAccess WHERE FormId = f.Id) as RoleCount,
+                FORMAT(f.CreatedAt, 'yyyy-MM-dd HH:mm') as CreatedAt
+            FROM Forms f 
+            ORDER BY f.ModuleName, f.FormName
+        `);
+        await pool.close();
+        
+        // Generate CSV
+        const headers = ['ID', 'Form Code', 'Form Name', 'Module', 'URL', 'Description', 'Status', 'Roles Assigned', 'Created At'];
+        let csv = headers.join(',') + '\\n';
+        
+        forms.recordset.forEach(f => {
+            csv += [
+                f.Id,
+                '"' + (f.FormCode || '').replace(/"/g, '""') + '"',
+                '"' + (f.FormName || '').replace(/"/g, '""') + '"',
+                '"' + (f.ModuleName || '').replace(/"/g, '""') + '"',
+                '"' + (f.FormUrl || '').replace(/"/g, '""') + '"',
+                '"' + (f.Description || '').replace(/"/g, '""') + '"',
+                f.Status,
+                f.RoleCount,
+                f.CreatedAt || ''
+            ].join(',') + '\\n';
+        });
+        
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename=forms-registry-' + new Date().toISOString().split('T')[0] + '.csv');
+        res.send(csv);
+        
+    } catch (err) {
+        console.error('Error exporting forms:', err);
+        res.status(500).send('Error: ' + err.message);
+    }
+});
+
+// ==========================================
 // Cache Management API
 // ==========================================
 
@@ -2863,6 +3519,7 @@ router.get('/impersonate', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
+<meta charset="UTF-8">
                 <title>Impersonate User - ${process.env.APP_NAME}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -3176,6 +3833,7 @@ router.get('/broadcast', requireSysAdmin, async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
+<meta charset="UTF-8">
                 <title>Send Broadcast - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -3610,6 +4268,7 @@ router.get('/email-templates', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
+<meta charset="UTF-8">
                 <title>Email Templates - Admin</title>
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -3772,7 +4431,11 @@ router.get('/email-templates', async (req, res) => {
                                 const iframe = document.getElementById('previewIframe');
                                 const doc = iframe.contentDocument || iframe.contentWindow.document;
                                 doc.open();
-                                doc.write(data.html);
+                                // Ensure UTF-8 encoding for emojis
+                                const htmlWithCharset = data.html.includes('<head>') 
+                                    ? data.html.replace('<head>', '<head><meta charset="UTF-8">')
+                                    : '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>' + data.html + '</body></html>';
+                                doc.write(htmlWithCharset);
                                 doc.close();
                                 document.getElementById('previewModal').style.display = 'flex';
                             } else {
@@ -3816,8 +4479,10 @@ router.get('/email-templates', async (req, res) => {
                             
                             if (data.success) {
                                 const previewWin = window.open('', 'Preview', 'width=800,height=600');
+                                previewWin.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>');
                                 previewWin.document.write('<h3 style="font-family:sans-serif;padding:10px;background:#f5f5f5;margin:0;">Subject: ' + data.subject + '</h3>');
                                 previewWin.document.write(data.html);
+                                previewWin.document.write('</body></html>');
                             } else {
                                 showToast('Error: ' + data.error, 'error');
                             }
@@ -3883,53 +4548,7 @@ router.get('/email-templates', async (req, res) => {
     }
 });
 
-// API to get single template
-router.get('/api/email-templates/:templateKey', async (req, res) => {
-    try {
-        const pool = await sql.connect(dbConfig);
-        const result = await pool.request()
-            .input('templateKey', req.params.templateKey)
-            .query('SELECT * FROM EmailTemplates WHERE TemplateKey = @templateKey');
-        
-        if (result.recordset.length === 0) {
-            return res.status(404).json({ success: false, error: 'Template not found' });
-        }
-        
-        res.json({ success: true, template: result.recordset[0] });
-    } catch (error) {
-        console.error('Error getting template:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// API to update template
-router.put('/api/email-templates/:templateKey', async (req, res) => {
-    try {
-        const { subject, body } = req.body;
-        const pool = await sql.connect(dbConfig);
-        
-        await pool.request()
-            .input('templateKey', req.params.templateKey)
-            .input('subject', subject)
-            .input('body', body)
-            .input('updatedBy', req.user?.name || 'Admin')
-            .query(`
-                UPDATE EmailTemplates 
-                SET SubjectTemplate = @subject, 
-                    BodyTemplate = @body, 
-                    UpdatedAt = GETDATE(),
-                    UpdatedBy = @updatedBy
-                WHERE TemplateKey = @templateKey
-            `);
-        
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Error updating template:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// API to preview template with sample data
+// API to preview template with sample data (MUST be before /:templateKey route)
 router.get('/api/email-templates/preview', async (req, res) => {
     try {
         const { templateKey, module, type } = req.query;
@@ -3978,6 +4597,9 @@ router.get('/api/email-templates/preview', async (req, res) => {
             lowFindings: '4',
             criticalFindings: '1',
             deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB'),
+            daysOverdue: '3',
+            recipientName: 'Ahmed Al Maktoum',
+            actionPlanUrl: 'https://oeapp.gmrlapps.com/oe-inspection/action-plan/1',
             year: new Date().getFullYear().toString()
         };
         
@@ -3998,7 +4620,7 @@ router.get('/api/email-templates/preview', async (req, res) => {
     }
 });
 
-// API to preview custom template (for editor)
+// API to preview custom template (for editor) - MUST be before /:templateKey route
 router.post('/api/email-templates/preview-custom', (req, res) => {
     try {
         const { subject, body } = req.body;
@@ -4026,6 +4648,9 @@ router.post('/api/email-templates/preview-custom', (req, res) => {
             lowFindings: '4',
             criticalFindings: '1',
             deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB'),
+            daysOverdue: '3',
+            recipientName: 'Ahmed Al Maktoum',
+            actionPlanUrl: 'https://oeapp.gmrlapps.com/oe-inspection/action-plan/1',
             year: new Date().getFullYear().toString()
         };
         
@@ -4042,6 +4667,52 @@ router.post('/api/email-templates/preview-custom', (req, res) => {
         res.json({ success: true, subject: processedSubject, html: processedHtml });
     } catch (error) {
         console.error('Error previewing custom template:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// API to get single template (MUST be after /preview routes due to :templateKey param)
+router.get('/api/email-templates/:templateKey', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request()
+            .input('templateKey', req.params.templateKey)
+            .query('SELECT * FROM EmailTemplates WHERE TemplateKey = @templateKey');
+        
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ success: false, error: 'Template not found' });
+        }
+        
+        res.json({ success: true, template: result.recordset[0] });
+    } catch (error) {
+        console.error('Error getting template:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// API to update template
+router.put('/api/email-templates/:templateKey', async (req, res) => {
+    try {
+        const { subject, body } = req.body;
+        const pool = await sql.connect(dbConfig);
+        
+        await pool.request()
+            .input('templateKey', req.params.templateKey)
+            .input('subject', subject)
+            .input('body', body)
+            .input('updatedBy', req.user?.name || 'Admin')
+            .query(`
+                UPDATE EmailTemplates 
+                SET SubjectTemplate = @subject, 
+                    BodyTemplate = @body, 
+                    UpdatedAt = GETDATE(),
+                    UpdatedBy = @updatedBy
+                WHERE TemplateKey = @templateKey
+            `);
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating template:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

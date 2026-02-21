@@ -128,6 +128,7 @@ router.get('/', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
+                <meta charset="UTF-8">
                 <title>OHS Inspection - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -3492,6 +3493,75 @@ router.post('/api/inspections/:inspectionId/send-report-email', async (req, res)
         }
     } catch (error) {
         console.error('Error sending report email:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ==========================================
+// OHS Escalation Settings API
+// ==========================================
+
+// Get OHS escalation settings
+router.get('/api/escalation-settings', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request().query(`
+            SELECT SettingKey, SettingValue, Description 
+            FROM OHS_EscalationSettings
+        `);
+        await pool.close();
+        
+        const settings = {};
+        result.recordset.forEach(s => {
+            settings[s.SettingKey] = s.SettingValue;
+        });
+        
+        res.json({ success: true, settings });
+    } catch (error) {
+        console.error('Error loading OHS escalation settings:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Update OHS escalation settings
+router.post('/api/escalation-settings', async (req, res) => {
+    try {
+        const { 
+            ActionPlanDeadlineDays, 
+            EscalationEnabled, 
+            ReminderDaysBefore, 
+            EmailNotifications, 
+            InAppNotifications 
+        } = req.body;
+        
+        const pool = await sql.connect(dbConfig);
+        
+        // Update each setting
+        const settings = [
+            { key: 'ActionPlanDeadlineDays', value: ActionPlanDeadlineDays },
+            { key: 'EscalationEnabled', value: EscalationEnabled },
+            { key: 'ReminderDaysBefore', value: ReminderDaysBefore },
+            { key: 'EmailNotifications', value: EmailNotifications },
+            { key: 'InAppNotifications', value: InAppNotifications }
+        ];
+        
+        for (const s of settings) {
+            if (s.value !== undefined) {
+                await pool.request()
+                    .input('key', sql.NVarChar, s.key)
+                    .input('value', sql.NVarChar, String(s.value))
+                    .query(`
+                        UPDATE OHS_EscalationSettings 
+                        SET SettingValue = @value, UpdatedAt = GETDATE() 
+                        WHERE SettingKey = @key
+                    `);
+            }
+        }
+        
+        await pool.close();
+        res.json({ success: true, message: 'OHS escalation settings saved' });
+    } catch (error) {
+        console.error('Error saving OHS escalation settings:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

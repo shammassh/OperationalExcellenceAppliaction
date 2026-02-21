@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Production Extras Dashboard for Operational Excellence
  * OE team can review and manage all production extras requests
  */
@@ -126,7 +126,8 @@ router.get('/', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Production Extras Dashboard - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>Production Extras Dashboard - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
                     body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f6fa; min-height: 100vh; }

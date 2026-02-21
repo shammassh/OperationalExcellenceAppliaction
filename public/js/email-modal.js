@@ -878,7 +878,12 @@ const EmailModal = (function() {
         const iframe = document.getElementById('email-body-preview');
         const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
         iframeDoc.open();
-        iframeDoc.write(options.bodyHtml || '');
+        // Ensure UTF-8 encoding for emojis
+        const bodyHtml = options.bodyHtml || '';
+        const htmlWithCharset = bodyHtml.includes('<head>') 
+            ? bodyHtml.replace('<head>', '<head><meta charset="UTF-8">')
+            : '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>' + bodyHtml + '</body></html>';
+        iframeDoc.write(htmlWithCharset);
         iframeDoc.close();
 
         // Reset status

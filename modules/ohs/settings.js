@@ -1,4 +1,4 @@
-/**
+﻿/**
  * OHS Settings Module
  * Manage OHS configuration: Stores, Event Types, Categories, Sub-Categories, Injury Types, Body Parts
  */
@@ -290,7 +290,8 @@ router.get('/stores', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Stores Management - OHS Settings</title>
+                <meta charset="UTF-8">
+            <title>Stores Management - OHS Settings</title>
                 <style>${getCommonStyles()}</style>
             </head>
             <body>
@@ -515,7 +516,8 @@ router.get('/event-types', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Event Types - OHS Settings</title>
+                <meta charset="UTF-8">
+            <title>Event Types - OHS Settings</title>
                 <style>${getCommonStyles()}</style>
             </head>
             <body>
@@ -744,7 +746,8 @@ router.get('/categories', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Categories - OHS Settings</title>
+                <meta charset="UTF-8">
+            <title>Categories - OHS Settings</title>
                 <style>
                     ${getCommonStyles()}
                     .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
@@ -1170,7 +1173,8 @@ router.get('/injury-types', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Injury Types - OHS Settings</title>
+                <meta charset="UTF-8">
+            <title>Injury Types - OHS Settings</title>
                 <style>${getCommonStyles()}</style>
             </head>
             <body>
@@ -1360,7 +1364,8 @@ router.get('/body-parts', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Body Parts - OHS Settings</title>
+                <meta charset="UTF-8">
+            <title>Body Parts - OHS Settings</title>
                 <style>${getCommonStyles()}</style>
             </head>
             <body>

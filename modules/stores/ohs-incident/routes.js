@@ -1,4 +1,4 @@
-/**
+﻿/**
  * OHS A&I (Accident & Incident) Reporting Routes
  * Allows store management to report accidents, incidents, and near misses
  */
@@ -99,7 +99,8 @@ router.get('/', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>OHS A&I Reporting - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>OHS A&I Reporting - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
                     body { 
@@ -903,6 +904,7 @@ router.get('/success', (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <title>Report Submitted - OHS</title>
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1008,7 +1010,8 @@ router.get('/history', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Incident History - OHS</title>
+                <meta charset="UTF-8">
+            <title>Incident History - OHS</title>
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
                     body { 
@@ -1297,7 +1300,8 @@ router.get('/view/:id', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>${inc.IncidentNumber} - OHS Incident</title>
+                <meta charset="UTF-8">
+            <title>${inc.IncidentNumber} - OHS Incident</title>
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
                     body { 

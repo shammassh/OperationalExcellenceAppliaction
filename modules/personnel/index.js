@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Personnel Module
  * Handles personnel-related forms and requests
  */
@@ -42,6 +42,7 @@ router.get('/', (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <title>Personnel - ${process.env.APP_NAME}</title>
             <style>
                 * { box-sizing: border-box; }

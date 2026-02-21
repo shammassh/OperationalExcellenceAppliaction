@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Theft Incident Settings - Routes
  * Manages Stores, Capture Methods, and Outsource Security Companies
  */
@@ -85,7 +85,8 @@ router.get('/', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Theft Incident Settings - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>Theft Incident Settings - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
                     body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f5; }

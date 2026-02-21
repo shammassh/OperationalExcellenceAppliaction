@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Complaint Routes
  * Store managers submit and track complaints to Third-Party/Cleaning/Procurement/Maintenance departments
  */
@@ -86,7 +86,8 @@ router.get('/', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Complaint - ${process.env.APP_NAME || 'OE App'}</title>
+                <meta charset="UTF-8">
+            <title>Complaint - ${process.env.APP_NAME || 'OE App'}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
                     body { font-family: 'Segoe UI', Arial; background: #f0f2f5; min-height: 100vh; }
@@ -427,6 +428,7 @@ router.get('/success', (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <title>Complaint Submitted - ${process.env.APP_NAME || 'OE App'}</title>
             <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -593,7 +595,8 @@ router.get('/view/:id', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Complaint #${c.Id} - ${process.env.APP_NAME || 'OE App'}</title>
+                <meta charset="UTF-8">
+            <title>Complaint #${c.Id} - ${process.env.APP_NAME || 'OE App'}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
                     body { font-family: 'Segoe UI', Arial; background: #f0f2f5; min-height: 100vh; }
@@ -848,6 +851,7 @@ function generateListPage(title, rows, isMyComplaints) {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <title>${title} - ${process.env.APP_NAME || 'OE App'}</title>
             <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; }

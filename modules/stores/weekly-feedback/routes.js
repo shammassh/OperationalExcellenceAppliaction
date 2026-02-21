@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Weekly Third Party Feedback Routes
  * Store managers submit weekly feedback about third party services
  */
@@ -111,7 +111,8 @@ router.get('/', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Weekly Third Party Feedback - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>Weekly Third Party Feedback - ${process.env.APP_NAME}</title>
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -512,6 +513,7 @@ router.get('/success/:id', async (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <title>Feedback Submitted - ${process.env.APP_NAME}</title>
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
@@ -574,7 +576,8 @@ router.get('/history', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>My Feedback History - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>My Feedback History - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
                     body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f6fa; min-height: 100vh; }
@@ -657,7 +660,8 @@ router.get('/view/:id', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>View Feedback WF-${f.Id} - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>View Feedback WF-${f.Id} - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
                     body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f6fa; min-height: 100vh; }

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Security Schedule Routes
  * Personnel fills weekly schedule for security employees
  */
@@ -64,7 +64,8 @@ router.get('/', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Security Schedule - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>Security Schedule - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; }
                     body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
@@ -212,7 +213,8 @@ router.get('/new', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>New Security Schedule - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>New Security Schedule - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; }
                     body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
@@ -644,7 +646,8 @@ router.get('/view/:id', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>View Schedule #${scheduleId} - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>View Schedule #${scheduleId} - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; }
                     body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }

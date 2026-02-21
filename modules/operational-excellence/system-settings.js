@@ -1,4 +1,4 @@
-/**
+﻿/**
  * System Settings Module for Operational Excellence
  * Manage global settings: Stores, Categories, Third Party Providers
  */
@@ -74,6 +74,7 @@ router.get('/', (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <title>System Settings - ${process.env.APP_NAME}</title>
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }

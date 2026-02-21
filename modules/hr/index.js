@@ -1,4 +1,4 @@
-/**
+﻿/**
  * HR & Talent Module
  * Handles HR-related tasks including Extra Cleaning approvals where HR is responsible
  */
@@ -68,7 +68,8 @@ router.get('/', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>HR & Talent - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>HR & Talent - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; }
                     body { 
@@ -296,7 +297,8 @@ router.get('/extra-cleaning', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Extra Cleaning HR Requests - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>Extra Cleaning HR Requests - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; }
                     body { 
@@ -515,7 +517,8 @@ router.get('/parking-violations', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Parking Violations - HR - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>Parking Violations - HR - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; }
                     body { 
@@ -737,7 +740,8 @@ router.get('/parking-violations/:id', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Parking Violation #${violation.Id} - HR - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>Parking Violation #${violation.Id} - HR - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; }
                     body { 

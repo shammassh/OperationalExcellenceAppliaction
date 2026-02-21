@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Security Services Module - Main Router
  * Internal & Third Party Security Management
  */
@@ -34,6 +34,7 @@ router.get('/', async (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <title>Security Services - ${process.env.APP_NAME}</title>
             <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -265,6 +266,7 @@ router.get('/internal/:section', (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <title>Internal Security - ${req.params.section} - ${process.env.APP_NAME}</title>
             <style>
                 body { font-family: 'Segoe UI', Arial; background: #f0f2f5; min-height: 100vh; }
@@ -301,6 +303,7 @@ router.get('/thirdparty/:section', (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <title>Third Party Security - ${req.params.section} - ${process.env.APP_NAME}</title>
             <style>
                 body { font-family: 'Segoe UI', Arial; background: #f0f2f5; min-height: 100vh; }

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 5 Days Dashboard for Operational Excellence
  * View all store entries for expired items tracking
  */
@@ -140,7 +140,8 @@ router.get('/', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>5 Days Dashboard - OE</title>
+                <meta charset="UTF-8">
+            <title>5 Days Dashboard - OE</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
                     body { font-family: 'Segoe UI', Arial; background: #f0f2f5; min-height: 100vh; }

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Theft Incident Dashboard
  * Review and process theft incident reports
  */
@@ -208,7 +208,8 @@ router.get('/', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Theft Incident Dashboard - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>Theft Incident Dashboard - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
                     body { 

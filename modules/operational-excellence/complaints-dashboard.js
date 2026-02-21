@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Complaints Dashboard for Operational Excellence
  * View and manage all store complaints
  */
@@ -121,7 +121,8 @@ router.get('/', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Complaints Dashboard - ${process.env.APP_NAME || 'OE App'}</title>
+                <meta charset="UTF-8">
+            <title>Complaints Dashboard - ${process.env.APP_NAME || 'OE App'}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
                     body { font-family: 'Segoe UI', Arial; background: #f0f2f5; min-height: 100vh; }

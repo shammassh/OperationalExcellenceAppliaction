@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Theft Incident Report - Routes
  */
 
@@ -126,6 +126,7 @@ router.get('/', async (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <title>Theft Incident Report - ${process.env.APP_NAME}</title>
             <style>
                 * { box-sizing: border-box; }
@@ -678,6 +679,7 @@ router.get('/success', (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <title>Report Submitted - ${process.env.APP_NAME}</title>
             <style>
                 body { 

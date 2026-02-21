@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Delivery Log Sheet Routes
  * Security Services - Delivery Log Management
  */
@@ -28,6 +28,7 @@ router.get('/', async (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <title>Delivery Log Sheet - ${process.env.APP_NAME}</title>
             <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -767,7 +768,8 @@ router.get('/:id', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Delivery Log - ${logDateFormatted} - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>Delivery Log - ${logDateFormatted} - ${process.env.APP_NAME}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
                     body { 

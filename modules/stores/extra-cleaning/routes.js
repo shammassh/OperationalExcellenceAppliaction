@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Extra Cleaning Agents Request Routes
  * Store managers can request extra cleaning agents
  */
@@ -160,7 +160,8 @@ router.get('/', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Extra Cleaning Agents Request - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>Extra Cleaning Agents Request - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
                     body { 
@@ -968,7 +969,8 @@ router.get('/success/:id', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Request Submitted - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>Request Submitted - ${process.env.APP_NAME}</title>
                 <style>
                     body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f6fa; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
                     .success-card { background: white; padding: 50px; border-radius: 16px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 550px; }
@@ -1008,7 +1010,8 @@ router.get('/success/:id', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Request Submitted - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>Request Submitted - ${process.env.APP_NAME}</title>
                 <style>
                     body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f6fa; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
                     .success-card { background: white; padding: 50px; border-radius: 16px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 500px; }
@@ -1074,7 +1077,8 @@ router.get('/my-requests', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>My Requests - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>My Requests - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
                     body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f6fa; min-height: 100vh; }
@@ -1203,7 +1207,8 @@ router.get('/approve/:id', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Approve Request - Extra Cleaning</title>
+                <meta charset="UTF-8">
+            <title>Approve Request - Extra Cleaning</title>
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
                     * { box-sizing: border-box; }
@@ -1382,6 +1387,7 @@ router.get('/approval-success', (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <title>${isApproved ? 'Approved' : 'Rejected'} - Extra Cleaning</title>
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>

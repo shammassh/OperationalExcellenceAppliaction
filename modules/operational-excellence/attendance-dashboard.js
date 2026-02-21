@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Thirdparty Attendance Dashboard
  * OE can view all attendance data with pivot-like filters
  */
@@ -292,7 +292,8 @@ router.get('/', async (req, res) => {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Thirdparty Attendance Dashboard - ${process.env.APP_NAME}</title>
+                <meta charset="UTF-8">
+            <title>Thirdparty Attendance Dashboard - ${process.env.APP_NAME}</title>
                 <style>
                     * { box-sizing: border-box; }
                     body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
