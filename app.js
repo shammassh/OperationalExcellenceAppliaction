@@ -564,6 +564,52 @@ app.get('/api/user', requireAuth, (req, res) => {
     });
 });
 
+// User search API for email forms
+const sql = require('mssql');
+const config = require('./config/default');
+const userSearchDbConfig = {
+    server: config.database.server,
+    database: config.database.database,
+    user: config.database.user,
+    password: config.database.password,
+    options: config.database.options
+};
+
+app.get('/api/users/search', requireAuth, async (req, res) => {
+    try {
+        const { q } = req.query;
+        if (!q || q.length < 2) {
+            return res.json({ success: true, users: [] });
+        }
+        
+        const pool = await sql.connect(userSearchDbConfig);
+        const result = await pool.request()
+            .input('search', sql.NVarChar, `%${q}%`)
+            .query(`
+                SELECT TOP 20 Id, Email, DisplayName as name
+                FROM Users 
+                WHERE IsActive = 1 
+                  AND IsApproved = 1
+                  AND (DisplayName LIKE @search OR Email LIKE @search)
+                ORDER BY DisplayName
+            `);
+        
+        await pool.close();
+        
+        res.json({ 
+            success: true, 
+            users: result.recordset.map(u => ({
+                id: u.Id,
+                email: u.Email,
+                name: u.name || u.Email
+            }))
+        });
+    } catch (error) {
+        console.error('Error searching users:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({ 

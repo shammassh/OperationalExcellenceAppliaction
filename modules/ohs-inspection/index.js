@@ -2309,10 +2309,30 @@ function generateOHSReportHTML(data) {
         .picture-group { margin-bottom: 8px; }
         .pictures-wrapper { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px; }
         .footer { text-align: center; padding: 20px; color: #64748b; font-size: 14px; }
-        @media print { body { background: white; } .container { max-width: 100%; padding: 0; } }
+        .action-bar { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 1000; }
+        .action-bar button { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); transition: transform 0.2s, box-shadow 0.2s; }
+        .action-bar button:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .btn-email { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; }
+        .btn-print { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; }
+        .btn-back { background: linear-gradient(135deg, #64748b 0%, #475569 100%); color: white; }
+        @media print { body { background: white; } .container { max-width: 100%; padding: 0; } .action-bar { display: none !important; } }
     </style>
 </head>
 <body>
+    <div class="action-bar">
+        <button class="btn-back" onclick="goBack()">← Back</button>
+        <button class="btn-email" onclick="openEmailModal('full')">📧 Send Report</button>
+        <button class="btn-print" onclick="window.print()">🖨️ Print</button>
+    </div>
+    <script>
+        function goBack() {
+            if (document.referrer && document.referrer.includes(window.location.hostname)) {
+                history.back();
+            } else {
+                window.location.href = '/ohs-inspection/reports';
+            }
+        }
+    </script>
     <div class="container">
         <div class="header">
             <h1>🦺 OHS Inspection Report</h1>
@@ -2391,6 +2411,54 @@ function generateOHSReportHTML(data) {
             Report generated on ${new Date(generatedAt).toLocaleString()} | OHS Inspection System
         </div>
     </div>
+    <script>
+        const inspectionId = ${audit.Id};
+        
+        async function openEmailModal(reportType) {
+            try {
+                const btn = document.querySelector('.btn-email');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '⏳ Loading...';
+                btn.disabled = true;
+                
+                const recipientsRes = await fetch('/ohs-inspection/api/inspections/' + inspectionId + '/email-recipients?reportType=' + reportType);
+                const recipientsData = await recipientsRes.json();
+                
+                if (!recipientsData.success) {
+                    throw new Error(recipientsData.error || 'Failed to load recipients');
+                }
+                
+                const previewRes = await fetch('/ohs-inspection/api/inspections/' + inspectionId + '/email-preview?reportType=' + reportType);
+                const previewData = await previewRes.json();
+                
+                if (!previewData.success) {
+                    throw new Error(previewData.error || 'Failed to generate preview');
+                }
+                
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                
+                EmailModal.show({
+                    module: 'OHS',
+                    from: recipientsData.from,
+                    to: recipientsData.to,
+                    ccSuggestions: recipientsData.ccSuggestions,
+                    subject: previewData.subject,
+                    bodyHtml: previewData.bodyHtml,
+                    reportType: reportType,
+                    auditId: inspectionId,
+                    sendUrl: '/ohs-inspection/api/inspections/' + inspectionId + '/send-report-email',
+                    searchEndpoint: '/operational-excellence/api/users'
+                });
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error preparing email: ' + error.message);
+                const btn = document.querySelector('.btn-email');
+                if (btn) { btn.innerHTML = '📧 Send Report'; btn.disabled = false; }
+            }
+        }
+    </script>
+    <script src="/js/email-modal.js"></script>
 </body>
 </html>`;
 }
@@ -3047,6 +3115,383 @@ router.post('/api/action-plan/send-email', async (req, res) => {
         res.json(result);
     } catch (error) {
         console.error('Error sending action plan email:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ==========================================
+// Email Report Endpoints
+// ==========================================
+
+const emailService = require('../../services/email-service');
+const emailTemplateBuilder = require('../../services/email-template-builder');
+
+// Get email recipients for an OHS inspection (store manager + brand responsibles for CC)
+// For action-plan reports, the To recipient is the inspector who created the inspection
+// For full reports, the To recipient is the store manager
+router.get('/api/inspections/:inspectionId/email-recipients', async (req, res) => {
+    try {
+        const { inspectionId } = req.params;
+        const { reportType } = req.query; // 'full' or 'action-plan'
+        const pool = await sql.connect(dbConfig);
+        
+        // Get inspection info with store and brand
+        const inspectionResult = await pool.request()
+            .input('inspectionId', sql.Int, inspectionId)
+            .query(`
+                SELECT 
+                    i.Id as inspectionId,
+                    i.DocumentNumber,
+                    i.StoreId,
+                    s.StoreName,
+                    s.StoreCode,
+                    s.BrandId,
+                    b.BrandName,
+                    b.BrandCode,
+                    b.PrimaryColor as BrandColor,
+                    i.Score as TotalScore,
+                    i.InspectionDate,
+                    i.Inspectors,
+                    i.Status,
+                    i.CreatedBy
+                FROM OHS_Inspections i
+                INNER JOIN Stores s ON i.StoreId = s.Id
+                LEFT JOIN Brands b ON s.BrandId = b.Id
+                WHERE i.Id = @inspectionId
+            `);
+        
+        if (inspectionResult.recordset.length === 0) {
+            await pool.close();
+            return res.status(404).json({ error: 'Inspection not found' });
+        }
+        
+        const inspection = inspectionResult.recordset[0];
+        
+        let toRecipient = null;
+        
+        // For action-plan reports, send to the inspector who created the inspection
+        if (reportType === 'action-plan' && inspection.CreatedBy) {
+            const inspectorResult = await pool.request()
+                .input('userId', sql.Int, inspection.CreatedBy)
+                .query(`
+                    SELECT Id, Email, DisplayName
+                    FROM Users
+                    WHERE Id = @userId AND IsActive = 1
+                `);
+            
+            if (inspectorResult.recordset.length > 0) {
+                const inspector = inspectorResult.recordset[0];
+                toRecipient = {
+                    email: inspector.Email,
+                    name: inspector.DisplayName
+                };
+            }
+        } else {
+            // For full reports, send to store manager
+            const storeManagerResult = await pool.request()
+                .input('storeId', sql.Int, inspection.StoreId)
+                .query(`
+                    SELECT TOP 1 u.Id, u.Email, u.DisplayName
+                    FROM StoreManagerAssignments sma
+                    INNER JOIN Users u ON sma.UserId = u.Id
+                    WHERE sma.StoreId = @storeId AND sma.IsPrimary = 1 AND u.IsActive = 1
+                `);
+            
+            if (storeManagerResult.recordset.length > 0) {
+                const storeManager = storeManagerResult.recordset[0];
+                toRecipient = {
+                    email: storeManager.Email,
+                    name: storeManager.DisplayName
+                };
+            }
+        }
+        
+        // Get brand responsibles (CC suggestions)
+        const ccSuggestions = [];
+        
+        if (inspection.BrandId) {
+            const brandResponsiblesResult = await pool.request()
+                .input('brandId', sql.Int, inspection.BrandId)
+                .query(`
+                    SELECT 
+                        br.AreaManagerId, am.Email as AreaManagerEmail, am.DisplayName as AreaManagerName,
+                        br.HeadOfOpsId, ho.Email as HeadOfOpsEmail, ho.DisplayName as HeadOfOpsName
+                    FROM OE_BrandResponsibles br
+                    LEFT JOIN Users am ON br.AreaManagerId = am.Id AND am.IsActive = 1
+                    LEFT JOIN Users ho ON br.HeadOfOpsId = ho.Id AND ho.IsActive = 1
+                    WHERE br.BrandId = @brandId AND br.IsActive = 1
+                `);
+            
+            if (brandResponsiblesResult.recordset.length > 0) {
+                const br = brandResponsiblesResult.recordset[0];
+                if (br.AreaManagerEmail) {
+                    ccSuggestions.push({
+                        email: br.AreaManagerEmail,
+                        name: br.AreaManagerName,
+                        role: 'Area Manager'
+                    });
+                }
+                if (br.HeadOfOpsEmail) {
+                    ccSuggestions.push({
+                        email: br.HeadOfOpsEmail,
+                        name: br.HeadOfOpsName,
+                        role: 'Head of Operations'
+                    });
+                }
+            }
+        }
+        
+        await pool.close();
+        
+        // Build response
+        res.json({
+            success: true,
+            inspection: {
+                inspectionId: inspection.inspectionId,
+                documentNumber: inspection.DocumentNumber,
+                storeName: inspection.StoreName,
+                storeCode: inspection.StoreCode,
+                brandName: inspection.BrandName,
+                brandCode: inspection.BrandCode,
+                brandColor: inspection.BrandColor,
+                totalScore: inspection.TotalScore,
+                inspectionDate: inspection.InspectionDate,
+                inspectors: inspection.Inspectors,
+                status: inspection.Status
+            },
+            to: toRecipient,
+            ccSuggestions: ccSuggestions,
+            from: req.currentUser ? {
+                email: req.currentUser.email,
+                name: req.currentUser.displayName || req.currentUser.name || req.currentUser.email
+            } : null
+        });
+    } catch (error) {
+        console.error('Error fetching email recipients:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get email preview for OHS inspection (subject and body HTML)
+router.get('/api/inspections/:inspectionId/email-preview', async (req, res) => {
+    try {
+        const { inspectionId } = req.params;
+        const { reportType } = req.query; // 'full' or 'action-plan'
+        
+        const pool = await sql.connect(dbConfig);
+        
+        // Get inspection details
+        const inspectionResult = await pool.request()
+            .input('inspectionId', sql.Int, inspectionId)
+            .query(`
+                SELECT 
+                    i.Id, i.DocumentNumber, i.StoreId, s.StoreName, s.StoreCode,
+                    b.BrandCode, i.Score as TotalScore, i.InspectionDate, i.Inspectors, i.Status,
+                    i.Cycle, i.Year
+                FROM OHS_Inspections i
+                INNER JOIN Stores s ON i.StoreId = s.Id
+                LEFT JOIN Brands b ON s.BrandId = b.Id
+                WHERE i.Id = @inspectionId
+            `);
+        
+        if (inspectionResult.recordset.length === 0) {
+            await pool.close();
+            return res.status(404).json({ error: 'Inspection not found' });
+        }
+        
+        const inspection = inspectionResult.recordset[0];
+        
+        // Build report URL
+        const appUrl = process.env.APP_URL || `https://${req.get('host')}`;
+        const reportUrl = reportType === 'action-plan' 
+            ? `${appUrl}/ohs-inspection/api/inspections/reports/OHS_ActionPlan_${inspection.DocumentNumber}_${new Date().toISOString().split('T')[0]}.html`
+            : `${appUrl}/ohs-inspection/api/inspections/reports/OHS_Report_${inspection.DocumentNumber}_${new Date().toISOString().split('T')[0]}.html`;
+        
+        // Get findings stats for action plan
+        let findingsStats = null;
+        if (reportType === 'action-plan') {
+            const findingsResult = await pool.request()
+                .input('inspectionId', sql.Int, inspectionId)
+                .query(`
+                    SELECT 
+                        COUNT(*) as total,
+                        SUM(CASE WHEN Priority = 'Critical' THEN 1 ELSE 0 END) as critical,
+                        SUM(CASE WHEN Priority = 'High' THEN 1 ELSE 0 END) as high,
+                        SUM(CASE WHEN Priority = 'Medium' THEN 1 ELSE 0 END) as medium,
+                        SUM(CASE WHEN Priority = 'Low' THEN 1 ELSE 0 END) as low
+                    FROM OHS_InspectionItems
+                    WHERE InspectionId = @inspectionId AND Finding IS NOT NULL AND Finding != ''
+                `);
+            findingsStats = findingsResult.recordset[0];
+        }
+        
+        await pool.close();
+        
+        // Build email using template builder
+        const inspectionData = {
+            documentNumber: inspection.DocumentNumber,
+            storeName: inspection.StoreName,
+            storeCode: inspection.StoreCode,
+            brandCode: inspection.BrandCode,
+            inspectionDate: inspection.InspectionDate,
+            auditDate: inspection.InspectionDate,
+            inspectors: inspection.Inspectors,
+            auditors: inspection.Inspectors,
+            totalScore: inspection.TotalScore,
+            status: inspection.Status,
+            cycle: inspection.Cycle,
+            year: inspection.Year,
+            passingGrade: 80
+        };
+        
+        // Use database template (falls back to hardcoded if not found)
+        const emailContent = await emailTemplateBuilder.buildEmailFromDB('OHS', reportType, inspectionData, reportUrl, findingsStats);
+        
+        res.json({
+            success: true,
+            subject: emailContent.subject,
+            bodyHtml: emailContent.body,
+            reportUrl: reportUrl
+        });
+    } catch (error) {
+        console.error('Error generating email preview:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Send OHS report email
+router.post('/api/inspections/:inspectionId/send-report-email', async (req, res) => {
+    try {
+        const { inspectionId } = req.params;
+        const { reportType, to, cc } = req.body;
+        
+        if (!to || !to.email) {
+            return res.status(400).json({ error: 'Recipient (to) is required' });
+        }
+        
+        const accessToken = req.session?.accessToken;
+        if (!accessToken) {
+            return res.status(401).json({ error: 'Not authenticated. Please log in again.' });
+        }
+        
+        const pool = await sql.connect(dbConfig);
+        
+        // Get inspection details
+        const inspectionResult = await pool.request()
+            .input('inspectionId', sql.Int, inspectionId)
+            .query(`
+                SELECT 
+                    i.Id, i.DocumentNumber, i.StoreId, s.StoreName, s.StoreCode,
+                    s.BrandId, b.BrandName, b.BrandCode, 
+                    i.Score as TotalScore, i.InspectionDate, i.Inspectors, i.Status, i.Cycle, i.Year
+                FROM OHS_Inspections i
+                INNER JOIN Stores s ON i.StoreId = s.Id
+                LEFT JOIN Brands b ON s.BrandId = b.Id
+                WHERE i.Id = @inspectionId
+            `);
+        
+        if (inspectionResult.recordset.length === 0) {
+            await pool.close();
+            return res.status(404).json({ error: 'Inspection not found' });
+        }
+        
+        const inspection = inspectionResult.recordset[0];
+        
+        // Build report URL
+        const appUrl = process.env.APP_URL || `https://${req.get('host')}`;
+        const reportUrl = reportType === 'action-plan' 
+            ? `${appUrl}/ohs-inspection/api/inspections/reports/OHS_ActionPlan_${inspection.DocumentNumber}_${new Date().toISOString().split('T')[0]}.html`
+            : `${appUrl}/ohs-inspection/api/inspections/reports/OHS_Report_${inspection.DocumentNumber}_${new Date().toISOString().split('T')[0]}.html`;
+        
+        // Get findings stats for action plan
+        let findingsStats = null;
+        if (reportType === 'action-plan') {
+            const findingsResult = await pool.request()
+                .input('inspectionId', sql.Int, inspectionId)
+                .query(`
+                    SELECT 
+                        COUNT(*) as total,
+                        SUM(CASE WHEN Priority = 'Critical' THEN 1 ELSE 0 END) as critical,
+                        SUM(CASE WHEN Priority = 'High' THEN 1 ELSE 0 END) as high,
+                        SUM(CASE WHEN Priority = 'Medium' THEN 1 ELSE 0 END) as medium,
+                        SUM(CASE WHEN Priority = 'Low' THEN 1 ELSE 0 END) as low
+                    FROM OHS_InspectionItems
+                    WHERE InspectionId = @inspectionId AND Finding IS NOT NULL AND Finding != ''
+                `);
+            findingsStats = findingsResult.recordset[0];
+        }
+        
+        // Build email content
+        const inspectionData = {
+            documentNumber: inspection.DocumentNumber,
+            storeName: inspection.StoreName,
+            storeCode: inspection.StoreCode,
+            brandCode: inspection.BrandCode,
+            inspectionDate: inspection.InspectionDate,
+            auditDate: inspection.InspectionDate,
+            inspectors: inspection.Inspectors,
+            auditors: inspection.Inspectors,
+            totalScore: inspection.TotalScore,
+            status: inspection.Status,
+            cycle: inspection.Cycle,
+            year: inspection.Year,
+            passingGrade: 80
+        };
+        
+        // Use database template (falls back to hardcoded if not found)
+        const emailContent = await emailTemplateBuilder.buildEmailFromDB('OHS', reportType, inspectionData, reportUrl, findingsStats);
+        
+        // Build CC string
+        const ccEmails = cc && cc.length > 0 ? cc.map(c => c.email).join(',') : null;
+        
+        // Send email
+        const emailResult = await emailService.sendEmail({
+            to: to.email,
+            subject: emailContent.subject,
+            body: emailContent.body,
+            cc: ccEmails,
+            accessToken: accessToken
+        });
+        
+        // Log the email
+        await pool.request()
+            .input('auditId', sql.Int, inspectionId)
+            .input('documentNumber', sql.NVarChar, inspection.DocumentNumber)
+            .input('module', sql.NVarChar, 'OHS')
+            .input('reportType', sql.NVarChar, reportType)
+            .input('sentBy', sql.Int, req.currentUser?.Id || null)
+            .input('sentByEmail', sql.NVarChar, req.currentUser?.email || 'Unknown')
+            .input('sentByName', sql.NVarChar, req.currentUser?.DisplayName || 'Unknown')
+            .input('sentTo', sql.NVarChar, JSON.stringify([to]))
+            .input('ccRecipients', sql.NVarChar, cc ? JSON.stringify(cc) : null)
+            .input('subject', sql.NVarChar, emailContent.subject)
+            .input('reportUrl', sql.NVarChar, reportUrl)
+            .input('status', sql.NVarChar, emailResult.success ? 'sent' : 'failed')
+            .input('errorMessage', sql.NVarChar, emailResult.error || null)
+            .input('storeId', sql.Int, inspection.StoreId)
+            .input('storeName', sql.NVarChar, inspection.StoreName)
+            .input('brandId', sql.Int, inspection.BrandId)
+            .input('brandName', sql.NVarChar, inspection.BrandName)
+            .query(`
+                INSERT INTO ReportEmailLog 
+                (AuditId, DocumentNumber, Module, ReportType, SentBy, SentByEmail, SentByName, 
+                 SentTo, CcRecipients, Subject, ReportUrl, Status, ErrorMessage, 
+                 StoreId, StoreName, BrandId, BrandName, SentAt)
+                VALUES 
+                (@auditId, @documentNumber, @module, @reportType, @sentBy, @sentByEmail, @sentByName,
+                 @sentTo, @ccRecipients, @subject, @reportUrl, @status, @errorMessage,
+                 @storeId, @storeName, @brandId, @brandName, GETDATE())
+            `);
+        
+        await pool.close();
+        
+        if (emailResult.success) {
+            res.json({ success: true, message: 'Email sent successfully' });
+        } else {
+            res.status(500).json({ success: false, error: emailResult.error || 'Failed to send email' });
+        }
+    } catch (error) {
+        console.error('Error sending report email:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

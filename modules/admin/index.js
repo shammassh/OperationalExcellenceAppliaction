@@ -30,7 +30,8 @@ const requireSysAdmin = async (req, res, next) => {
         '/admin/stores': 'ADMIN_STORES',
         '/admin/impersonate': 'ADMIN_IMPERSONATE',
         '/admin/sessions': 'ADMIN_SESSIONS',
-        '/admin/notification-history': 'ADMIN_NOTIFICATIONS'
+        '/admin/notification-history': 'ADMIN_NOTIFICATIONS',
+        '/admin/email-templates': 'ADMIN_EMAIL_TEMPLATES'
     };
     
     // Find matching form code
@@ -274,6 +275,11 @@ router.get('/', (req, res) => {
                         <div class="card-icon">🔐</div>
                         <div class="card-title">Session Monitor</div>
                         <div class="card-desc">View active sessions & detect duplicates</div>
+                    </a>
+                    <a href="/admin/email-templates" class="admin-card">
+                        <div class="card-icon">📧</div>
+                        <div class="card-title">Email Templates</div>
+                        <div class="card-desc">View & edit OE/OHS report email templates</div>
                     </a>
                 </div>
             </div>
@@ -3576,6 +3582,467 @@ router.post('/api/broadcasts/:id/read', async (req, res) => {
     } catch (err) {
         console.error('Error marking broadcast as read:', err);
         res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ==========================================
+// Email Templates Management
+// ==========================================
+
+const emailTemplateBuilder = require('../../services/email-template-builder');
+const fs = require('fs');
+const path = require('path');
+
+// Email Templates Page
+router.get('/email-templates', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request().query(`
+            SELECT Id, TemplateKey, TemplateName, Module, ReportType, SubjectTemplate, 
+                   IsActive, UpdatedAt, UpdatedBy
+            FROM EmailTemplates
+            ORDER BY Module, ReportType
+        `);
+        
+        const templates = result.recordset;
+        
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Email Templates - Admin</title>
+                <style>
+                    * { box-sizing: border-box; margin: 0; padding: 0; }
+                    body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; min-height: 100vh; }
+                    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px 30px; }
+                    .header h1 { font-size: 24px; display: flex; align-items: center; gap: 10px; }
+                    .header a { color: white; text-decoration: none; opacity: 0.8; }
+                    .header a:hover { opacity: 1; }
+                    .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+                    .info-box { background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; }
+                    .info-box h3 { color: #1565c0; margin-bottom: 8px; }
+                    .info-box p { color: #1976d2; font-size: 14px; }
+                    .templates-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; margin-bottom: 30px; }
+                    .template-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                    .template-card h3 { color: #333; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+                    .template-card .module { font-size: 12px; padding: 4px 8px; border-radius: 4px; font-weight: 600; }
+                    .template-card .module.oe { background: #e8f5e9; color: #2e7d32; }
+                    .template-card .module.ohs { background: #ffebee; color: #c62828; }
+                    .template-card p { color: #666; font-size: 14px; margin-bottom: 15px; }
+                    .template-card .meta { font-size: 12px; color: #999; margin-bottom: 15px; }
+                    .btn { display: inline-block; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px; cursor: pointer; border: none; margin-right: 8px; }
+                    .btn-preview { background: #e3f2fd; color: #1976d2; }
+                    .btn-preview:hover { background: #bbdefb; }
+                    .btn-edit { background: #667eea; color: white; }
+                    .btn-edit:hover { background: #5a6fd6; }
+                    .btn-save { background: #28a745; color: white; }
+                    .btn-save:hover { background: #218838; }
+                    .btn-cancel { background: #6c757d; color: white; }
+                    .btn-cancel:hover { background: #5a6268; }
+                    .preview-modal, .editor-modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center; }
+                    .preview-content { background: white; border-radius: 12px; width: 90%; max-width: 800px; max-height: 90vh; overflow: auto; }
+                    .editor-content { background: white; border-radius: 12px; width: 95%; max-width: 1200px; max-height: 95vh; overflow: auto; }
+                    .modal-header { padding: 15px 20px; background: #f5f5f5; border-radius: 12px 12px 0 0; display: flex; justify-content: space-between; align-items: center; }
+                    .modal-header h3 { margin: 0; }
+                    .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: #666; }
+                    .modal-body { padding: 20px; }
+                    .preview-iframe { width: 100%; height: 500px; border: 1px solid #eee; border-radius: 8px; }
+                    .form-group { margin-bottom: 20px; }
+                    .form-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #333; }
+                    .form-group input, .form-group textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; }
+                    .form-group input:focus, .form-group textarea:focus { outline: none; border-color: #667eea; }
+                    .form-group textarea { min-height: 400px; font-family: 'Consolas', monospace; font-size: 13px; }
+                    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+                    .variables-box { background: #f8f9fa; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
+                    .variables-box h4 { margin-bottom: 10px; color: #333; }
+                    .variables-box code { background: #e9ecef; padding: 2px 6px; border-radius: 4px; font-size: 12px; margin: 2px; display: inline-block; }
+                    .btn-container { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee; }
+                    .toast { position: fixed; bottom: 20px; right: 20px; padding: 15px 25px; border-radius: 8px; color: white; font-weight: 600; z-index: 2000; animation: slideIn 0.3s ease; }
+                    .toast.success { background: #28a745; }
+                    .toast.error { background: #dc3545; }
+                    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1><a href="/admin">← Admin</a> / 📧 Email Templates</h1>
+                </div>
+                <div class="container">
+                    <div class="info-box">
+                        <h3>📝 About Email Templates</h3>
+                        <p>Email templates are used when sending OE and OHS inspection reports to store managers. 
+                           Click "Edit" to customize the subject and body HTML for each template. Changes are saved to the database and take effect immediately.</p>
+                    </div>
+                    
+                    <div class="templates-grid">
+                        ${templates.map(t => `
+                            <div class="template-card">
+                                <h3><span class="module ${t.Module.toLowerCase()}">${t.Module}</span> ${t.TemplateName}</h3>
+                                <p>${t.ReportType === 'full' ? 'Sent when sharing the complete inspection report.' : 'Sent with findings requiring corrective actions.'}</p>
+                                <div class="meta">
+                                    ${t.UpdatedAt ? `Last updated: ${new Date(t.UpdatedAt).toLocaleDateString('en-GB')}` : 'Never edited'}
+                                    ${t.UpdatedBy ? ` by ${t.UpdatedBy}` : ''}
+                                </div>
+                                <button class="btn btn-preview" onclick="previewTemplate('${t.TemplateKey}')">👁️ Preview</button>
+                                <button class="btn btn-edit" onclick="editTemplate('${t.TemplateKey}')">✏️ Edit</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                <div class="preview-modal" id="previewModal">
+                    <div class="preview-content">
+                        <div class="modal-header">
+                            <h3 id="previewTitle">Email Preview</h3>
+                            <button class="modal-close" onclick="closeModal('previewModal')">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div style="margin-bottom: 15px; padding: 10px; background: #f5f5f5; border-radius: 6px;">
+                                <strong>Subject:</strong> <span id="previewSubject"></span>
+                            </div>
+                            <iframe id="previewIframe" class="preview-iframe"></iframe>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="editor-modal" id="editorModal">
+                    <div class="editor-content">
+                        <div class="modal-header">
+                            <h3 id="editorTitle">Edit Template</h3>
+                            <button class="modal-close" onclick="closeModal('editorModal')">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <input type="hidden" id="editTemplateKey">
+                            
+                            <div class="variables-box">
+                                <h4>📌 Available Variables (use double curly braces)</h4>
+                                <code>{{storeName}}</code>
+                                <code>{{storeCode}}</code>
+                                <code>{{documentNumber}}</code>
+                                <code>{{totalScore}}</code>
+                                <code>{{auditDate}}</code>
+                                <code>{{inspectionDate}}</code>
+                                <code>{{auditors}}</code>
+                                <code>{{inspectors}}</code>
+                                <code>{{status}}</code>
+                                <code>{{reportUrl}}</code>
+                                <code>{{brandColor}}</code>
+                                <code>{{brandGradient}}</code>
+                                <code>{{scoreClass}}</code>
+                                <code>{{scoreIcon}}</code>
+                                <code>{{scoreStatus}}</code>
+                                <code>{{totalFindings}}</code>
+                                <code>{{highFindings}}</code>
+                                <code>{{mediumFindings}}</code>
+                                <code>{{lowFindings}}</code>
+                                <code>{{criticalFindings}}</code>
+                                <code>{{deadline}}</code>
+                                <code>{{year}}</code>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Subject Line Template</label>
+                                <input type="text" id="editSubject" placeholder="Email subject line with {{variables}}">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Email Body (HTML)</label>
+                                <textarea id="editBody" placeholder="HTML email body template"></textarea>
+                            </div>
+                            
+                            <div class="btn-container">
+                                <button class="btn btn-preview" onclick="previewEditing()">👁️ Preview Changes</button>
+                                <button class="btn btn-cancel" onclick="closeModal('editorModal')">Cancel</button>
+                                <button class="btn btn-save" onclick="saveTemplate()">💾 Save Template</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <script>
+                    async function previewTemplate(templateKey) {
+                        try {
+                            const res = await fetch('/admin/api/email-templates/preview?templateKey=' + templateKey);
+                            const data = await res.json();
+                            
+                            if (data.success) {
+                                document.getElementById('previewTitle').textContent = 'Email Preview - ' + templateKey;
+                                document.getElementById('previewSubject').textContent = data.subject;
+                                
+                                const iframe = document.getElementById('previewIframe');
+                                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                                doc.open();
+                                doc.write(data.html);
+                                doc.close();
+                                document.getElementById('previewModal').style.display = 'flex';
+                            } else {
+                                showToast('Error: ' + data.error, 'error');
+                            }
+                        } catch (err) {
+                            showToast('Error loading preview: ' + err.message, 'error');
+                        }
+                    }
+                    
+                    async function editTemplate(templateKey) {
+                        try {
+                            const res = await fetch('/admin/api/email-templates/' + templateKey);
+                            const data = await res.json();
+                            
+                            if (data.success) {
+                                document.getElementById('editTemplateKey').value = templateKey;
+                                document.getElementById('editorTitle').textContent = 'Edit Template - ' + data.template.TemplateName;
+                                document.getElementById('editSubject').value = data.template.SubjectTemplate;
+                                document.getElementById('editBody').value = data.template.BodyTemplate;
+                                document.getElementById('editorModal').style.display = 'flex';
+                            } else {
+                                showToast('Error: ' + data.error, 'error');
+                            }
+                        } catch (err) {
+                            showToast('Error loading template: ' + err.message, 'error');
+                        }
+                    }
+                    
+                    async function previewEditing() {
+                        const subject = document.getElementById('editSubject').value;
+                        const body = document.getElementById('editBody').value;
+                        
+                        try {
+                            const res = await fetch('/admin/api/email-templates/preview-custom', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ subject, body })
+                            });
+                            const data = await res.json();
+                            
+                            if (data.success) {
+                                const previewWin = window.open('', 'Preview', 'width=800,height=600');
+                                previewWin.document.write('<h3 style="font-family:sans-serif;padding:10px;background:#f5f5f5;margin:0;">Subject: ' + data.subject + '</h3>');
+                                previewWin.document.write(data.html);
+                            } else {
+                                showToast('Error: ' + data.error, 'error');
+                            }
+                        } catch (err) {
+                            showToast('Error previewing: ' + err.message, 'error');
+                        }
+                    }
+                    
+                    async function saveTemplate() {
+                        const templateKey = document.getElementById('editTemplateKey').value;
+                        const subject = document.getElementById('editSubject').value;
+                        const body = document.getElementById('editBody').value;
+                        
+                        if (!subject.trim() || !body.trim()) {
+                            showToast('Subject and body are required', 'error');
+                            return;
+                        }
+                        
+                        try {
+                            const res = await fetch('/admin/api/email-templates/' + templateKey, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ subject, body })
+                            });
+                            const data = await res.json();
+                            
+                            if (data.success) {
+                                showToast('Template saved successfully!', 'success');
+                                closeModal('editorModal');
+                                setTimeout(() => location.reload(), 1000);
+                            } else {
+                                showToast('Error: ' + data.error, 'error');
+                            }
+                        } catch (err) {
+                            showToast('Error saving template: ' + err.message, 'error');
+                        }
+                    }
+                    
+                    function closeModal(modalId) {
+                        document.getElementById(modalId).style.display = 'none';
+                    }
+                    
+                    function showToast(message, type) {
+                        const toast = document.createElement('div');
+                        toast.className = 'toast ' + type;
+                        toast.textContent = message;
+                        document.body.appendChild(toast);
+                        setTimeout(() => toast.remove(), 3000);
+                    }
+                    
+                    document.querySelectorAll('.preview-modal, .editor-modal').forEach(modal => {
+                        modal.addEventListener('click', function(e) {
+                            if (e.target === this) closeModal(this.id);
+                        });
+                    });
+                </script>
+            </body>
+            </html>
+        `);
+    } catch (error) {
+        console.error('Error loading email templates:', error);
+        res.status(500).send('Error loading email templates: ' + error.message);
+    }
+});
+
+// API to get single template
+router.get('/api/email-templates/:templateKey', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request()
+            .input('templateKey', req.params.templateKey)
+            .query('SELECT * FROM EmailTemplates WHERE TemplateKey = @templateKey');
+        
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ success: false, error: 'Template not found' });
+        }
+        
+        res.json({ success: true, template: result.recordset[0] });
+    } catch (error) {
+        console.error('Error getting template:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// API to update template
+router.put('/api/email-templates/:templateKey', async (req, res) => {
+    try {
+        const { subject, body } = req.body;
+        const pool = await sql.connect(dbConfig);
+        
+        await pool.request()
+            .input('templateKey', req.params.templateKey)
+            .input('subject', subject)
+            .input('body', body)
+            .input('updatedBy', req.user?.name || 'Admin')
+            .query(`
+                UPDATE EmailTemplates 
+                SET SubjectTemplate = @subject, 
+                    BodyTemplate = @body, 
+                    UpdatedAt = GETDATE(),
+                    UpdatedBy = @updatedBy
+                WHERE TemplateKey = @templateKey
+            `);
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating template:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// API to preview template with sample data
+router.get('/api/email-templates/preview', async (req, res) => {
+    try {
+        const { templateKey, module, type } = req.query;
+        const pool = await sql.connect(dbConfig);
+        
+        // Get template from database
+        let template;
+        if (templateKey) {
+            const result = await pool.request()
+                .input('templateKey', templateKey)
+                .query('SELECT * FROM EmailTemplates WHERE TemplateKey = @templateKey');
+            template = result.recordset[0];
+        } else {
+            // Fallback to module/type lookup
+            const key = `${module.toUpperCase()}_${type === 'action-plan' ? 'ACTION_PLAN' : 'FULL'}`;
+            const result = await pool.request()
+                .input('templateKey', key)
+                .query('SELECT * FROM EmailTemplates WHERE TemplateKey = @templateKey');
+            template = result.recordset[0];
+        }
+        
+        if (!template) {
+            return res.status(404).json({ success: false, error: 'Template not found' });
+        }
+        
+        // Sample data for preview
+        const sampleData = {
+            storeName: 'Spinneys - Motor City',
+            storeCode: 'SP-MC-001',
+            documentNumber: 'GMRL-OEI-0001',
+            totalScore: '87',
+            auditDate: new Date().toLocaleDateString('en-GB'),
+            inspectionDate: new Date().toLocaleDateString('en-GB'),
+            auditors: 'John Smith',
+            inspectors: 'John Smith',
+            status: 'Completed',
+            reportUrl: 'https://oeapp.gmrlapps.com/sample-report',
+            brandColor: '#1a5f2a',
+            brandGradient: 'linear-gradient(135deg, #1a5f2a 0%, #2d8f42 100%)',
+            scoreClass: 'score-pass',
+            scoreIcon: '✅',
+            scoreStatus: 'PASS',
+            totalFindings: '12',
+            highFindings: '3',
+            mediumFindings: '5',
+            lowFindings: '4',
+            criticalFindings: '1',
+            deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB'),
+            year: new Date().getFullYear().toString()
+        };
+        
+        // Replace variables in template
+        let subject = template.SubjectTemplate;
+        let html = template.BodyTemplate;
+        
+        for (const [key, value] of Object.entries(sampleData)) {
+            const regex = new RegExp(`{{${key}}}`, 'g');
+            subject = subject.replace(regex, value);
+            html = html.replace(regex, value);
+        }
+        
+        res.json({ success: true, subject, html });
+    } catch (error) {
+        console.error('Error previewing template:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// API to preview custom template (for editor)
+router.post('/api/email-templates/preview-custom', (req, res) => {
+    try {
+        const { subject, body } = req.body;
+        
+        // Sample data for preview
+        const sampleData = {
+            storeName: 'Spinneys - Motor City',
+            storeCode: 'SP-MC-001',
+            documentNumber: 'GMRL-OEI-0001',
+            totalScore: '87',
+            auditDate: new Date().toLocaleDateString('en-GB'),
+            inspectionDate: new Date().toLocaleDateString('en-GB'),
+            auditors: 'John Smith',
+            inspectors: 'John Smith',
+            status: 'Completed',
+            reportUrl: 'https://oeapp.gmrlapps.com/sample-report',
+            brandColor: '#1a5f2a',
+            brandGradient: 'linear-gradient(135deg, #1a5f2a 0%, #2d8f42 100%)',
+            scoreClass: 'score-pass',
+            scoreIcon: '✅',
+            scoreStatus: 'PASS',
+            totalFindings: '12',
+            highFindings: '3',
+            mediumFindings: '5',
+            lowFindings: '4',
+            criticalFindings: '1',
+            deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB'),
+            year: new Date().getFullYear().toString()
+        };
+        
+        // Replace variables in template
+        let processedSubject = subject;
+        let processedHtml = body;
+        
+        for (const [key, value] of Object.entries(sampleData)) {
+            const regex = new RegExp(`{{${key}}}`, 'g');
+            processedSubject = processedSubject.replace(regex, value);
+            processedHtml = processedHtml.replace(regex, value);
+        }
+        
+        res.json({ success: true, subject: processedSubject, html: processedHtml });
+    } catch (error) {
+        console.error('Error previewing custom template:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 

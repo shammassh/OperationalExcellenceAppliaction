@@ -515,6 +515,12 @@
                             <label>Store Name <span class="required">*</span></label>
                             <input type="text" id="storeName" placeholder="e.g., Store Name - Location" required>
                         </div>
+                        <div class="form-group">
+                            <label>Brand <span class="required">*</span></label>
+                            <select id="storeBrand" required>
+                                <option value="">Select brand...</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
@@ -569,6 +575,12 @@
                 <div class="form-group">
                     <label>Store Name <span class="required">*</span></label>
                     <input type="text" id="editStoreName" required>
+                </div>
+                <div class="form-group">
+                    <label>Brand <span class="required">*</span></label>
+                    <select id="editStoreBrand" required>
+                        <option value="">Select brand...</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Location</label>
@@ -643,6 +655,7 @@
         const API_BASE = '/oe-inspection/api/stores';
         let stores = [];
         let templates = [];
+        let brands = [];
         let availableManagers = [];
         let managerAssignments = {};
         let selectedEditManagers = [];
@@ -651,6 +664,7 @@
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             loadTemplates();
+            loadBrands();
             loadAvailableManagers();
             loadStores();
             
@@ -661,6 +675,25 @@
                 }
             });
         });
+
+        // Load brands for dropdowns
+        async function loadBrands() {
+            try {
+                const response = await fetch('/operational-excellence/system-settings/api/brands');
+                brands = await response.json();
+
+                const select = document.getElementById('storeBrand');
+                const editSelect = document.getElementById('editStoreBrand');
+
+                brands.filter(b => b.IsActive).forEach(brand => {
+                    const option = `<option value="${brand.Id}">${brand.BrandName} (${brand.BrandCode})</option>`;
+                    select.innerHTML += option;
+                    editSelect.innerHTML += option;
+                });
+            } catch (error) {
+                console.error('Error loading brands:', error);
+            }
+        }
 
         // Load available managers (users with Store Manager role)
         async function loadAvailableManagers() {
@@ -806,6 +839,7 @@
             const storeData = {
                 storeCode: document.getElementById('storeCode').value,
                 storeName: document.getElementById('storeName').value,
+                brandId: parseInt(document.getElementById('storeBrand').value) || null,
                 location: document.getElementById('storeLocation').value,
                 storeSize: document.getElementById('storeSize').value,
                 templateId: parseInt(document.getElementById('storeTemplate').value)
@@ -842,6 +876,7 @@
             document.getElementById('editStoreId').value = storeId;
             document.getElementById('editStoreCode').value = store.storeCode;
             document.getElementById('editStoreName').value = store.storeName;
+            document.getElementById('editStoreBrand').value = store.brandId || '';
             document.getElementById('editStoreLocation').value = store.location || '';
             document.getElementById('editStoreSize').value = store.storeSize || '';
             document.getElementById('editStoreTemplate').value = store.templateId;
@@ -1004,6 +1039,7 @@
             const storeData = {
                 storeCode: document.getElementById('editStoreCode').value,
                 storeName: document.getElementById('editStoreName').value,
+                brandId: parseInt(document.getElementById('editStoreBrand').value) || null,
                 location: document.getElementById('editStoreLocation').value,
                 storeSize: document.getElementById('editStoreSize').value,
                 templateId: parseInt(document.getElementById('editStoreTemplate').value),

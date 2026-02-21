@@ -892,6 +892,9 @@ router.get('/api/stores', async (req, res) => {
                 s.Id as storeId,
                 s.StoreCode as storeCode,
                 s.StoreName as storeName,
+                s.BrandId as brandId,
+                b.BrandName as brandName,
+                b.BrandCode as brandCode,
                 s.Location as location,
                 s.StoreSize as storeSize,
                 s.TemplateId as templateId,
@@ -900,6 +903,7 @@ router.get('/api/stores', async (req, res) => {
                 s.CreatedDate as createdDate
             FROM Stores s
             LEFT JOIN OE_InspectionTemplates t ON s.TemplateId = t.Id
+            LEFT JOIN Brands b ON s.BrandId = b.Id
             ORDER BY s.StoreName
         `);
         await pool.close();
@@ -913,19 +917,20 @@ router.get('/api/stores', async (req, res) => {
 // Create store
 router.post('/api/stores', async (req, res) => {
     try {
-        const { storeCode, storeName, location, storeSize, templateId } = req.body;
+        const { storeCode, storeName, brandId, location, storeSize, templateId } = req.body;
         const pool = await sql.connect(dbConfig);
         const result = await pool.request()
             .input('code', sql.NVarChar, storeCode)
             .input('name', sql.NVarChar, storeName)
+            .input('brandId', sql.Int, brandId || null)
             .input('location', sql.NVarChar, location || null)
             .input('storeSize', sql.NVarChar, storeSize || null)
             .input('templateId', sql.Int, templateId || null)
             .input('createdBy', sql.NVarChar, req.currentUser?.email || 'System')
             .query(`
-                INSERT INTO Stores (StoreCode, StoreName, Location, StoreSize, TemplateId, IsActive, CreatedDate, CreatedBy)
+                INSERT INTO Stores (StoreCode, StoreName, BrandId, Location, StoreSize, TemplateId, IsActive, CreatedDate, CreatedBy)
                 OUTPUT INSERTED.Id as storeId
-                VALUES (@code, @name, @location, @storeSize, @templateId, 1, GETDATE(), @createdBy)
+                VALUES (@code, @name, @brandId, @location, @storeSize, @templateId, 1, GETDATE(), @createdBy)
             `);
         await pool.close();
         res.json({ success: true, data: { storeId: result.recordset[0].storeId } });
@@ -938,19 +943,20 @@ router.post('/api/stores', async (req, res) => {
 // Update store
 router.put('/api/stores/:storeId', async (req, res) => {
     try {
-        const { storeCode, storeName, location, storeSize, templateId, isActive } = req.body;
+        const { storeCode, storeName, brandId, location, storeSize, templateId, isActive } = req.body;
         const pool = await sql.connect(dbConfig);
         await pool.request()
             .input('id', sql.Int, req.params.storeId)
             .input('code', sql.NVarChar, storeCode)
             .input('name', sql.NVarChar, storeName)
+            .input('brandId', sql.Int, brandId || null)
             .input('location', sql.NVarChar, location || null)
             .input('storeSize', sql.NVarChar, storeSize || null)
             .input('templateId', sql.Int, templateId || null)
             .input('isActive', sql.Bit, isActive)
             .query(`
                 UPDATE Stores 
-                SET StoreCode = @code, StoreName = @name, Location = @location, 
+                SET StoreCode = @code, StoreName = @name, BrandId = @brandId, Location = @location, 
                     StoreSize = @storeSize, TemplateId = @templateId, IsActive = @isActive
                 WHERE Id = @id
             `);
@@ -1998,10 +2004,30 @@ function generateReportHTML(data) {
         .pictures-wrapper { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px; }
         .finding-detail { color: #64748b; font-size: 14px; }
         .footer { text-align: center; padding: 20px; color: #64748b; font-size: 14px; }
-        @media print { body { background: white; } .container { max-width: 100%; padding: 0; } }
+        .action-bar { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 1000; }
+        .action-bar button { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); transition: transform 0.2s, box-shadow 0.2s; }
+        .action-bar button:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .btn-email { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; }
+        .btn-print { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; }
+        .btn-back { background: linear-gradient(135deg, #64748b 0%, #475569 100%); color: white; }
+        @media print { body { background: white; } .container { max-width: 100%; padding: 0; } .action-bar { display: none !important; } }
     </style>
 </head>
 <body>
+    <div class="action-bar">
+        <button class="btn-back" onclick="goBack()">← Back</button>
+        <button class="btn-email" onclick="openEmailModal('full')">📧 Send Report</button>
+        <button class="btn-print" onclick="window.print()">🖨️ Print</button>
+    </div>
+    <script>
+        function goBack() {
+            if (document.referrer && document.referrer.includes(window.location.hostname)) {
+                history.back();
+            } else {
+                window.location.href = '/oe-inspection/reports';
+            }
+        }
+    </script>
     <div class="container">
         <div class="header">
             <h1>📋 OE Inspection Report</h1>
@@ -2104,6 +2130,54 @@ function generateReportHTML(data) {
             Report generated on ${new Date(generatedAt).toLocaleString()}
         </div>
     </div>
+    <script>
+        const auditId = ${audit.Id};
+        
+        async function openEmailModal(reportType) {
+            try {
+                const btn = document.querySelector('.btn-email');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '⏳ Loading...';
+                btn.disabled = true;
+                
+                const recipientsRes = await fetch('/oe-inspection/api/audits/' + auditId + '/email-recipients?reportType=' + reportType);
+                const recipientsData = await recipientsRes.json();
+                
+                if (!recipientsData.success) {
+                    throw new Error(recipientsData.error || 'Failed to load recipients');
+                }
+                
+                const previewRes = await fetch('/oe-inspection/api/audits/' + auditId + '/email-preview?reportType=' + reportType);
+                const previewData = await previewRes.json();
+                
+                if (!previewData.success) {
+                    throw new Error(previewData.error || 'Failed to generate preview');
+                }
+                
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                
+                EmailModal.show({
+                    module: 'OE',
+                    from: recipientsData.from,
+                    to: recipientsData.to,
+                    ccSuggestions: recipientsData.ccSuggestions,
+                    subject: previewData.subject,
+                    bodyHtml: previewData.bodyHtml,
+                    reportType: reportType,
+                    auditId: auditId,
+                    sendUrl: '/oe-inspection/api/audits/' + auditId + '/send-report-email',
+                    searchEndpoint: '/operational-excellence/api/users'
+                });
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error preparing email: ' + error.message);
+                const btn = document.querySelector('.btn-email');
+                if (btn) { btn.innerHTML = '📧 Send Report'; btn.disabled = false; }
+            }
+        }
+    </script>
+    <script src="/js/email-modal.js"></script>
 </body>
 </html>`;
 }
@@ -3636,6 +3710,377 @@ router.get('/api/verification/stats', async (req, res) => {
         res.json({ success: true, data: result.recordset[0] });
     } catch (error) {
         console.error('Error fetching verification stats:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ==========================================
+// Email Report Endpoints
+// ==========================================
+
+const emailService = require('../../services/email-service');
+const emailTemplateBuilder = require('../../services/email-template-builder');
+
+// Get email recipients for an audit (store manager + brand responsibles for CC)
+// For action-plan reports, the To recipient is the auditor who created the inspection
+// For full reports, the To recipient is the store manager
+router.get('/api/audits/:auditId/email-recipients', async (req, res) => {
+    try {
+        const { auditId } = req.params;
+        const { reportType } = req.query; // 'full' or 'action-plan'
+        const pool = await sql.connect(dbConfig);
+        
+        // Get audit info with store and brand
+        const auditResult = await pool.request()
+            .input('auditId', sql.Int, auditId)
+            .query(`
+                SELECT 
+                    i.Id as auditId,
+                    i.DocumentNumber,
+                    i.StoreId,
+                    s.StoreName,
+                    s.StoreCode,
+                    s.BrandId,
+                    b.BrandName,
+                    b.BrandCode,
+                    b.PrimaryColor as BrandColor,
+                    i.Score as TotalScore,
+                    i.InspectionDate as AuditDate,
+                    i.Inspectors as Auditors,
+                    i.Status,
+                    i.CreatedBy
+                FROM OE_Inspections i
+                INNER JOIN Stores s ON i.StoreId = s.Id
+                LEFT JOIN Brands b ON s.BrandId = b.Id
+                WHERE i.Id = @auditId
+            `);
+        
+        if (auditResult.recordset.length === 0) {
+            await pool.close();
+            return res.status(404).json({ error: 'Audit not found' });
+        }
+        
+        const audit = auditResult.recordset[0];
+        
+        let toRecipient = null;
+        
+        // For action-plan reports, send to the auditor/inspector who created the inspection
+        if (reportType === 'action-plan' && audit.CreatedBy) {
+            const auditorResult = await pool.request()
+                .input('userId', sql.Int, audit.CreatedBy)
+                .query(`
+                    SELECT Id, Email, DisplayName
+                    FROM Users
+                    WHERE Id = @userId AND IsActive = 1
+                `);
+            
+            if (auditorResult.recordset.length > 0) {
+                const auditor = auditorResult.recordset[0];
+                toRecipient = {
+                    email: auditor.Email,
+                    name: auditor.DisplayName
+                };
+            }
+        } else {
+            // For full reports, send to store manager
+            const storeManagerResult = await pool.request()
+                .input('storeId', sql.Int, audit.StoreId)
+                .query(`
+                    SELECT TOP 1 u.Id, u.Email, u.DisplayName
+                    FROM StoreManagerAssignments sma
+                    INNER JOIN Users u ON sma.UserId = u.Id
+                    WHERE sma.StoreId = @storeId AND sma.IsPrimary = 1 AND u.IsActive = 1
+                `);
+            
+            if (storeManagerResult.recordset.length > 0) {
+                const storeManager = storeManagerResult.recordset[0];
+                toRecipient = {
+                    email: storeManager.Email,
+                    name: storeManager.DisplayName
+                };
+            }
+        }
+        
+        // Get brand responsibles (CC suggestions)
+        const ccSuggestions = [];
+        
+        if (audit.BrandId) {
+            const brandResponsiblesResult = await pool.request()
+                .input('brandId', sql.Int, audit.BrandId)
+                .query(`
+                    SELECT 
+                        br.AreaManagerId, am.Email as AreaManagerEmail, am.DisplayName as AreaManagerName,
+                        br.HeadOfOpsId, ho.Email as HeadOfOpsEmail, ho.DisplayName as HeadOfOpsName
+                    FROM OE_BrandResponsibles br
+                    LEFT JOIN Users am ON br.AreaManagerId = am.Id AND am.IsActive = 1
+                    LEFT JOIN Users ho ON br.HeadOfOpsId = ho.Id AND ho.IsActive = 1
+                    WHERE br.BrandId = @brandId AND br.IsActive = 1
+                `);
+            
+            if (brandResponsiblesResult.recordset.length > 0) {
+                const br = brandResponsiblesResult.recordset[0];
+                if (br.AreaManagerEmail) {
+                    ccSuggestions.push({
+                        email: br.AreaManagerEmail,
+                        name: br.AreaManagerName,
+                        role: 'Area Manager'
+                    });
+                }
+                if (br.HeadOfOpsEmail) {
+                    ccSuggestions.push({
+                        email: br.HeadOfOpsEmail,
+                        name: br.HeadOfOpsName,
+                        role: 'Head of Operations'
+                    });
+                }
+            }
+        }
+        
+        await pool.close();
+        
+        // Build response
+        res.json({
+            success: true,
+            audit: {
+                auditId: audit.auditId,
+                documentNumber: audit.DocumentNumber,
+                storeName: audit.StoreName,
+                storeCode: audit.StoreCode,
+                brandName: audit.BrandName,
+                brandCode: audit.BrandCode,
+                brandColor: audit.BrandColor,
+                totalScore: audit.TotalScore,
+                auditDate: audit.AuditDate,
+                auditors: audit.Auditors,
+                status: audit.Status
+            },
+            to: toRecipient,
+            ccSuggestions: ccSuggestions,
+            from: req.currentUser ? {
+                email: req.currentUser.email,
+                name: req.currentUser.displayName || req.currentUser.name || req.currentUser.email
+            } : null
+        });
+    } catch (error) {
+        console.error('Error fetching email recipients:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get email preview (subject and body HTML)
+router.get('/api/audits/:auditId/email-preview', async (req, res) => {
+    try {
+        const { auditId } = req.params;
+        const { reportType } = req.query; // 'full' or 'action-plan'
+        
+        const pool = await sql.connect(dbConfig);
+        
+        // Get audit details
+        const auditResult = await pool.request()
+            .input('auditId', sql.Int, auditId)
+            .query(`
+                SELECT 
+                    i.Id, i.DocumentNumber, i.StoreId, s.StoreName, s.StoreCode,
+                    b.BrandCode, i.Score as TotalScore, i.InspectionDate as AuditDate, i.Inspectors as Auditors, i.Status,
+                    i.Cycle, i.Year
+                FROM OE_Inspections i
+                INNER JOIN Stores s ON i.StoreId = s.Id
+                LEFT JOIN Brands b ON s.BrandId = b.Id
+                WHERE i.Id = @auditId
+            `);
+        
+        if (auditResult.recordset.length === 0) {
+            await pool.close();
+            return res.status(404).json({ error: 'Audit not found' });
+        }
+        
+        const audit = auditResult.recordset[0];
+        
+        // Build report URL
+        const appUrl = process.env.APP_URL || `https://${req.get('host')}`;
+        const reportUrl = reportType === 'action-plan' 
+            ? `${appUrl}/oe-inspection/api/audits/reports/OE_ActionPlan_${audit.DocumentNumber}_${new Date().toISOString().split('T')[0]}.html`
+            : `${appUrl}/oe-inspection/api/audits/reports/OE_Report_${audit.DocumentNumber}_${new Date().toISOString().split('T')[0]}.html`;
+        
+        // Get findings stats for action plan
+        let findingsStats = null;
+        if (reportType === 'action-plan') {
+            const findingsResult = await pool.request()
+                .input('auditId', sql.Int, auditId)
+                .query(`
+                    SELECT 
+                        COUNT(*) as total,
+                        SUM(CASE WHEN Priority = 'High' THEN 1 ELSE 0 END) as high,
+                        SUM(CASE WHEN Priority = 'Medium' THEN 1 ELSE 0 END) as medium,
+                        SUM(CASE WHEN Priority = 'Low' THEN 1 ELSE 0 END) as low
+                    FROM OE_InspectionItems
+                    WHERE InspectionId = @auditId AND Finding IS NOT NULL AND Finding != ''
+                `);
+            findingsStats = findingsResult.recordset[0];
+        }
+        
+        await pool.close();
+        
+        // Build email using template builder
+        const auditData = {
+            documentNumber: audit.DocumentNumber,
+            storeName: audit.StoreName,
+            storeCode: audit.StoreCode,
+            brandCode: audit.BrandCode,
+            auditDate: audit.AuditDate,
+            auditors: audit.Auditors,
+            totalScore: audit.TotalScore,
+            status: audit.Status,
+            cycle: audit.Cycle,
+            year: audit.Year,
+            passingGrade: 85
+        };
+        
+        // Use database template (falls back to hardcoded if not found)
+        const emailContent = await emailTemplateBuilder.buildEmailFromDB('OE', reportType, auditData, reportUrl, findingsStats);
+        
+        res.json({
+            success: true,
+            subject: emailContent.subject,
+            bodyHtml: emailContent.body,
+            reportUrl: reportUrl
+        });
+    } catch (error) {
+        console.error('Error generating email preview:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Send report email
+router.post('/api/audits/:auditId/send-report-email', async (req, res) => {
+    try {
+        const { auditId } = req.params;
+        const { reportType, to, cc } = req.body;
+        
+        if (!to || !to.email) {
+            return res.status(400).json({ error: 'Recipient (to) is required' });
+        }
+        
+        const accessToken = req.session?.accessToken;
+        if (!accessToken) {
+            return res.status(401).json({ error: 'Not authenticated. Please log in again.' });
+        }
+        
+        const pool = await sql.connect(dbConfig);
+        
+        // Get audit details
+        const auditResult = await pool.request()
+            .input('auditId', sql.Int, auditId)
+            .query(`
+                SELECT 
+                    i.Id, i.DocumentNumber, i.StoreId, s.StoreName, s.StoreCode,
+                    s.BrandId, b.BrandName, b.BrandCode, 
+                    i.Score as TotalScore, i.InspectionDate as AuditDate, i.Inspectors as Auditors, i.Status, i.Cycle, i.Year
+                FROM OE_Inspections i
+                INNER JOIN Stores s ON i.StoreId = s.Id
+                LEFT JOIN Brands b ON s.BrandId = b.Id
+                WHERE i.Id = @auditId
+            `);
+        
+        if (auditResult.recordset.length === 0) {
+            await pool.close();
+            return res.status(404).json({ error: 'Audit not found' });
+        }
+        
+        const audit = auditResult.recordset[0];
+        
+        // Build report URL
+        const appUrl = process.env.APP_URL || `https://${req.get('host')}`;
+        const reportUrl = reportType === 'action-plan' 
+            ? `${appUrl}/oe-inspection/api/audits/reports/OE_ActionPlan_${audit.DocumentNumber}_${new Date().toISOString().split('T')[0]}.html`
+            : `${appUrl}/oe-inspection/api/audits/reports/OE_Report_${audit.DocumentNumber}_${new Date().toISOString().split('T')[0]}.html`;
+        
+        // Get findings stats for action plan
+        let findingsStats = null;
+        if (reportType === 'action-plan') {
+            const findingsResult = await pool.request()
+                .input('auditId', sql.Int, auditId)
+                .query(`
+                    SELECT 
+                        COUNT(*) as total,
+                        SUM(CASE WHEN Priority = 'High' THEN 1 ELSE 0 END) as high,
+                        SUM(CASE WHEN Priority = 'Medium' THEN 1 ELSE 0 END) as medium,
+                        SUM(CASE WHEN Priority = 'Low' THEN 1 ELSE 0 END) as low
+                    FROM OE_InspectionItems
+                    WHERE InspectionId = @auditId AND Finding IS NOT NULL AND Finding != ''
+                `);
+            findingsStats = findingsResult.recordset[0];
+        }
+        
+        // Build email content
+        const auditData = {
+            documentNumber: audit.DocumentNumber,
+            storeName: audit.StoreName,
+            storeCode: audit.StoreCode,
+            brandCode: audit.BrandCode,
+            auditDate: audit.AuditDate,
+            auditors: audit.Auditors,
+            totalScore: audit.TotalScore,
+            status: audit.Status,
+            cycle: audit.Cycle,
+            year: audit.Year,
+            passingGrade: 85
+        };
+        
+        // Use database template (falls back to hardcoded if not found)
+        const emailContent = await emailTemplateBuilder.buildEmailFromDB('OE', reportType, auditData, reportUrl, findingsStats);
+        
+        // Build CC string
+        const ccEmails = cc && cc.length > 0 ? cc.map(c => c.email).join(',') : null;
+        
+        // Send email
+        const emailResult = await emailService.sendEmail({
+            to: to.email,
+            subject: emailContent.subject,
+            body: emailContent.body,
+            cc: ccEmails,
+            accessToken: accessToken
+        });
+        
+        // Log the email
+        await pool.request()
+            .input('auditId', sql.Int, auditId)
+            .input('documentNumber', sql.NVarChar, audit.DocumentNumber)
+            .input('module', sql.NVarChar, 'OE')
+            .input('reportType', sql.NVarChar, reportType)
+            .input('sentBy', sql.Int, req.currentUser?.Id || null)
+            .input('sentByEmail', sql.NVarChar, req.currentUser?.email || 'Unknown')
+            .input('sentByName', sql.NVarChar, req.currentUser?.DisplayName || 'Unknown')
+            .input('sentTo', sql.NVarChar, JSON.stringify([to]))
+            .input('ccRecipients', sql.NVarChar, cc ? JSON.stringify(cc) : null)
+            .input('subject', sql.NVarChar, emailContent.subject)
+            .input('reportUrl', sql.NVarChar, reportUrl)
+            .input('status', sql.NVarChar, emailResult.success ? 'sent' : 'failed')
+            .input('errorMessage', sql.NVarChar, emailResult.error || null)
+            .input('storeId', sql.Int, audit.StoreId)
+            .input('storeName', sql.NVarChar, audit.StoreName)
+            .input('brandId', sql.Int, audit.BrandId)
+            .input('brandName', sql.NVarChar, audit.BrandName)
+            .query(`
+                INSERT INTO ReportEmailLog 
+                (AuditId, DocumentNumber, Module, ReportType, SentBy, SentByEmail, SentByName, 
+                 SentTo, CcRecipients, Subject, ReportUrl, Status, ErrorMessage, 
+                 StoreId, StoreName, BrandId, BrandName, SentAt)
+                VALUES 
+                (@auditId, @documentNumber, @module, @reportType, @sentBy, @sentByEmail, @sentByName,
+                 @sentTo, @ccRecipients, @subject, @reportUrl, @status, @errorMessage,
+                 @storeId, @storeName, @brandId, @brandName, GETDATE())
+            `);
+        
+        await pool.close();
+        
+        if (emailResult.success) {
+            res.json({ success: true, message: 'Email sent successfully' });
+        } else {
+            res.status(500).json({ success: false, error: emailResult.error || 'Failed to send email' });
+        }
+    } catch (error) {
+        console.error('Error sending report email:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

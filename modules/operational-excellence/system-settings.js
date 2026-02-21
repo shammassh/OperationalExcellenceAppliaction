@@ -454,6 +454,13 @@ router.get('/', (req, res) => {
                         <li><a data-tab="escalation"><span class="menu-icon">⏰</span> Escalation Settings</a></li>
                         <li><a data-tab="storeresponsibles"><span class="menu-icon">👤</span> Store Responsibles</a></li>
                     </ul>
+                    
+                    <div class="sidebar-divider"></div>
+                    <div class="sidebar-title">Brand Management</div>
+                    <ul class="sidebar-menu">
+                        <li><a data-tab="brands"><span class="menu-icon">🏷️</span> Brands</a></li>
+                        <li><a data-tab="brandresponsibles"><span class="menu-icon">👥</span> Brand Responsibles</a></li>
+                    </ul>
                 </div>
                 
                 <!-- Content Area -->
@@ -474,6 +481,8 @@ router.get('/', (req, res) => {
                         <button class="tab" data-tab="complaints">Complaints</button>
                         <button class="tab" data-tab="escalation">Escalation</button>
                         <button class="tab" data-tab="storeresponsibles">Store Responsibles</button>
+                        <button class="tab" data-tab="brands">Brands</button>
+                        <button class="tab" data-tab="brandresponsibles">Brand Responsibles</button>
                     </div>
                     
                     <!-- Stores Tab -->
@@ -784,6 +793,41 @@ router.get('/', (req, res) => {
                     
                     <div id="storeresponsibles-table">
                         <div class="loading">Loading store assignments...</div>
+                    </div>
+                </div>
+                
+                <!-- Brands Tab -->
+                <div id="brands-tab" class="tab-content">
+                    <div class="section-header">
+                        <div class="section-title">🏷️ Manage Brands</div>
+                        <button class="btn btn-primary" onclick="openBrandModal()">+ Add Brand</button>
+                    </div>
+                    <p style="color: #666; margin-bottom: 20px;">Manage company brands (e.g., Spinneys, Happy, NokNok). Brands are used for organizing stores and assigning brand-level responsibles.</p>
+                    
+                    <div id="brands-table">
+                        <div class="loading">Loading brands...</div>
+                    </div>
+                </div>
+                
+                <!-- Brand Responsibles Tab -->
+                <div id="brandresponsibles-tab" class="tab-content">
+                    <div class="section-header">
+                        <div class="section-title">👥 Assign Managers to Brands</div>
+                        <button class="btn btn-primary" onclick="openBrandResponsibleModal()">+ Assign Manager</button>
+                    </div>
+                    <p style="color: #666; margin-bottom: 20px;">Assign Area Managers and Head of Operations to each brand. These managers will be auto-suggested as CC recipients when sending inspection reports.</p>
+                    
+                    <div style="margin-bottom: 20px; display: flex; gap: 15px; align-items: center;">
+                        <input type="text" id="brandResponsibleSearch" placeholder="🔍 Search brands..." style="padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 8px; width: 300px;">
+                        <select id="brandResponsibleFilter" style="padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                            <option value="">All Brands</option>
+                            <option value="assigned">Assigned Only</option>
+                            <option value="unassigned">Unassigned Only</option>
+                        </select>
+                    </div>
+                    
+                    <div id="brandresponsibles-table">
+                        <div class="loading">Loading brand assignments...</div>
                     </div>
                 </div>
                 </div><!-- End content-area -->
@@ -1348,6 +1392,84 @@ router.get('/', (req, res) => {
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" onclick="closeStoreResponsibleModal()">Cancel</button>
+                            <button type="submit" class="btn btn-success">💾 Save Assignment</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Brand Modal -->
+            <div id="brandModal" class="modal">
+                <div class="modal-content" style="max-width: 500px;">
+                    <div class="modal-header">
+                        <div class="modal-title" id="brandModalTitle">Add Brand</div>
+                        <button class="modal-close" onclick="closeBrandModal()">&times;</button>
+                    </div>
+                    <form id="brandForm">
+                        <input type="hidden" id="brandId" value="">
+                        <div class="form-group">
+                            <label>Brand Name *</label>
+                            <input type="text" id="brandName" required placeholder="e.g., Spinneys, Happy, NokNok" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Brand Code *</label>
+                            <input type="text" id="brandCode" required placeholder="e.g., SPINNEYS, HAPPY" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px;" oninput="this.value = this.value.toUpperCase()">
+                        </div>
+                        <div class="form-group">
+                            <label>Primary Color (for emails)</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="color" id="brandColor" value="#667eea" style="width: 60px; height: 40px; border: 2px solid #e0e0e0; border-radius: 8px; cursor: pointer;">
+                                <input type="text" id="brandColorText" value="#667eea" style="flex: 1; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px;" maxlength="7">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="brandStatus" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                                <option value="1">Active</option>
+                                <option value="0">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="closeBrandModal()">Cancel</button>
+                            <button type="submit" class="btn btn-success">💾 Save Brand</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Brand Responsible Modal -->
+            <div id="brandResponsibleModal" class="modal">
+                <div class="modal-content" style="max-width: 500px;">
+                    <div class="modal-header">
+                        <div class="modal-title" id="brandResponsibleModalTitle">Assign Managers to Brand</div>
+                        <button class="modal-close" onclick="closeBrandResponsibleModal()">&times;</button>
+                    </div>
+                    <form id="brandResponsibleForm">
+                        <input type="hidden" id="brandResponsibleId" value="">
+                        <div class="form-group">
+                            <label>Brand *</label>
+                            <select id="brBrandId" required style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                                <option value="">Select Brand...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Area Manager *</label>
+                            <select id="brAreaManagerId" required style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                                <option value="">Loading...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Head of Operations</label>
+                            <select id="brHeadOfOpsId" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                                <option value="">Select Head of Operations (Optional)...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Notes (Optional)</label>
+                            <textarea id="brNotes" rows="3" placeholder="Additional notes..." style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; resize: vertical;"></textarea>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="closeBrandResponsibleModal()">Cancel</button>
                             <button type="submit" class="btn btn-success">💾 Save Assignment</button>
                         </div>
                     </form>
@@ -3268,6 +3390,368 @@ router.get('/', (req, res) => {
                         showToast('Error saving assignment', 'error');
                     }
                 });
+                
+                // ========== BRANDS ==========
+                let brandsData = [];
+                
+                async function loadBrands() {
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/brands?t=' + Date.now());
+                        brandsData = await res.json();
+                        renderBrandsTable();
+                    } catch (err) {
+                        console.error('Error loading brands:', err);
+                        document.getElementById('brands-table').innerHTML = '<div class="empty-state"><div class="icon">❌</div><p>Error loading brands</p></div>';
+                    }
+                }
+                
+                function renderBrandsTable() {
+                    if (brandsData.length === 0) {
+                        document.getElementById('brands-table').innerHTML = '<div class="empty-state"><div class="icon">🏷️</div><p>No brands found. Click "+ Add Brand" to create one.</p></div>';
+                        return;
+                    }
+                    
+                    let html = '<table class="data-table"><thead><tr><th>Brand Name</th><th>Code</th><th>Color</th><th>Stores</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+                    
+                    brandsData.forEach(b => {
+                        const statusBadge = b.IsActive 
+                            ? '<span class="status-badge status-active">Active</span>'
+                            : '<span class="status-badge status-inactive">Inactive</span>';
+                        
+                        const colorSwatch = '<span style="display: inline-block; width: 24px; height: 24px; background: ' + (b.PrimaryColor || '#667eea') + '; border-radius: 4px; vertical-align: middle; margin-right: 8px; border: 1px solid #ddd;"></span>' + (b.PrimaryColor || '#667eea');
+                        
+                        html += '<tr>';
+                        html += '<td><strong>' + b.BrandName + '</strong></td>';
+                        html += '<td><code style="background: #f0f0f0; padding: 2px 8px; border-radius: 4px;">' + b.BrandCode + '</code></td>';
+                        html += '<td>' + colorSwatch + '</td>';
+                        html += '<td>' + (b.StoreCount || 0) + ' stores</td>';
+                        html += '<td>' + statusBadge + '</td>';
+                        html += '<td class="actions">';
+                        html += '<button class="btn btn-sm" onclick="editBrand(' + b.Id + ')" title="Edit">✏️</button> ';
+                        html += '<button class="btn btn-sm btn-danger" onclick="deleteBrand(' + b.Id + ')" title="Delete">🗑️</button>';
+                        html += '</td>';
+                        html += '</tr>';
+                    });
+                    
+                    html += '</tbody></table>';
+                    document.getElementById('brands-table').innerHTML = html;
+                }
+                
+                function openBrandModal() {
+                    document.getElementById('brandId').value = '';
+                    document.getElementById('brandForm').reset();
+                    document.getElementById('brandColor').value = '#667eea';
+                    document.getElementById('brandColorText').value = '#667eea';
+                    document.getElementById('brandModalTitle').textContent = 'Add Brand';
+                    document.getElementById('brandModal').classList.add('show');
+                }
+                
+                function closeBrandModal() {
+                    document.getElementById('brandModal').classList.remove('show');
+                }
+                
+                function editBrand(id) {
+                    const brand = brandsData.find(b => b.Id === id);
+                    if (!brand) return;
+                    
+                    document.getElementById('brandId').value = id;
+                    document.getElementById('brandName').value = brand.BrandName;
+                    document.getElementById('brandCode').value = brand.BrandCode;
+                    document.getElementById('brandColor').value = brand.PrimaryColor || '#667eea';
+                    document.getElementById('brandColorText').value = brand.PrimaryColor || '#667eea';
+                    document.getElementById('brandStatus').value = brand.IsActive ? '1' : '0';
+                    document.getElementById('brandModalTitle').textContent = 'Edit Brand';
+                    document.getElementById('brandModal').classList.add('show');
+                }
+                
+                async function deleteBrand(id) {
+                    const brand = brandsData.find(b => b.Id === id);
+                    if (!brand) return;
+                    
+                    if (brand.StoreCount > 0) {
+                        showToast('Cannot delete brand with assigned stores. Reassign stores first.', 'error');
+                        return;
+                    }
+                    
+                    if (!confirm('Delete brand "' + brand.BrandName + '"?')) return;
+                    
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/brands/' + id, { method: 'DELETE' });
+                        if (res.ok) {
+                            showToast('Brand deleted', 'success');
+                            await loadBrands();
+                        } else {
+                            const err = await res.json();
+                            showToast(err.error || 'Error deleting brand', 'error');
+                        }
+                    } catch (err) {
+                        console.error('Error deleting brand:', err);
+                        showToast('Error deleting brand', 'error');
+                    }
+                }
+                
+                // Sync color inputs
+                document.getElementById('brandColor')?.addEventListener('input', function() {
+                    document.getElementById('brandColorText').value = this.value;
+                });
+                document.getElementById('brandColorText')?.addEventListener('input', function() {
+                    if (/^#[0-9A-Fa-f]{6}$/.test(this.value)) {
+                        document.getElementById('brandColor').value = this.value;
+                    }
+                });
+                
+                document.getElementById('brandForm').addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    const id = document.getElementById('brandId').value;
+                    const data = {
+                        brandName: document.getElementById('brandName').value,
+                        brandCode: document.getElementById('brandCode').value.toUpperCase(),
+                        primaryColor: document.getElementById('brandColorText').value,
+                        isActive: document.getElementById('brandStatus').value === '1'
+                    };
+                    
+                    try {
+                        const url = id 
+                            ? '/operational-excellence/system-settings/api/brands/' + id 
+                            : '/operational-excellence/system-settings/api/brands';
+                        
+                        const res = await fetch(url, {
+                            method: id ? 'PUT' : 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        });
+                        
+                        if (res.ok) {
+                            showToast(id ? 'Brand updated!' : 'Brand created!', 'success');
+                            closeBrandModal();
+                            await loadBrands();
+                        } else {
+                            const err = await res.json();
+                            showToast(err.error || 'Error saving brand', 'error');
+                        }
+                    } catch (err) {
+                        console.error('Error saving brand:', err);
+                        showToast('Error saving brand', 'error');
+                    }
+                });
+                
+                // ========== BRAND RESPONSIBLES ==========
+                let brandResponsiblesData = [];
+                
+                async function loadBrandResponsibles() {
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/brand-responsibles?t=' + Date.now());
+                        brandResponsiblesData = await res.json();
+                        renderBrandResponsiblesTable();
+                    } catch (err) {
+                        console.error('Error loading brand responsibles:', err);
+                        document.getElementById('brandresponsibles-table').innerHTML = '<div class="empty-state"><div class="icon">❌</div><p>Error loading data</p></div>';
+                    }
+                }
+                
+                function renderBrandResponsiblesTable() {
+                    const searchTerm = (document.getElementById('brandResponsibleSearch')?.value || '').toLowerCase();
+                    const filter = document.getElementById('brandResponsibleFilter')?.value || '';
+                    
+                    // Create a map of assigned brands
+                    const assignedBrandIds = new Set(brandResponsiblesData.map(br => br.BrandId));
+                    
+                    // Build combined list - assigned brands + unassigned brands
+                    const combinedData = brandResponsiblesData.map(br => ({
+                        ...br,
+                        isAssigned: true
+                    }));
+                    
+                    // Add unassigned brands
+                    brandsData.filter(b => !assignedBrandIds.has(b.Id) && b.IsActive).forEach(b => {
+                        combinedData.push({
+                            BrandId: b.Id,
+                            BrandName: b.BrandName,
+                            BrandCode: b.BrandCode,
+                            AreaManagerId: null,
+                            AreaManagerName: null,
+                            HeadOfOpsId: null,
+                            HeadOfOpsName: null,
+                            isAssigned: false
+                        });
+                    });
+                    
+                    let filtered = combinedData;
+                    
+                    // Apply search filter
+                    if (searchTerm) {
+                        filtered = filtered.filter(br => 
+                            (br.BrandName || '').toLowerCase().includes(searchTerm) ||
+                            (br.BrandCode || '').toLowerCase().includes(searchTerm) ||
+                            (br.AreaManagerName || '').toLowerCase().includes(searchTerm) ||
+                            (br.HeadOfOpsName || '').toLowerCase().includes(searchTerm)
+                        );
+                    }
+                    
+                    // Apply assignment filter
+                    if (filter === 'assigned') {
+                        filtered = filtered.filter(br => br.isAssigned);
+                    } else if (filter === 'unassigned') {
+                        filtered = filtered.filter(br => !br.isAssigned);
+                    }
+                    
+                    if (filtered.length === 0) {
+                        document.getElementById('brandresponsibles-table').innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>No brands found</p></div>';
+                        return;
+                    }
+                    
+                    let html = '<table class="data-table"><thead><tr><th>Brand</th><th>Code</th><th>Area Manager</th><th>Head of Operations</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+                    
+                    filtered.forEach(br => {
+                        const statusBadge = br.isAssigned 
+                            ? '<span style="background: #d4edda; color: #155724; padding: 4px 10px; border-radius: 12px; font-size: 12px;">✅ Assigned</span>'
+                            : '<span style="background: #fff3cd; color: #856404; padding: 4px 10px; border-radius: 12px; font-size: 12px;">⚠️ Unassigned</span>';
+                        
+                        html += '<tr>';
+                        html += '<td><strong>' + (br.BrandName || '') + '</strong></td>';
+                        html += '<td><code style="background: #f0f0f0; padding: 2px 8px; border-radius: 4px;">' + (br.BrandCode || '-') + '</code></td>';
+                        html += '<td>' + (br.AreaManagerName || '<span style="color: #aaa;">-</span>') + '</td>';
+                        html += '<td>' + (br.HeadOfOpsName || '<span style="color: #aaa;">-</span>') + '</td>';
+                        html += '<td>' + statusBadge + '</td>';
+                        html += '<td>';
+                        if (br.isAssigned) {
+                            html += '<button class="btn btn-sm" onclick="editBrandResponsible(' + br.Id + ')" title="Edit">✏️</button> ';
+                            html += '<button class="btn btn-sm btn-danger" onclick="deleteBrandResponsible(' + br.Id + ')" title="Remove">🗑️</button>';
+                        } else {
+                            html += '<button class="btn btn-sm btn-primary" onclick="assignBrandManager(' + br.BrandId + ', \\'' + (br.BrandName || '').replace(/'/g, "\\\\'") + '\\')">+ Assign</button>';
+                        }
+                        html += '</td>';
+                        html += '</tr>';
+                    });
+                    
+                    html += '</tbody></table>';
+                    document.getElementById('brandresponsibles-table').innerHTML = html;
+                }
+                
+                // Search and filter listeners
+                document.getElementById('brandResponsibleSearch')?.addEventListener('input', renderBrandResponsiblesTable);
+                document.getElementById('brandResponsibleFilter')?.addEventListener('change', renderBrandResponsiblesTable);
+                
+                async function openBrandResponsibleModal(id = null) {
+                    document.getElementById('brandResponsibleId').value = '';
+                    document.getElementById('brandResponsibleForm').reset();
+                    document.getElementById('brandResponsibleModalTitle').textContent = id ? 'Edit Assignment' : 'Assign Managers to Brand';
+                    
+                    // Load data if not already loaded
+                    if (!areaManagersData || areaManagersData.length === 0) {
+                        await loadAreaManagers();
+                    }
+                    if (!headOfOpsData || headOfOpsData.length === 0) {
+                        await loadHeadOfOps();
+                    }
+                    if (!brandsData || brandsData.length === 0) {
+                        await loadBrands();
+                    }
+                    
+                    // Populate brands dropdown
+                    const brandSelect = document.getElementById('brBrandId');
+                    brandSelect.innerHTML = '<option value="">Select Brand...</option>';
+                    brandsData.filter(b => b.IsActive).forEach(b => {
+                        brandSelect.innerHTML += '<option value="' + b.Id + '">' + b.BrandName + ' (' + b.BrandCode + ')</option>';
+                    });
+                    
+                    // Populate area managers dropdown
+                    const managerSelect = document.getElementById('brAreaManagerId');
+                    managerSelect.innerHTML = '<option value="">Select Area Manager...</option>';
+                    areaManagersData.forEach(m => {
+                        managerSelect.innerHTML += '<option value="' + m.Id + '">' + m.DisplayName + '</option>';
+                    });
+                    
+                    // Populate head of operations dropdown
+                    const headOfOpsSelect = document.getElementById('brHeadOfOpsId');
+                    headOfOpsSelect.innerHTML = '<option value="">Select Head of Operations (Optional)...</option>';
+                    headOfOpsData.forEach(m => {
+                        headOfOpsSelect.innerHTML += '<option value="' + m.Id + '">' + m.DisplayName + '</option>';
+                    });
+                    
+                    document.getElementById('brandResponsibleModal').classList.add('show');
+                }
+                
+                function closeBrandResponsibleModal() {
+                    document.getElementById('brandResponsibleModal').classList.remove('show');
+                }
+                
+                async function assignBrandManager(brandId, brandName) {
+                    await openBrandResponsibleModal();
+                    document.getElementById('brBrandId').value = brandId;
+                }
+                
+                async function editBrandResponsible(id) {
+                    const br = brandResponsiblesData.find(b => b.Id === id);
+                    if (!br) return;
+                    
+                    await openBrandResponsibleModal(id);
+                    document.getElementById('brandResponsibleId').value = id;
+                    document.getElementById('brBrandId').value = br.BrandId;
+                    document.getElementById('brAreaManagerId').value = br.AreaManagerId;
+                    document.getElementById('brHeadOfOpsId').value = br.HeadOfOpsId || '';
+                    document.getElementById('brNotes').value = br.Notes || '';
+                }
+                
+                async function deleteBrandResponsible(id) {
+                    if (!confirm('Remove this assignment?')) return;
+                    
+                    try {
+                        const res = await fetch('/operational-excellence/system-settings/api/brand-responsibles/' + id, {
+                            method: 'DELETE'
+                        });
+                        if (res.ok) {
+                            showToast('Assignment removed', 'success');
+                            await loadBrandResponsibles();
+                        } else {
+                            showToast('Error removing assignment', 'error');
+                        }
+                    } catch (err) {
+                        console.error('Error deleting brand responsible:', err);
+                        showToast('Error removing assignment', 'error');
+                    }
+                }
+                
+                document.getElementById('brandResponsibleForm').addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    const id = document.getElementById('brandResponsibleId').value;
+                    const data = {
+                        brandId: document.getElementById('brBrandId').value,
+                        areaManagerId: document.getElementById('brAreaManagerId').value,
+                        headOfOpsId: document.getElementById('brHeadOfOpsId').value || null,
+                        notes: document.getElementById('brNotes').value
+                    };
+                    
+                    try {
+                        const url = id 
+                            ? '/operational-excellence/system-settings/api/brand-responsibles/' + id 
+                            : '/operational-excellence/system-settings/api/brand-responsibles';
+                        
+                        const res = await fetch(url, {
+                            method: id ? 'PUT' : 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        });
+                        
+                        if (res.ok) {
+                            showToast(id ? 'Assignment updated!' : 'Managers assigned to brand!', 'success');
+                            closeBrandResponsibleModal();
+                            await loadBrandResponsibles();
+                        } else {
+                            const err = await res.json();
+                            showToast(err.error || 'Error saving', 'error');
+                        }
+                    } catch (err) {
+                        console.error('Error saving brand responsible:', err);
+                        showToast('Error saving assignment', 'error');
+                    }
+                });
+                
+                // Load brands data on page load
+                loadBrands();
+                loadBrandResponsibles();
             </script>
         </body>
         </html>
@@ -4530,6 +5014,208 @@ router.delete('/api/store-responsibles/:id', async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         console.error('Error deleting store responsible:', err);
+        res.status(500).json({ error: 'Failed to remove assignment' });
+    }
+});
+
+// ========== BRANDS API ==========
+router.get('/api/brands', async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request().query(`
+            SELECT b.*, 
+                   (SELECT COUNT(*) FROM Stores s WHERE s.BrandId = b.Id) as StoreCount
+            FROM Brands b
+            ORDER BY b.BrandName
+        `);
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error fetching brands:', err);
+        res.status(500).json({ error: 'Failed to fetch brands' });
+    }
+});
+
+router.post('/api/brands', async (req, res) => {
+    try {
+        const { brandName, brandCode, primaryColor, isActive } = req.body;
+        const pool = await getPool();
+        
+        // Check if brand code already exists
+        const existing = await pool.request()
+            .input('brandCode', sql.NVarChar, brandCode)
+            .query('SELECT Id FROM Brands WHERE BrandCode = @brandCode');
+        
+        if (existing.recordset.length > 0) {
+            return res.status(400).json({ error: 'Brand code already exists. Please use a unique code.' });
+        }
+        
+        await pool.request()
+            .input('brandName', sql.NVarChar, brandName)
+            .input('brandCode', sql.NVarChar, brandCode)
+            .input('primaryColor', sql.NVarChar, primaryColor || '#667eea')
+            .input('isActive', sql.Bit, isActive ? 1 : 0)
+            .input('createdBy', sql.Int, req.currentUser?.Id || null)
+            .query(`
+                INSERT INTO Brands (BrandName, BrandCode, PrimaryColor, IsActive, CreatedAt, CreatedBy)
+                VALUES (@brandName, @brandCode, @primaryColor, @isActive, GETDATE(), @createdBy)
+            `);
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error creating brand:', err);
+        res.status(500).json({ error: 'Failed to create brand' });
+    }
+});
+
+router.put('/api/brands/:id', async (req, res) => {
+    try {
+        const { brandName, brandCode, primaryColor, isActive } = req.body;
+        const pool = await getPool();
+        
+        // Check if brand code exists for different brand
+        const existing = await pool.request()
+            .input('brandCode', sql.NVarChar, brandCode)
+            .input('id', sql.Int, req.params.id)
+            .query('SELECT Id FROM Brands WHERE BrandCode = @brandCode AND Id != @id');
+        
+        if (existing.recordset.length > 0) {
+            return res.status(400).json({ error: 'Brand code already exists. Please use a unique code.' });
+        }
+        
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .input('brandName', sql.NVarChar, brandName)
+            .input('brandCode', sql.NVarChar, brandCode)
+            .input('primaryColor', sql.NVarChar, primaryColor || '#667eea')
+            .input('isActive', sql.Bit, isActive ? 1 : 0)
+            .input('updatedBy', sql.Int, req.currentUser?.Id || null)
+            .query(`
+                UPDATE Brands 
+                SET BrandName = @brandName, BrandCode = @brandCode, PrimaryColor = @primaryColor, 
+                    IsActive = @isActive, UpdatedAt = GETDATE(), UpdatedBy = @updatedBy
+                WHERE Id = @id
+            `);
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating brand:', err);
+        res.status(500).json({ error: 'Failed to update brand' });
+    }
+});
+
+router.delete('/api/brands/:id', async (req, res) => {
+    try {
+        const pool = await getPool();
+        
+        // Check if brand has stores
+        const storeCount = await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query('SELECT COUNT(*) as cnt FROM Stores WHERE BrandId = @id');
+        
+        if (storeCount.recordset[0].cnt > 0) {
+            return res.status(400).json({ error: 'Cannot delete brand with assigned stores. Reassign stores first.' });
+        }
+        
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query('DELETE FROM Brands WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting brand:', err);
+        res.status(500).json({ error: 'Failed to delete brand' });
+    }
+});
+
+// ========== BRAND RESPONSIBLES API ==========
+router.get('/api/brand-responsibles', async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request().query(`
+            SELECT br.*, 
+                   b.BrandName, b.BrandCode,
+                   am.DisplayName as AreaManagerName, am.Email as AreaManagerEmail,
+                   ho.DisplayName as HeadOfOpsName, ho.Email as HeadOfOpsEmail
+            FROM OE_BrandResponsibles br
+            INNER JOIN Brands b ON br.BrandId = b.Id
+            LEFT JOIN Users am ON br.AreaManagerId = am.Id
+            LEFT JOIN Users ho ON br.HeadOfOpsId = ho.Id
+            WHERE br.IsActive = 1
+            ORDER BY b.BrandName
+        `);
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error fetching brand responsibles:', err);
+        res.status(500).json({ error: 'Failed to fetch data' });
+    }
+});
+
+router.post('/api/brand-responsibles', async (req, res) => {
+    try {
+        const { brandId, areaManagerId, headOfOpsId, notes } = req.body;
+        const pool = await getPool();
+        
+        // Check if brand already has an assignment
+        const existing = await pool.request()
+            .input('brandId', sql.Int, brandId)
+            .query('SELECT Id FROM OE_BrandResponsibles WHERE BrandId = @brandId AND IsActive = 1');
+        
+        if (existing.recordset.length > 0) {
+            return res.status(400).json({ error: 'This brand already has managers assigned. Edit or remove the existing assignment first.' });
+        }
+        
+        await pool.request()
+            .input('brandId', sql.Int, brandId)
+            .input('areaManagerId', sql.Int, areaManagerId)
+            .input('headOfOpsId', sql.Int, headOfOpsId || null)
+            .input('notes', sql.NVarChar, notes || null)
+            .input('createdBy', sql.Int, req.currentUser?.Id || null)
+            .query(`
+                INSERT INTO OE_BrandResponsibles (BrandId, AreaManagerId, HeadOfOpsId, Notes, CreatedBy, CreatedAt, IsActive)
+                VALUES (@brandId, @areaManagerId, @headOfOpsId, @notes, @createdBy, GETDATE(), 1)
+            `);
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error creating brand responsible:', err);
+        res.status(500).json({ error: 'Failed to save assignment' });
+    }
+});
+
+router.put('/api/brand-responsibles/:id', async (req, res) => {
+    try {
+        const { brandId, areaManagerId, headOfOpsId, notes } = req.body;
+        const pool = await getPool();
+        
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .input('brandId', sql.Int, brandId)
+            .input('areaManagerId', sql.Int, areaManagerId)
+            .input('headOfOpsId', sql.Int, headOfOpsId || null)
+            .input('notes', sql.NVarChar, notes || null)
+            .input('updatedBy', sql.Int, req.currentUser?.Id || null)
+            .query(`
+                UPDATE OE_BrandResponsibles 
+                SET BrandId = @brandId, AreaManagerId = @areaManagerId, HeadOfOpsId = @headOfOpsId, Notes = @notes, 
+                    UpdatedBy = @updatedBy, UpdatedAt = GETDATE()
+                WHERE Id = @id
+            `);
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating brand responsible:', err);
+        res.status(500).json({ error: 'Failed to update assignment' });
+    }
+});
+
+router.delete('/api/brand-responsibles/:id', async (req, res) => {
+    try {
+        const pool = await getPool();
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query('UPDATE OE_BrandResponsibles SET IsActive = 0 WHERE Id = @id');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting brand responsible:', err);
         res.status(500).json({ error: 'Failed to remove assignment' });
     }
 });

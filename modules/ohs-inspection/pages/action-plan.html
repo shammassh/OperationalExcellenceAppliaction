@@ -669,8 +669,8 @@
                 <button onclick="generateFullReport()" style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);">
                     📄 Generate Report
                 </button>
-                <button onclick="sendToStoreManager()" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
-                    📧 Send to Manager
+                <button onclick="sendToStoreManager()" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);" title="Send Action Plan to Store Manager">
+                    📧 Send Report
                 </button>
                 <button onclick="window.print()">
                     🖨️ Print
@@ -1312,48 +1312,54 @@
             // First save the action plan
             await saveActionPlan();
 
-            // Show email modal or prompt
-            const email = prompt('Enter Store Manager email address:', '');
-            if (!email) return;
-
+            // Get inspection ID from URL
+            const pathParts = window.location.pathname.split('/');
+            const inspectionId = pathParts[pathParts.length - 1];
+            
+            if (!inspectionId || isNaN(inspectionId)) {
+                showToast('Invalid inspection ID', 'error');
+                return;
+            }
+            
             try {
-                showToast('Sending action plan...', 'info');
+                showToast('Preparing email...', 'info');
                 
-                const response = await fetch('/ohs-inspection/api/action-plan/send-email', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        documentNumber: auditData.documentNumber,
-                        storeName: auditData.storeName,
-                        auditDate: auditData.auditDate,
-                        score: auditData.score,
-                        recipientEmail: email,
-                        actionItems: actionItems.map(item => ({
-                            referenceValue: item.referenceValue,
-                            sectionName: item.sectionName,
-                            finding: item.finding || item.title,
-                            selectedChoice: item.selectedChoice,
-                            priority: item.priority,
-                            actionTaken: item.actionTaken,
-                            deadline: item.deadline,
-                            personInCharge: item.personInCharge,
-                            status: item.status
-                        }))
-                    })
-                });
-
-                const result = await response.json();
+                // Fetch email recipients (pass reportType to get correct To recipient - inspector for action-plan)
+                const recipientsRes = await fetch(`/ohs-inspection/api/inspections/${inspectionId}/email-recipients?reportType=action-plan`);
+                const recipientsData = await recipientsRes.json();
                 
-                if (result.success) {
-                    showToast('Action plan sent to ' + email, 'success');
-                } else {
-                    showToast('Error: ' + result.error, 'error');
+                if (!recipientsData.success) {
+                    throw new Error(recipientsData.error || 'Failed to load email recipients');
                 }
+                
+                // Fetch email preview
+                const previewRes = await fetch(`/ohs-inspection/api/inspections/${inspectionId}/email-preview?reportType=action-plan`);
+                const previewData = await previewRes.json();
+                
+                if (!previewData.success) {
+                    throw new Error(previewData.error || 'Failed to generate email preview');
+                }
+                
+                // Show email modal
+                EmailModal.show({
+                    module: 'OHS',
+                    from: recipientsData.from,
+                    to: recipientsData.to,
+                    ccSuggestions: recipientsData.ccSuggestions,
+                    subject: previewData.subject,
+                    bodyHtml: previewData.bodyHtml,
+                    reportType: 'action-plan',
+                    auditId: inspectionId,
+                    sendUrl: `/ohs-inspection/api/inspections/${inspectionId}/send-report-email`,
+                    searchEndpoint: '/operational-excellence/api/users'
+                });
+                
             } catch (error) {
-                console.error('Error sending email:', error);
-                showToast('Error sending email', 'error');
+                console.error('Error preparing email:', error);
+                showToast('Error preparing email: ' + error.message, 'error');
             }
         }
     </script>
+    <script src="/js/email-modal.js"></script>
 </body>
 </html>

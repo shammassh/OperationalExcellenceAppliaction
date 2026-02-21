@@ -704,6 +704,9 @@
                 <button class="save-btn" onclick="saveActionPlan()">
                     💾 Save
                 </button>
+                <button onclick="openEmailModal('action-plan')" title="Send Action Plan to Store Manager">
+                    📧 Send Report
+                </button>
                 <button onclick="window.print()">
                     🖨️ Print
                 </button>
@@ -1377,6 +1380,74 @@
                 saveActionPlan();
             }
         });
+
+        // ==========================================
+        // Email Modal Functions
+        // ==========================================
+        
+        async function openEmailModal(reportType) {
+            const pathParts = window.location.pathname.split('/');
+            const auditId = pathParts[pathParts.length - 1];
+            
+            if (!auditId || isNaN(auditId)) {
+                alert('Invalid audit ID');
+                return;
+            }
+            
+            try {
+                // Show loading state
+                const sendBtn = document.querySelector('button[onclick*="openEmailModal"]');
+                const originalText = sendBtn.innerHTML;
+                sendBtn.innerHTML = '⏳ Loading...';
+                sendBtn.disabled = true;
+                
+                // Fetch email recipients (pass reportType to get correct To recipient)
+                const recipientsRes = await fetch(`/oe-inspection/api/audits/${auditId}/email-recipients?reportType=${reportType}`);
+                const recipientsData = await recipientsRes.json();
+                
+                if (!recipientsData.success) {
+                    throw new Error(recipientsData.error || 'Failed to load email recipients');
+                }
+                
+                // Fetch email preview
+                const previewRes = await fetch(`/oe-inspection/api/audits/${auditId}/email-preview?reportType=${reportType}`);
+                const previewData = await previewRes.json();
+                
+                if (!previewData.success) {
+                    throw new Error(previewData.error || 'Failed to generate email preview');
+                }
+                
+                // Restore button
+                sendBtn.innerHTML = originalText;
+                sendBtn.disabled = false;
+                
+                // Show email modal
+                EmailModal.show({
+                    module: 'OE',
+                    from: recipientsData.from,
+                    to: recipientsData.to,
+                    ccSuggestions: recipientsData.ccSuggestions,
+                    subject: previewData.subject,
+                    bodyHtml: previewData.bodyHtml,
+                    reportType: reportType,
+                    auditId: auditId,
+                    sendUrl: `/oe-inspection/api/audits/${auditId}/send-report-email`,
+                    searchEndpoint: '/operational-excellence/api/users'
+                });
+                
+            } catch (error) {
+                console.error('Error opening email modal:', error);
+                alert('Error preparing email: ' + error.message);
+                
+                // Restore button
+                const sendBtn = document.querySelector('button[onclick*="openEmailModal"]');
+                if (sendBtn) {
+                    sendBtn.innerHTML = '📧 Send Report';
+                    sendBtn.disabled = false;
+                }
+            }
+        }
     </script>
+    <script src="/js/email-modal.js"></script>
 </body>
 </html>
