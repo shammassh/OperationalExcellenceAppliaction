@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekly Cleaning Schedule - Configuration</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .header h1 {
+            font-size: 1.8rem;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .header h1 i {
+            color: #4CAF50;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(76, 175, 80, 0.4);
+        }
+        
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+            color: white;
+        }
+        
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 0.9rem;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .tab-btn {
+            padding: 15px 25px;
+            background: rgba(255,255,255,0.05);
+            border: 2px solid transparent;
+            border-radius: 10px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .tab-btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .tab-btn.active {
+            background: rgba(76, 175, 80, 0.2);
+            border-color: #4CAF50;
+        }
+        
+        .tab-btn .badge {
+            background: rgba(255,255,255,0.2);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+        
+        .panel {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+        
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .panel-header h2 {
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .panel-header h2 i {
+            color: #4CAF50;
+        }
+        
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 1024px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        th {
+            background: rgba(0,0,0,0.2);
+            font-weight: 600;
+            color: #4CAF50;
+        }
+        
+        tr:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        
+        .break-row {
+            background: rgba(255, 193, 7, 0.1);
+            font-style: italic;
+        }
+        
+        .break-row:hover {
+            background: rgba(255, 193, 7, 0.15);
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #ccc;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 15px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 1rem;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .agent-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .agent-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+        }
+        
+        .agent-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .agent-avatar {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        
+        .agent-name {
+            font-weight: 500;
+        }
+        
+        .agent-email {
+            font-size: 0.85rem;
+            color: #888;
+        }
+        
+        .remove-btn {
+            background: transparent;
+            border: none;
+            color: #f44336;
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 5px;
+            transition: transform 0.2s;
+        }
+        
+        .remove-btn:hover {
+            transform: scale(1.2);
+        }
+        
+        .action-btns {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .icon-btn {
+            background: transparent;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 8px;
+            border-radius: 5px;
+            transition: all 0.2s;
+        }
+        
+        .icon-btn:hover {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+        
+        .icon-btn.edit:hover {
+            color: #2196F3;
+        }
+        
+        .icon-btn.delete:hover {
+            color: #f44336;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            color: #555;
+        }
+        
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: #1a1a2e;
+            border-radius: 15px;
+            padding: 30px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+        
+        .modal-header h3 {
+            font-size: 1.3rem;
+        }
+        
+        .close-btn {
+            background: transparent;
+            border: none;
+            color: #888;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+        
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top-color: #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .shift-time {
+            font-size: 0.85rem;
+            color: #888;
+        }
+        
+        .back-link {
+            color: #4CAF50;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/security" class="back-link">
+            <i class="fas fa-arrow-left"></i> Back to Security Dashboard
+        </a>
+        
+        <div class="header">
+            <h1><i class="fas fa-calendar-week"></i> Weekly Cleaning Schedule - Configuration</h1>
+            <button class="btn btn-primary" onclick="openAddShiftModal()">
+                <i class="fas fa-plus"></i> Add Shift
+            </button>
+        </div>
+        
+        <div class="tabs" id="shiftTabs">
+            <div class="loading"><div class="spinner"></div></div>
+        </div>
+        
+        <div id="shiftContent">
+            <div class="empty-state">
+                <i class="fas fa-calendar-alt"></i>
+                <h3>Select a shift to configure</h3>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add/Edit Shift Modal -->
+    <div class="modal" id="shiftModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="shiftModalTitle">Add Shift</h3>
+                <button class="close-btn" onclick="closeModal('shiftModal')">&times;</button>
+            </div>
+            <form id="shiftForm">
+                <input type="hidden" id="shiftId">
+                <div class="form-group">
+                    <label>Shift Name</label>
+                    <input type="text" id="shiftName" required placeholder="e.g., Offices 7AM-4PM">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" id="shiftDescription" placeholder="Optional description">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Start Time</label>
+                        <input type="time" id="shiftStartTime" required>
+                    </div>
+                    <div class="form-group">
+                        <label>End Time</label>
+                        <input type="time" id="shiftEndTime" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('shiftModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Shift</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Add/Edit Time Slot Modal -->
+    <div class="modal" id="timeSlotModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="timeSlotModalTitle">Add Time Slot</h3>
+                <button class="close-btn" onclick="closeModal('timeSlotModal')">&times;</button>
+            </div>
+            <form id="timeSlotForm">
+                <input type="hidden" id="timeSlotId">
+                <input type="hidden" id="timeSlotShiftId">
+                <div class="form-group">
+                    <label>Slot Name</label>
+                    <input type="text" id="slotName" required placeholder="e.g., 7 AM To 7:20 AM">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Start Time</label>
+                        <input type="time" id="slotStartTime" required>
+                    </div>
+                    <div class="form-group">
+                        <label>End Time</label>
+                        <input type="time" id="slotEndTime" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Task Description</label>
+                    <input type="text" id="taskDescription" required placeholder="e.g., Parking and Entrance">
+                </div>
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="isBreak">
+                        <label for="isBreak">This is a break slot</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('timeSlotModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Time Slot</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Assign Agent Modal -->
+    <div class="modal" id="assignAgentModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Assign Cleaner to Shift</h3>
+                <button class="close-btn" onclick="closeModal('assignAgentModal')">&times;</button>
+            </div>
+            <form id="assignAgentForm">
+                <input type="hidden" id="assignShiftId">
+                <div class="form-group">
+                    <label>Select User</label>
+                    <select id="assignUserId" required>
+                        <option value="">-- Select User --</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('assignAgentModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Assign</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = '/security/weekly-schedule/api';
+        let shifts = [];
+        let currentShiftId = null;
+        let allUsers = [];
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', init);
+        
+        async function init() {
+            await loadShifts();
+            await loadUsers();
+        }
+        
+        async function loadShifts() {
+            try {
+                const res = await fetch(`${API_BASE}/shifts`);
+                shifts = await res.json();
+                renderShiftTabs();
+            } catch (err) {
+                console.error('Error loading shifts:', err);
+            }
+        }
+        
+        async function loadUsers() {
+            try {
+                const res = await fetch(`${API_BASE}/users`);
+                allUsers = await res.json();
+            } catch (err) {
+                console.error('Error loading users:', err);
+            }
+        }
+        
+        function renderShiftTabs() {
+            const container = document.getElementById('shiftTabs');
+            
+            if (shifts.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <p>No shifts configured. Click "Add Shift" to create one.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = shifts.map(s => `
+                <button class="tab-btn ${currentShiftId === s.Id ? 'active' : ''}" onclick="selectShift(${s.Id})">
+                    <i class="fas fa-clock"></i>
+                    <div>
+                        <div>${s.ShiftName}</div>
+                        <div class="shift-time">${formatTime(s.StartTime)} - ${formatTime(s.EndTime)}</div>
+                    </div>
+                    <span class="badge">${s.TimeSlotCount} slots</span>
+                </button>
+            `).join('');
+            
+            // Auto-select first shift if none selected
+            if (currentShiftId === null && shifts.length > 0) {
+                selectShift(shifts[0].Id);
+            }
+        }
+        
+        async function selectShift(shiftId) {
+            currentShiftId = shiftId;
+            renderShiftTabs();
+            await loadShiftContent(shiftId);
+        }
+        
+        async function loadShiftContent(shiftId) {
+            const shift = shifts.find(s => s.Id === shiftId);
+            if (!shift) return;
+            
+            const container = document.getElementById('shiftContent');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+            
+            try {
+                const [timeSlotsRes, agentsRes] = await Promise.all([
+                    fetch(`${API_BASE}/shifts/${shiftId}/timeslots`),
+                    fetch(`${API_BASE}/shifts/${shiftId}/agents`)
+                ]);
+                
+                const timeSlotsData = await timeSlotsRes.json();
+                const agentsData = await agentsRes.json();
+                
+                // Ensure we have arrays even if API returns error object
+                const timeSlots = Array.isArray(timeSlotsData) ? timeSlotsData : [];
+                const agents = Array.isArray(agentsData) ? agentsData : [];
+                
+                container.innerHTML = `
+                    <div class="grid-2">
+                        <div class="panel">
+                            <div class="panel-header">
+                                <h2><i class="fas fa-clock"></i> Time Slots</h2>
+                                <div class="action-btns">
+                                    <button class="btn btn-primary btn-sm" onclick="openAddTimeSlotModal(${shiftId})">
+                                        <i class="fas fa-plus"></i> Add Slot
+                                    </button>
+                                    <button class="btn btn-secondary btn-sm" onclick="openEditShiftModal(${shiftId})">
+                                        <i class="fas fa-edit"></i> Edit Shift
+                                    </button>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteShift(${shiftId})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            ${renderTimeSlotsTable(timeSlots)}
+                        </div>
+                        
+                        <div class="panel">
+                            <div class="panel-header">
+                                <h2><i class="fas fa-users"></i> Assigned Cleaners</h2>
+                                <button class="btn btn-primary btn-sm" onclick="openAssignAgentModal(${shiftId})">
+                                    <i class="fas fa-plus"></i> Assign
+                                </button>
+                            </div>
+                            ${renderAgentsList(agents)}
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                console.error('Error loading shift content:', err);
+                container.innerHTML = `<div class="empty-state"><p>Error loading shift data</p></div>`;
+            }
+        }
+        
+        function renderTimeSlotsTable(timeSlots) {
+            if (timeSlots.length === 0) {
+                return `
+                    <div class="empty-state">
+                        <i class="fas fa-clock"></i>
+                        <h3>No time slots</h3>
+                        <p>Add time slots to define the schedule</p>
+                    </div>
+                `;
+            }
+            
+            return `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Task</th>
+                            <th style="width:100px">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${timeSlots.map(ts => `
+                            <tr class="${ts.IsBreak ? 'break-row' : ''}">
+                                <td>
+                                    <strong>${ts.SlotName}</strong><br>
+                                    <small style="color:#888">${formatTime(ts.StartTime)} - ${formatTime(ts.EndTime)}</small>
+                                </td>
+                                <td>
+                                    ${ts.IsBreak ? '<i class="fas fa-coffee"></i> ' : ''}
+                                    ${ts.TaskDescription}
+                                </td>
+                                <td>
+                                    <div class="action-btns">
+                                        <button class="icon-btn edit" onclick="openEditTimeSlotModal(${ts.Id})" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="icon-btn delete" onclick="deleteTimeSlot(${ts.Id})" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+        
+        function renderAgentsList(agents) {
+            if (agents.length === 0) {
+                return `
+                    <div class="empty-state">
+                        <i class="fas fa-user-plus"></i>
+                        <h3>No cleaners assigned</h3>
+                        <p>Assign cleaners to this shift</p>
+                    </div>
+                `;
+            }
+            
+            return `
+                <div class="agent-list">
+                    ${agents.map(a => `
+                        <div class="agent-card">
+                            <div class="agent-info">
+                                <div class="agent-avatar">${getInitials(a.DisplayName)}</div>
+                                <div>
+                                    <div class="agent-name">${a.DisplayName}</div>
+                                    <div class="agent-email">${a.Email || a.Department || ''}</div>
+                                </div>
+                            </div>
+                            <button class="remove-btn" onclick="removeAgent(${a.AssignmentId})" title="Remove">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+        
+        // Modal functions
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+        }
+        
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+        
+        function openAddShiftModal() {
+            document.getElementById('shiftModalTitle').textContent = 'Add Shift';
+            document.getElementById('shiftForm').reset();
+            document.getElementById('shiftId').value = '';
+            openModal('shiftModal');
+        }
+        
+        function openEditShiftModal(shiftId) {
+            const shift = shifts.find(s => s.Id === shiftId);
+            if (!shift) return;
+            
+            document.getElementById('shiftModalTitle').textContent = 'Edit Shift';
+            document.getElementById('shiftId').value = shift.Id;
+            document.getElementById('shiftName').value = shift.ShiftName;
+            document.getElementById('shiftDescription').value = shift.ShiftDescription || '';
+            document.getElementById('shiftStartTime').value = shift.StartTime.substring(0, 5);
+            document.getElementById('shiftEndTime').value = shift.EndTime.substring(0, 5);
+            openModal('shiftModal');
+        }
+        
+        function openAddTimeSlotModal(shiftId) {
+            document.getElementById('timeSlotModalTitle').textContent = 'Add Time Slot';
+            document.getElementById('timeSlotForm').reset();
+            document.getElementById('timeSlotId').value = '';
+            document.getElementById('timeSlotShiftId').value = shiftId;
+            openModal('timeSlotModal');
+        }
+        
+        async function openEditTimeSlotModal(timeSlotId) {
+            try {
+                const res = await fetch(`${API_BASE}/shifts/${currentShiftId}/timeslots`);
+                const timeSlots = await res.json();
+                const ts = timeSlots.find(t => t.Id === timeSlotId);
+                if (!ts) return;
+                
+                document.getElementById('timeSlotModalTitle').textContent = 'Edit Time Slot';
+                document.getElementById('timeSlotId').value = ts.Id;
+                document.getElementById('timeSlotShiftId').value = ts.ShiftId;
+                document.getElementById('slotName').value = ts.SlotName;
+                document.getElementById('slotStartTime').value = ts.StartTime.substring(0, 5);
+                document.getElementById('slotEndTime').value = ts.EndTime.substring(0, 5);
+                document.getElementById('taskDescription').value = ts.TaskDescription;
+                document.getElementById('isBreak').checked = ts.IsBreak;
+                openModal('timeSlotModal');
+            } catch (err) {
+                console.error('Error loading time slot:', err);
+            }
+        }
+        
+        function openAssignAgentModal(shiftId) {
+            document.getElementById('assignShiftId').value = shiftId;
+            
+            // Populate user dropdown
+            const select = document.getElementById('assignUserId');
+            select.innerHTML = '<option value="">-- Select User --</option>' +
+                allUsers.map(u => `<option value="${u.Id}">${u.DisplayName} (${u.Email || u.Department || ''})</option>`).join('');
+            
+            openModal('assignAgentModal');
+        }
+        
+        // Form submissions
+        document.getElementById('shiftForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const id = document.getElementById('shiftId').value;
+            const data = {
+                shiftName: document.getElementById('shiftName').value,
+                shiftDescription: document.getElementById('shiftDescription').value,
+                startTime: document.getElementById('shiftStartTime').value,
+                endTime: document.getElementById('shiftEndTime').value
+            };
+            
+            try {
+                const url = id ? `${API_BASE}/shifts/${id}` : `${API_BASE}/shifts`;
+                const method = id ? 'PUT' : 'POST';
+                
+                await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                closeModal('shiftModal');
+                await loadShifts();
+                if (currentShiftId) {
+                    await loadShiftContent(currentShiftId);
+                }
+            } catch (err) {
+                console.error('Error saving shift:', err);
+                alert('Error saving shift');
+            }
+        });
+        
+        document.getElementById('timeSlotForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const id = document.getElementById('timeSlotId').value;
+            const shiftId = document.getElementById('timeSlotShiftId').value;
+            const data = {
+                slotName: document.getElementById('slotName').value,
+                startTime: document.getElementById('slotStartTime').value,
+                endTime: document.getElementById('slotEndTime').value,
+                taskDescription: document.getElementById('taskDescription').value,
+                isBreak: document.getElementById('isBreak').checked
+            };
+            
+            try {
+                const url = id ? `${API_BASE}/timeslots/${id}` : `${API_BASE}/shifts/${shiftId}/timeslots`;
+                const method = id ? 'PUT' : 'POST';
+                
+                await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                closeModal('timeSlotModal');
+                await loadShifts();
+                await loadShiftContent(currentShiftId);
+            } catch (err) {
+                console.error('Error saving time slot:', err);
+                alert('Error saving time slot');
+            }
+        });
+        
+        document.getElementById('assignAgentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const shiftId = document.getElementById('assignShiftId').value;
+            const userId = document.getElementById('assignUserId').value;
+            
+            try {
+                const res = await fetch(`${API_BASE}/shifts/${shiftId}/agents`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId })
+                });
+                
+                const data = await res.json();
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                
+                closeModal('assignAgentModal');
+                await loadShifts();
+                await loadShiftContent(currentShiftId);
+            } catch (err) {
+                console.error('Error assigning agent:', err);
+                alert('Error assigning agent');
+            }
+        });
+        
+        // Delete functions
+        async function deleteShift(shiftId) {
+            if (!confirm('Are you sure you want to delete this shift? All time slots and assignments will be removed.')) return;
+            
+            try {
+                await fetch(`${API_BASE}/shifts/${shiftId}`, { method: 'DELETE' });
+                currentShiftId = null;
+                await loadShifts();
+                document.getElementById('shiftContent').innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-calendar-alt"></i>
+                        <h3>Select a shift to configure</h3>
+                    </div>
+                `;
+            } catch (err) {
+                console.error('Error deleting shift:', err);
+                alert('Error deleting shift');
+            }
+        }
+        
+        async function deleteTimeSlot(timeSlotId) {
+            if (!confirm('Are you sure you want to delete this time slot?')) return;
+            
+            try {
+                await fetch(`${API_BASE}/timeslots/${timeSlotId}`, { method: 'DELETE' });
+                await loadShifts();
+                await loadShiftContent(currentShiftId);
+            } catch (err) {
+                console.error('Error deleting time slot:', err);
+                alert('Error deleting time slot');
+            }
+        }
+        
+        async function removeAgent(assignmentId) {
+            if (!confirm('Remove this cleaner from the shift?')) return;
+            
+            try {
+                await fetch(`${API_BASE}/shifts/${currentShiftId}/agents/${assignmentId}`, { method: 'DELETE' });
+                await loadShifts();
+                await loadShiftContent(currentShiftId);
+            } catch (err) {
+                console.error('Error removing agent:', err);
+                alert('Error removing agent');
+            }
+        }
+        
+        // Utility functions
+        function formatTime(timeStr) {
+            if (!timeStr) return '';
+            const [hours, minutes] = timeStr.split(':');
+            const h = parseInt(hours);
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            const h12 = h % 12 || 12;
+            return `${h12}:${minutes} ${ampm}`;
+        }
+        
+        function getInitials(name) {
+            if (!name) return '?';
+            return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+        }
+    </script>
+</body>
+</html>

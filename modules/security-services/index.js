@@ -16,6 +16,7 @@ const parkingViolationRoutes = require('./parking-violation/routes');
 const securityChecklistRoutes = require('./security-checklist/routes');
 const cleaningChecklistRoutes = require('./cleaning-checklist/routes');
 const dailyTasksRoutes = require('./daily-tasks/routes');
+const weeklyScheduleRoutes = require('./weekly-schedule/routes');
 
 // Mount sub-routes
 router.use('/delivery-log', deliveryLogRoutes);
@@ -27,6 +28,7 @@ router.use('/parking-violation', parkingViolationRoutes); // Form accessible via
 router.use('/security-checklist', securityChecklistRoutes);
 router.use('/cleaning-checklist', cleaningChecklistRoutes);
 router.use('/daily-tasks', dailyTasksRoutes);
+router.use('/weekly-schedule', weeklyScheduleRoutes);
 
 // Landing Page
 router.get('/', async (req, res) => {
@@ -229,6 +231,12 @@ router.get('/', async (req, res) => {
                         <div class="card-icon">📝</div>
                         <div class="card-title">Daily Tasks</div>
                         <div class="card-desc">Daily task form for Multi-Zone and Fixed Area cleaning teams - المهام اليومية</div>
+                        <span class="card-badge internal">Internal</span>
+                    </a>
+                    <a href="/security-services/weekly-schedule" class="menu-card internal">
+                        <div class="card-icon">📆</div>
+                        <div class="card-title">Weekly Schedule</div>
+                        <div class="card-desc">Monthly cleaning schedule checklist for shifts - الجدول الأسبوعي</div>
                         <span class="card-badge internal">Internal</span>
                     </a>
                 </div>

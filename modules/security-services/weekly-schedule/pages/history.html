@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekly Cleaning Schedule - History</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .header h1 {
+            font-size: 1.6rem;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .header h1 i {
+            color: #4CAF50;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(76, 175, 80, 0.4);
+        }
+        
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 0.9rem;
+        }
+        
+        .filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+        
+        .filter-group {
+            flex: 1;
+            min-width: 150px;
+        }
+        
+        .filter-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #ccc;
+        }
+        
+        .filter-group select {
+            width: 100%;
+            padding: 10px 15px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        
+        .filter-group select option {
+            background: #1a1a2e;
+            color: #fff;
+        }
+        
+        .filter-group select:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        
+        .panel {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        th {
+            background: rgba(0,0,0,0.2);
+            font-weight: 600;
+            color: #4CAF50;
+        }
+        
+        tr:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        
+        .badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        .badge-shift1 {
+            background: rgba(33, 150, 243, 0.2);
+            color: #2196F3;
+        }
+        
+        .badge-shift2 {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4CAF50;
+        }
+        
+        .badge-shift3 {
+            background: rgba(255, 152, 0, 0.2);
+            color: #FF9800;
+        }
+        
+        .week-indicators {
+            display: flex;
+            gap: 8px;
+            font-size: 1.1rem;
+        }
+        
+        .week-indicators span {
+            cursor: help;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            transition: width 0.5s ease;
+        }
+        
+        .progress-text {
+            font-size: 0.85rem;
+            color: #888;
+            margin-top: 4px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #888;
+        }
+        
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            color: #555;
+        }
+        
+        .empty-state h3 {
+            margin-bottom: 10px;
+            color: #fff;
+        }
+        
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 60px;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top-color: #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .back-link {
+            color: #4CAF50;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .action-btn {
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #2196F3, #1976D2);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(33, 150, 243, 0.3);
+        }
+        
+        @media (max-width: 768px) {
+            th, td {
+                padding: 10px;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/security-services" class="back-link">
+            <i class="fas fa-arrow-left"></i> Back to Security Services
+        </a>
+        
+        <div class="header">
+            <h1><i class="fas fa-history"></i> Weekly Schedule History</h1>
+            <a href="/security-services/weekly-schedule" class="btn btn-primary">
+                <i class="fas fa-plus"></i> New Entry
+            </a>
+        </div>
+        
+        <div class="filters">
+            <div class="filter-group">
+                <label>Filter by Month</label>
+                <select id="monthFilter" onchange="loadEntries()">
+                    <option value="">All Months</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Filter by Shift</label>
+                <select id="shiftFilter" onchange="loadEntries()">
+                    <option value="">All Shifts</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Filter by Year</label>
+                <select id="yearFilter" onchange="loadEntries()">
+                    <option value="">All Years</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Shift</th>
+                        <th>Month</th>
+                        <th>Weeks Completed</th>
+                        <th>Overall Progress</th>
+                        <th>Last Updated</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="entriesTable">
+                    <tr>
+                        <td colspan="6">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = '/security-services/weekly-schedule/api';
+        
+        let shifts = [];
+        let entries = [];
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', init);
+        
+        async function init() {
+            await loadShifts();
+            populateYearFilter();
+            populateMonthFilter();
+            await loadEntries();
+        }
+        
+        async function loadShifts() {
+            try {
+                const res = await fetch(`${API_BASE}/shifts`);
+                shifts = await res.json();
+                
+                const select = document.getElementById('shiftFilter');
+                select.innerHTML = '<option value="">All Shifts</option>' +
+                    shifts.map(s => `<option value="${s.ShiftId}">${s.ShiftName}</option>`).join('');
+            } catch (err) {
+                console.error('Error loading shifts:', err);
+            }
+        }
+        
+        function populateYearFilter() {
+            const currentYear = new Date().getFullYear();
+            const years = [currentYear, currentYear - 1, currentYear - 2];
+            
+            const select = document.getElementById('yearFilter');
+            select.innerHTML = '<option value="">All Years</option>' +
+                years.map(y => `<option value="${y}">${y}</option>`).join('');
+        }
+        
+        function populateMonthFilter() {
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                               'July', 'August', 'September', 'October', 'November', 'December'];
+            
+            const select = document.getElementById('monthFilter');
+            select.innerHTML = '<option value="">All Months</option>' +
+                monthNames.map((name, i) => `<option value="${i + 1}">${name}</option>`).join('');
+        }
+        
+        async function loadEntries() {
+            const shiftId = document.getElementById('shiftFilter').value;
+            const year = document.getElementById('yearFilter').value;
+            const month = document.getElementById('monthFilter').value;
+            
+            let url = `${API_BASE}/entries?`;
+            if (shiftId) url += `shiftId=${shiftId}&`;
+            if (year) url += `year=${year}&`;
+            if (month) url += `month=${month}&`;
+            
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                if (!res.ok || data.error) {
+                    throw new Error(data.error || 'Failed to load entries');
+                }
+                
+                entries = Array.isArray(data) ? data : [];
+                renderEntries();
+            } catch (err) {
+                console.error('Error loading entries:', err);
+                document.getElementById('entriesTable').innerHTML = 
+                    '<tr><td colspan="6" style="text-align:center;color:red;">Error loading data: ' + err.message + '</td></tr>';
+            }
+        }
+        
+        function renderEntries() {
+            const tbody = document.getElementById('entriesTable');
+            
+            if (entries.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">
+                                <i class="fas fa-calendar-times"></i>
+                                <h3>No entries found</h3>
+                                <p>Start filling out weekly schedules to see history</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = entries.map(e => {
+                const percent = e.ExpectedCount > 0 ? Math.round((e.CompletedCount / e.ExpectedCount) * 100) : 0;
+                const monthName = new Date(e.Year, e.Month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                const shiftClass = `badge-shift${(e.ShiftId % 3) + 1}`;
+                
+                // Calculate week completion status
+                const weekExp = e.WeekExpected || 1;
+                const w1 = e.Week1Done >= weekExp ? '✓' : (e.Week1Done > 0 ? '◐' : '○');
+                const w2 = e.Week2Done >= weekExp ? '✓' : (e.Week2Done > 0 ? '◐' : '○');
+                const w3 = e.Week3Done >= weekExp ? '✓' : (e.Week3Done > 0 ? '◐' : '○');
+                const w4 = e.Week4Done >= weekExp ? '✓' : (e.Week4Done > 0 ? '◐' : '○');
+                
+                const weekStatus = `
+                    <span title="Week 1: ${e.Week1Done}/${weekExp}" style="color:${e.Week1Done >= weekExp ? '#4CAF50' : (e.Week1Done > 0 ? '#FF9800' : '#666')}">${w1}</span>
+                    <span title="Week 2: ${e.Week2Done}/${weekExp}" style="color:${e.Week2Done >= weekExp ? '#4CAF50' : (e.Week2Done > 0 ? '#FF9800' : '#666')}">${w2}</span>
+                    <span title="Week 3: ${e.Week3Done}/${weekExp}" style="color:${e.Week3Done >= weekExp ? '#4CAF50' : (e.Week3Done > 0 ? '#FF9800' : '#666')}">${w3}</span>
+                    <span title="Week 4: ${e.Week4Done}/${weekExp}" style="color:${e.Week4Done >= weekExp ? '#4CAF50' : (e.Week4Done > 0 ? '#FF9800' : '#666')}">${w4}</span>
+                `;
+                
+                return `
+                    <tr>
+                        <td><span class="badge ${shiftClass}">${e.ShiftName}</span></td>
+                        <td><strong>${monthName}</strong></td>
+                        <td style="font-size:1.2rem;letter-spacing:4px;">${weekStatus}</td>
+                        <td>
+                            <div class="progress-bar">
+                                <div class="progress-bar-fill" style="width:${percent}%"></div>
+                            </div>
+                            <span class="progress-text">${percent}% (${e.CompletedCount}/${e.ExpectedCount})</span>
+                        </td>
+                        <td>
+                            ${e.CreatedByName || 'Unknown'}<br>
+                            <small style="color:#666;">${formatDateTime(e.UpdatedAt || e.CreatedAt)}</small>
+                        </td>
+                        <td>
+                            <a href="/security-services/weekly-schedule?shift=${e.ShiftId}&year=${e.Year}&month=${e.Month}" class="action-btn">
+                                View / Edit
+                            </a>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        function formatDateTime(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekly Cleaning Schedule</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .header h1 {
+            font-size: 1.6rem;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .header h1 i {
+            color: #4CAF50;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(76, 175, 80, 0.4);
+        }
+        
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .selectors {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+        
+        .selector-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .selector-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #ccc;
+        }
+        
+        .selector-group select {
+            width: 100%;
+            padding: 12px 15px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        
+        .selector-group select option {
+            background: #1a1a2e;
+            color: #fff;
+        }
+        
+        .selector-group select:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        
+        .week-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .week-tab {
+            padding: 12px 25px;
+            background: rgba(255,255,255,0.05);
+            border: 2px solid transparent;
+            border-radius: 10px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .week-tab:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .week-tab.active {
+            background: rgba(76, 175, 80, 0.2);
+            border-color: #4CAF50;
+        }
+        
+        .week-tab .progress {
+            font-size: 0.85rem;
+            color: #888;
+            margin-top: 4px;
+        }
+        
+        .schedule-grid {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .schedule-table th,
+        .schedule-table td {
+            padding: 15px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .schedule-table th {
+            background: rgba(0,0,0,0.3);
+            font-weight: 600;
+            color: #4CAF50;
+        }
+        
+        .schedule-table th:first-child {
+            text-align: left;
+            min-width: 200px;
+        }
+        
+        .schedule-table td:first-child {
+            text-align: left;
+            background: rgba(0,0,0,0.1);
+        }
+        
+        .time-slot-cell {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .slot-time {
+            font-weight: 600;
+            color: #fff;
+        }
+        
+        .slot-task {
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+        
+        .break-row {
+            background: rgba(255, 193, 7, 0.1);
+        }
+        
+        .break-row td:first-child {
+            background: rgba(255, 193, 7, 0.15);
+        }
+        
+        /* Custom checkbox */
+        .checkbox-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .custom-checkbox {
+            display: none;
+        }
+        
+        .checkbox-label {
+            width: 40px;
+            height: 40px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+        
+        .checkbox-label:hover {
+            background: rgba(255,255,255,0.2);
+            border-color: #4CAF50;
+        }
+        
+        .custom-checkbox:checked + .checkbox-label {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            border-color: #4CAF50;
+        }
+        
+        .custom-checkbox:checked + .checkbox-label::after {
+            content: '✓';
+            color: white;
+            font-size: 1.3rem;
+            font-weight: bold;
+        }
+        
+        .break-checkbox .checkbox-label {
+            background: rgba(255, 193, 7, 0.2);
+            border-color: rgba(255, 193, 7, 0.5);
+        }
+        
+        .break-checkbox .custom-checkbox:checked + .checkbox-label {
+            background: linear-gradient(135deg, #FFC107, #FFA000);
+            border-color: #FFC107;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            transition: width 0.5s ease;
+        }
+        
+        .summary-panel {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .summary-stats {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            color: #888;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #888;
+        }
+        
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            color: #555;
+        }
+        
+        .empty-state h3 {
+            margin-bottom: 10px;
+            color: #fff;
+        }
+        
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 60px;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top-color: #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            padding: 15px 25px;
+            background: #4CAF50;
+            color: white;
+            border-radius: 10px;
+            display: none;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+        
+        .toast.error {
+            background: #f44336;
+        }
+        
+        .toast.show {
+            display: block;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .back-link {
+            color: #4CAF50;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 768px) {
+            .schedule-table th,
+            .schedule-table td {
+                padding: 10px 5px;
+                font-size: 0.85rem;
+            }
+            
+            .checkbox-label {
+                width: 32px;
+                height: 32px;
+            }
+            
+            .slot-task {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/security-services" class="back-link">
+            <i class="fas fa-arrow-left"></i> Back to Security Services
+        </a>
+        
+        <div class="header">
+            <h1><i class="fas fa-calendar-week"></i> Weekly Cleaning Schedule</h1>
+            <div class="header-actions">
+                <a href="/security-services/weekly-schedule/history" class="btn btn-secondary">
+                    <i class="fas fa-history"></i> History
+                </a>
+                <button class="btn btn-primary" id="saveBtn" onclick="saveSchedule()" disabled>
+                    <i class="fas fa-save"></i> Save
+                </button>
+            </div>
+        </div>
+        
+        <div class="selectors">
+            <div class="selector-group">
+                <label><i class="fas fa-clock"></i> Select Shift</label>
+                <select id="shiftSelect" onchange="onShiftChange()">
+                    <option value="">-- Select Shift --</option>
+                </select>
+            </div>
+            <div class="selector-group">
+                <label><i class="fas fa-calendar"></i> Select Month</label>
+                <select id="monthSelect" onchange="onMonthChange()">
+                    <option value="">-- Select Month --</option>
+                </select>
+            </div>
+        </div>
+        
+        <div id="content">
+            <div class="empty-state">
+                <i class="fas fa-calendar-check"></i>
+                <h3>Select a shift and month to begin</h3>
+                <p>Your weekly cleaning schedule will appear here</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+    
+    <script>
+        const API_BASE = '/security-services/weekly-schedule/api';
+        
+        let shifts = [];
+        let months = [];
+        let currentShift = null;
+        let currentMonth = null;
+        let timeSlots = [];
+        let entryData = { entry: null, details: [] };
+        let activeWeek = 1;
+        let hasChanges = false;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', init);
+        
+        async function init() {
+            // Check for URL params (coming from history)
+            const params = new URLSearchParams(window.location.search);
+            const urlShiftId = params.get('shift');
+            const urlYear = params.get('year');
+            const urlMonth = params.get('month');
+            
+            await Promise.all([loadShifts(), loadMonths()]);
+            
+            // Auto-select month from URL params and set currentMonth
+            if (urlYear && urlMonth) {
+                document.getElementById('monthSelect').value = `${urlYear}-${urlMonth}`;
+                currentMonth = { year: parseInt(urlYear), month: parseInt(urlMonth) };
+            }
+            
+            // Auto-select shift if provided and set currentShift
+            if (urlShiftId !== null && urlShiftId !== '') {
+                document.getElementById('shiftSelect').value = urlShiftId;
+                // Find the shift in our list - handle ShiftId=0
+                currentShift = shifts.find(s => String(s.ShiftId) === urlShiftId) || null;
+                console.log('URL shift selected:', urlShiftId, 'currentShift:', currentShift);
+            }
+            
+            // Auto-load if both shift and month are set
+            if (currentShift && currentMonth) {
+                await loadSchedule();
+            }
+        }
+        
+        async function loadShifts() {
+            try {
+                const res = await fetch(`${API_BASE}/my-shifts`);
+                let data = await res.json();
+                
+                // Handle error response
+                if (data.error) {
+                    console.error('API error:', data.error);
+                    data = [];
+                }
+                
+                shifts = Array.isArray(data) ? data : [];
+                
+                // If no assigned shifts, try loading all shifts
+                if (shifts.length === 0) {
+                    const allRes = await fetch(`${API_BASE}/shifts`);
+                    const allData = await allRes.json();
+                    shifts = Array.isArray(allData) ? allData : [];
+                }
+                
+                console.log('Loaded shifts:', shifts);
+                
+                const select = document.getElementById('shiftSelect');
+                if (shifts.length === 0) {
+                    select.innerHTML = '<option value="">-- No Shifts Available --</option>';
+                } else {
+                    select.innerHTML = '<option value="">-- Select Shift --</option>' +
+                        shifts.map(s => `<option value="${s.ShiftId}">${s.ShiftName}</option>`).join('');
+                }
+            } catch (err) {
+                console.error('Error loading shifts:', err);
+                document.getElementById('shiftSelect').innerHTML = '<option value="">-- Error Loading --</option>';
+            }
+        }
+        
+        async function loadMonths() {
+            try {
+                const res = await fetch(`${API_BASE}/months`);
+                months = await res.json();
+                
+                const select = document.getElementById('monthSelect');
+                select.innerHTML = '<option value="">-- Select Month --</option>' +
+                    months.map(m => `<option value="${m.year}-${m.month}">${m.label}</option>`).join('');
+                
+                // Default to current month and set currentMonth variable
+                const now = new Date();
+                select.value = `${now.getFullYear()}-${now.getMonth() + 1}`;
+                currentMonth = { year: now.getFullYear(), month: now.getMonth() + 1 };
+            } catch (err) {
+                console.error('Error loading months:', err);
+            }
+        }
+        
+        function onShiftChange() {
+            const shiftId = document.getElementById('shiftSelect').value;
+            // Handle ShiftId=0 case - check if value is not empty string
+            if (shiftId === '') {
+                currentShift = null;
+                return;
+            }
+            currentShift = shifts.find(s => String(s.ShiftId) === shiftId) || null;
+            if (currentShift && currentMonth) {
+                loadSchedule();
+            }
+        }
+        
+        function onMonthChange() {
+            const value = document.getElementById('monthSelect').value;
+            if (value) {
+                const [year, month] = value.split('-').map(Number);
+                currentMonth = { year, month };
+                if (currentShift) {
+                    loadSchedule();
+                }
+            }
+        }
+        
+        async function loadSchedule() {
+            if (!currentShift || !currentMonth) return;
+            
+            const content = document.getElementById('content');
+            content.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+            
+            try {
+                // Load form structure
+                const formRes = await fetch(`${API_BASE}/form/${currentShift.ShiftId}`);
+                const formData = await formRes.json();
+                timeSlots = formData.timeSlots;
+                
+                // Load existing entry
+                const entryRes = await fetch(`${API_BASE}/entry/${currentShift.ShiftId}/${currentMonth.year}/${currentMonth.month}`);
+                entryData = await entryRes.json();
+                
+                renderSchedule();
+                document.getElementById('saveBtn').disabled = false;
+                hasChanges = false;
+            } catch (err) {
+                console.error('Error loading schedule:', err);
+                content.innerHTML = `<div class="empty-state"><p>Error loading schedule</p></div>`;
+            }
+        }
+        
+        function renderSchedule() {
+            const content = document.getElementById('content');
+            
+            if (timeSlots.length === 0) {
+                content.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <h3>No time slots configured</h3>
+                        <p>Contact your supervisor to set up the schedule</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Calculate week progress
+            const weekProgress = [1, 2, 3, 4].map(w => {
+                const total = timeSlots.length * 5; // 5 days
+                const completed = entryData.details.filter(d => d.WeekNumber === w && d.IsCompleted).length;
+                return { week: w, completed, total, percent: Math.round((completed / total) * 100) };
+            });
+            
+            content.innerHTML = `
+                <div class="week-tabs">
+                    ${[1, 2, 3, 4].map(w => `
+                        <button class="week-tab ${activeWeek === w ? 'active' : ''}" onclick="selectWeek(${w})">
+                            <div>Week ${w}</div>
+                            <div class="progress">${weekProgress[w-1].completed}/${weekProgress[w-1].total}</div>
+                        </button>
+                    `).join('')}
+                </div>
+                
+                <div class="schedule-grid">
+                    <table class="schedule-table">
+                        <thead>
+                            <tr>
+                                <th>Time Slot / Task</th>
+                                <th>Monday</th>
+                                <th>Tuesday</th>
+                                <th>Wednesday</th>
+                                <th>Thursday</th>
+                                <th>Friday</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${timeSlots.map(ts => renderTimeSlotRow(ts)).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                
+                ${renderSummary()}
+            `;
+        }
+        
+        function renderTimeSlotRow(slot) {
+            const days = [1, 2, 3, 4, 5]; // Mon-Fri
+            const isBreak = slot.IsBreak;
+            
+            return `
+                <tr class="${isBreak ? 'break-row' : ''}">
+                    <td>
+                        <div class="time-slot-cell">
+                            <span class="slot-time">${slot.SlotName}</span>
+                            <span class="slot-task">${isBreak ? '☕ ' : ''}${slot.TaskDescription}</span>
+                        </div>
+                    </td>
+                    ${days.map(day => {
+                        const detail = entryData.details.find(d => 
+                            d.TimeSlotId === slot.Id && 
+                            d.WeekNumber === activeWeek && 
+                            d.DayOfWeek === day
+                        );
+                        const isCompleted = detail?.IsCompleted || false;
+                        const checkId = `check-${slot.Id}-${activeWeek}-${day}`;
+                        
+                        return `
+                            <td>
+                                <div class="checkbox-wrapper ${isBreak ? 'break-checkbox' : ''}">
+                                    <input type="checkbox" 
+                                           class="custom-checkbox" 
+                                           id="${checkId}"
+                                           data-slot="${slot.Id}"
+                                           data-week="${activeWeek}"
+                                           data-day="${day}"
+                                           ${isCompleted ? 'checked' : ''}
+                                           onchange="onCheckChange(this)">
+                                    <label class="checkbox-label" for="${checkId}"></label>
+                                </div>
+                            </td>
+                        `;
+                    }).join('')}
+                </tr>
+            `;
+        }
+        
+        function renderSummary() {
+            const totalSlots = timeSlots.length * 5 * 4; // 5 days * 4 weeks
+            const completedSlots = entryData.details.filter(d => d.IsCompleted).length;
+            const percent = totalSlots > 0 ? Math.round((completedSlots / totalSlots) * 100) : 0;
+            
+            return `
+                <div class="summary-panel">
+                    <div class="summary-stats">
+                        <div class="stat">
+                            <div class="stat-value">${completedSlots}</div>
+                            <div class="stat-label">Completed</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${totalSlots - completedSlots}</div>
+                            <div class="stat-label">Remaining</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${percent}%</div>
+                            <div class="stat-label">Progress</div>
+                        </div>
+                    </div>
+                    <div style="flex:1;max-width:300px;">
+                        <div style="color:#888;margin-bottom:5px;">Overall Progress</div>
+                        <div class="progress-bar">
+                            <div class="progress-bar-fill" style="width:${percent}%"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function selectWeek(week) {
+            activeWeek = week;
+            renderSchedule();
+        }
+        
+        function onCheckChange(checkbox) {
+            const slotId = parseInt(checkbox.dataset.slot);
+            const week = parseInt(checkbox.dataset.week);
+            const day = parseInt(checkbox.dataset.day);
+            const isCompleted = checkbox.checked;
+            
+            // Update local data
+            const existingIdx = entryData.details.findIndex(d => 
+                d.TimeSlotId === slotId && d.WeekNumber === week && d.DayOfWeek === day
+            );
+            
+            if (existingIdx >= 0) {
+                entryData.details[existingIdx].IsCompleted = isCompleted;
+            } else {
+                entryData.details.push({
+                    TimeSlotId: slotId,
+                    WeekNumber: week,
+                    DayOfWeek: day,
+                    IsCompleted: isCompleted
+                });
+            }
+            
+            hasChanges = true;
+            
+            // Update summary without full re-render
+            updateSummaryDisplay();
+        }
+        
+        function updateSummaryDisplay() {
+            const summaryPanel = document.querySelector('.summary-panel');
+            if (summaryPanel) {
+                summaryPanel.outerHTML = renderSummary();
+            }
+            
+            // Update week tabs
+            const weekProgress = [1, 2, 3, 4].map(w => {
+                const total = timeSlots.length * 5;
+                const completed = entryData.details.filter(d => d.WeekNumber === w && d.IsCompleted).length;
+                return { week: w, completed, total };
+            });
+            
+            document.querySelectorAll('.week-tab').forEach((tab, idx) => {
+                const progressEl = tab.querySelector('.progress');
+                if (progressEl) {
+                    progressEl.textContent = `${weekProgress[idx].completed}/${weekProgress[idx].total}`;
+                }
+            });
+        }
+        
+        async function saveSchedule() {
+            if (!currentShift || !currentMonth) return;
+            
+            const saveBtn = document.getElementById('saveBtn');
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+            
+            try {
+                // Prepare all details (including unchecked)
+                const allDetails = [];
+                
+                for (const slot of timeSlots) {
+                    for (let week = 1; week <= 4; week++) {
+                        for (let day = 1; day <= 5; day++) {
+                            const existing = entryData.details.find(d => 
+                                d.TimeSlotId === slot.Id && d.WeekNumber === week && d.DayOfWeek === day
+                            );
+                            
+                            allDetails.push({
+                                timeSlotId: slot.Id,
+                                weekNumber: week,
+                                dayOfWeek: day,
+                                isCompleted: existing?.IsCompleted || false,
+                                notes: existing?.Notes || null
+                            });
+                        }
+                    }
+                }
+                
+                const res = await fetch(
+                    `${API_BASE}/entry/${currentShift.ShiftId}/${currentMonth.year}/${currentMonth.month}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ details: allDetails })
+                    }
+                );
+                
+                const result = await res.json();
+                
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+                
+                showToast('Schedule saved successfully!');
+                hasChanges = false;
+            } catch (err) {
+                console.error('Error saving schedule:', err);
+                showToast('Error saving schedule: ' + err.message, true);
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-save"></i> Save';
+            }
+        }
+        
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast show' + (isError ? ' error' : '');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+        
+        // Warn before leaving with unsaved changes
+        window.addEventListener('beforeunload', (e) => {
+            if (hasChanges) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+    </script>
+</body>
+</html>

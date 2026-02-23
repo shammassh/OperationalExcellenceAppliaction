@@ -12,12 +12,14 @@ const checklistReferenceRoutes = require('./checklist-reference/routes');
 const cleaningReferenceRoutes = require('./cleaning-reference/routes');
 const multizoneTeamRoutes = require('./multizone-team/routes');
 const fixedareaTeamRoutes = require('./fixedarea-team/routes');
+const weeklyScheduleRoutes = require('./weekly-schedule/routes');
 
 // Mount sub-routes
 router.use('/checklist-reference', checklistReferenceRoutes);
 router.use('/cleaning-reference', cleaningReferenceRoutes);
 router.use('/multizone-team', multizoneTeamRoutes);
 router.use('/fixedarea-team', fixedareaTeamRoutes);
+router.use('/weekly-schedule', weeklyScheduleRoutes);
 
 // Redirect old daily-tasks path to security-services
 router.get('/daily-tasks', (req, res) => {
@@ -314,6 +316,17 @@ router.get('/', async (req, res) => {
                         background: #e0f2f1;
                         color: #009688;
                     }
+                    .dashboard-card.weekly {
+                        border-bottom: 5px solid #FF5722;
+                    }
+                    .dashboard-card.weekly:hover {
+                        border-color: #FF5722;
+                    }
+                    .stat-number.weekly { color: #FF5722; }
+                    .view-btn.weekly {
+                        background: #fbe9e7;
+                        color: #FF5722;
+                    }
                 </style>
             </head>
             <body>
@@ -484,6 +497,19 @@ router.get('/', async (req, res) => {
                                 </div>
                             </div>
                             <div class="view-btn fixedarea">Manage &#8594;</div>
+                        </a>
+                        
+                        <a href="/security/weekly-schedule" class="dashboard-card weekly">
+                            <div class="card-icon">📆</div>
+                            <div class="card-title">Weekly Schedule</div>
+                            <div class="card-desc">Configure weekly cleaning schedule shifts, time slots, and agent assignments</div>
+                            <div class="card-stats">
+                                <div class="stat-item">
+                                    <div class="stat-number weekly">Setup</div>
+                                    <div class="stat-label">Admin</div>
+                                </div>
+                            </div>
+                            <div class="view-btn weekly">Manage &#8594;</div>
                         </a>
                     </div>
                 </div>
