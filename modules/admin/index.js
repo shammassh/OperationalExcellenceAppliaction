@@ -124,6 +124,169 @@ router.post('/api/job-monitor/run-now', async (req, res) => {
     }
 });
 
+// Start the scheduler
+router.post('/api/job-monitor/start-scheduler', async (req, res) => {
+    try {
+        const status = escalationService.getSchedulerStatus();
+        
+        if (status.schedulerRunning) {
+            return res.json({ 
+                success: true, 
+                message: 'Scheduler is already running.' 
+            });
+        }
+        
+        escalationService.startScheduler();
+        
+        res.json({ 
+            success: true, 
+            message: 'Scheduler started successfully.' 
+        });
+    } catch (err) {
+        console.error('Error starting scheduler:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Stop the scheduler
+router.post('/api/job-monitor/stop-scheduler', async (req, res) => {
+    try {
+        escalationService.stopScheduler();
+        
+        res.json({ 
+            success: true, 
+            message: 'Scheduler stopped successfully.' 
+        });
+    } catch (err) {
+        console.error('Error stopping scheduler:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Dry run all - preview all pending notifications
+router.get('/api/job-monitor/dry-run-all', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        
+        // Helper to get settings from key-value table
+        const getSettings = async (tableName) => {
+            const result = await pool.request().query(`SELECT SettingKey, SettingValue FROM ${tableName}`);
+            const settings = {};
+            result.recordset.forEach(r => { settings[r.SettingKey] = r.SettingValue; });
+            return {
+                reminderDays: parseInt(settings.ReminderDaysBefore?.split(',')[0]) || 3,
+                overdueDays: 1
+            };
+        };
+        
+        const oeSettings = await getSettings('OE_EscalationSettings');
+        const ohsSettings = await getSettings('OHS_EscalationSettings');
+        
+        const results = {
+            oe: { reminders: [], overdue: [] },
+            ohs: { reminders: [], overdue: [] }
+        };
+        
+        // OE Reminders
+        const oeReminders = await pool.request()
+            .input('reminderDays', sql.Int, oeSettings.reminderDays)
+            .query(`
+                SELECT TOP 20
+                    i.DocumentNumber, i.StoreName, i.ActionPlanDeadline,
+                    DATEDIFF(DAY, GETDATE(), i.ActionPlanDeadline) as DaysUntilDeadline,
+                    ISNULL(u.Email, 'N/A') as RecipientEmail
+                FROM OE_Inspections i
+                LEFT JOIN StoreManagerAssignments sma ON sma.StoreId = i.StoreId AND sma.IsPrimary = 1
+                LEFT JOIN Users u ON sma.UserId = u.Id
+                WHERE i.ActionPlanDeadline IS NOT NULL
+                  AND i.ActionPlanCompletedAt IS NULL
+                  AND DATEDIFF(DAY, GETDATE(), i.ActionPlanDeadline) BETWEEN 0 AND @reminderDays
+                ORDER BY i.ActionPlanDeadline
+            `);
+        results.oe.reminders = oeReminders.recordset.map(r => ({
+            documentNumber: r.DocumentNumber,
+            storeName: r.StoreName,
+            daysUntilDeadline: r.DaysUntilDeadline,
+            recipientEmail: r.RecipientEmail
+        }));
+        
+        // OE Overdue
+        const oeOverdue = await pool.request()
+            .query(`
+                SELECT TOP 20
+                    i.DocumentNumber, i.StoreName, i.ActionPlanDeadline,
+                    DATEDIFF(DAY, i.ActionPlanDeadline, GETDATE()) as DaysOverdue,
+                    ISNULL(u.Email, 'N/A') as RecipientEmail
+                FROM OE_Inspections i
+                LEFT JOIN StoreManagerAssignments sma ON sma.StoreId = i.StoreId AND sma.IsPrimary = 1
+                LEFT JOIN Users u ON sma.UserId = u.Id
+                WHERE i.ActionPlanDeadline IS NOT NULL
+                  AND i.ActionPlanCompletedAt IS NULL
+                  AND i.ActionPlanDeadline < GETDATE()
+                ORDER BY i.ActionPlanDeadline
+            `);
+        results.oe.overdue = oeOverdue.recordset.map(r => ({
+            documentNumber: r.DocumentNumber,
+            storeName: r.StoreName,
+            daysOverdue: r.DaysOverdue,
+            recipientEmail: r.RecipientEmail
+        }));
+        
+        // OHS Reminders
+        const ohsReminders = await pool.request()
+            .input('reminderDays', sql.Int, ohsSettings.reminderDays)
+            .query(`
+                SELECT TOP 20
+                    i.DocumentNumber, i.StoreName, i.ActionPlanDeadline,
+                    DATEDIFF(DAY, GETDATE(), i.ActionPlanDeadline) as DaysUntilDeadline,
+                    ISNULL(u.Email, 'N/A') as RecipientEmail
+                FROM OHS_Inspections i
+                LEFT JOIN StoreManagerAssignments sma ON sma.StoreId = i.StoreId AND sma.IsPrimary = 1
+                LEFT JOIN Users u ON sma.UserId = u.Id
+                WHERE i.ActionPlanDeadline IS NOT NULL
+                  AND i.ActionPlanCompletedAt IS NULL
+                  AND DATEDIFF(DAY, GETDATE(), i.ActionPlanDeadline) BETWEEN 0 AND @reminderDays
+                ORDER BY i.ActionPlanDeadline
+            `);
+        results.ohs.reminders = ohsReminders.recordset.map(r => ({
+            documentNumber: r.DocumentNumber,
+            storeName: r.StoreName,
+            daysUntilDeadline: r.DaysUntilDeadline,
+            recipientEmail: r.RecipientEmail
+        }));
+        
+        // OHS Overdue
+        const ohsOverdue = await pool.request()
+            .query(`
+                SELECT TOP 20
+                    i.DocumentNumber, i.StoreName, i.ActionPlanDeadline,
+                    DATEDIFF(DAY, i.ActionPlanDeadline, GETDATE()) as DaysOverdue,
+                    ISNULL(u.Email, 'N/A') as RecipientEmail
+                FROM OHS_Inspections i
+                LEFT JOIN StoreManagerAssignments sma ON sma.StoreId = i.StoreId AND sma.IsPrimary = 1
+                LEFT JOIN Users u ON sma.UserId = u.Id
+                WHERE i.ActionPlanDeadline IS NOT NULL
+                  AND i.ActionPlanCompletedAt IS NULL
+                  AND i.ActionPlanDeadline < GETDATE()
+                ORDER BY i.ActionPlanDeadline
+            `);
+        results.ohs.overdue = ohsOverdue.recordset.map(r => ({
+            documentNumber: r.DocumentNumber,
+            storeName: r.StoreName,
+            daysOverdue: r.DaysOverdue,
+            recipientEmail: r.RecipientEmail
+        }));
+        
+        res.json({ success: true, results });
+    } catch (err) {
+        console.error('Error running dry-run-all:', err);
+        res.status(500).json({ success: false, error: err.message });
+    } finally {
+        if (pool) await pool.close();
+    }
+});
+
 // Get email template preview for job monitor
 router.get('/api/job-monitor/preview-template/:templateKey', async (req, res) => {
     let pool;
@@ -211,16 +374,35 @@ router.post('/api/job-monitor/preview-inspection-email', async (req, res) => {
         
         const template = result.recordset[0];
         
+        // Get store manager from StoreManagerAssignments
+        let storeManagerEmail = 'N/A';
+        let storeManagerName = inspection.createdBy || 'Store Manager';
+        
+        if (inspection.storeId) {
+            const smResult = await pool.request()
+                .input('storeId', sql.Int, inspection.storeId)
+                .query(`
+                    SELECT u.Email, u.DisplayName 
+                    FROM StoreManagerAssignments sma
+                    INNER JOIN Users u ON sma.UserId = u.Id
+                    WHERE sma.StoreId = @storeId AND sma.IsPrimary = 1
+                `);
+            if (smResult.recordset.length > 0) {
+                storeManagerEmail = smResult.recordset[0].Email;
+                storeManagerName = smResult.recordset[0].DisplayName;
+            }
+        }
+        
         // Build data from the inspection
         const data = {
-            recipientName: inspection.createdBy || 'Store Manager',
+            recipientName: storeManagerName,
             storeName: inspection.storeName || 'Unknown Store',
             documentNumber: inspection.documentNumber || 'N/A',
             inspectionDate: inspection.inspectionDate ? new Date(inspection.inspectionDate).toLocaleDateString() : 'N/A',
             deadline: inspection.deadline ? new Date(inspection.deadline).toLocaleDateString() : 'Not Set',
             daysUntilDeadline: inspection.daysLeft || 0,
             daysOverdue: inspection.daysOverdue || 0,
-            storeManagerName: inspection.createdBy || 'Store Manager',
+            storeManagerName: storeManagerName,
             actionPlanUrl: '#'
         };
         
@@ -237,6 +419,9 @@ router.post('/api/job-monitor/preview-inspection-email', async (req, res) => {
         res.json({
             success: true,
             preview: {
+                from: 'spnotification@spinneys-lebanon.com',
+                to: storeManagerEmail,
+                toName: storeManagerName,
                 subject: subject,
                 bodyHtml: body
             }
@@ -5196,7 +5381,7 @@ router.get('/job-monitor', async (req, res) => {
         
         // Get OE Inspections with action plan tracking
         const oeInspectionsResult = await pool.request().query(`
-            SELECT i.DocumentNumber, i.StoreName, i.InspectionDate, i.Status, i.ActionPlanDeadline, i.ActionPlanCompletedAt,
+            SELECT i.Id, i.StoreId, i.DocumentNumber, i.StoreName, i.InspectionDate, i.Status, i.ActionPlanDeadline, i.ActionPlanCompletedAt,
                 ISNULL(u.DisplayName, 'Unknown') as CreatedByName,
                 CASE WHEN i.ActionPlanCompletedAt IS NOT NULL THEN 'Completed'
                      WHEN i.ActionPlanDeadline IS NULL THEN 'No Deadline'
@@ -5216,7 +5401,7 @@ router.get('/job-monitor', async (req, res) => {
         
         // Get OHS Inspections with action plan tracking
         const ohsInspectionsResult = await pool.request().query(`
-            SELECT i.DocumentNumber, i.StoreName, i.InspectionDate, i.Status, i.ActionPlanDeadline, i.ActionPlanCompletedAt,
+            SELECT i.Id, i.StoreId, i.DocumentNumber, i.StoreName, i.InspectionDate, i.Status, i.ActionPlanDeadline, i.ActionPlanCompletedAt,
                 ISNULL(u.DisplayName, 'Unknown') as CreatedByName,
                 CASE WHEN i.ActionPlanCompletedAt IS NOT NULL THEN 'Completed'
                      WHEN i.ActionPlanDeadline IS NULL THEN 'No Deadline'
@@ -5254,6 +5439,7 @@ router.get('/job-monitor', async (req, res) => {
                              i.ActionPlanStatus === 'Due Soon' ? 'reminder' : 'reminder';
             // Use Base64 encoding to safely pass data
             const inspectionData = Buffer.from(JSON.stringify({
+                storeId: i.StoreId,
                 documentNumber: i.DocumentNumber,
                 storeName: i.StoreName,
                 inspectionDate: i.InspectionDate,
@@ -5444,11 +5630,28 @@ router.get('/job-monitor', async (req, res) => {
                         </div>
                     </div>
                     
-                    <div class="action-bar">
-                        <div class="meta">Last refreshed: <span id="lastRefresh">just now</span> | Auto-refresh: 30s</div>
-                        <div class="action-buttons">
-                            <button class="btn btn-secondary" onclick="location.reload()">🔄 Refresh</button>
-                            <button class="btn btn-primary" id="runNowBtn" onclick="runNow()">▶️ Run Scheduler Now</button>
+                    <!-- Job Controls -->
+                    <div class="section" style="margin-bottom: 20px;">
+                        <div class="section-header" style="border-bottom: none; margin-bottom: 0; padding-bottom: 0;">
+                            <h2>🎛️ Job Controls</h2>
+                            <div class="meta">Last refreshed: <span id="lastRefresh">just now</span> | Auto-refresh: 30s</div>
+                        </div>
+                        <div class="job-controls" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
+                            <button class="btn btn-outline" id="previewBtn" onclick="previewDryRun()">
+                                👁️ Preview (Dry Run)
+                            </button>
+                            <button class="btn btn-primary" id="runNowBtn" onclick="runNow()">
+                                ▶️ Run Now
+                            </button>
+                            <button class="btn btn-success" id="startSchedulerBtn" onclick="startScheduler()" style="background: linear-gradient(135deg, #28a745, #20c997); color: white;">
+                                ⏵ Start Scheduler
+                            </button>
+                            <button class="btn btn-danger" id="stopSchedulerBtn" onclick="stopScheduler()" style="background: linear-gradient(135deg, #dc3545, #c82333); color: white;">
+                                ⏹ Stop Scheduler
+                            </button>
+                            <button class="btn btn-secondary" onclick="location.reload()">
+                                🔄 Refresh
+                            </button>
                         </div>
                     </div>
                     
@@ -5549,6 +5752,10 @@ router.get('/job-monitor', async (req, res) => {
                     <div class="modal-content">
                         <div class="modal-header"><h3 id="previewTitle">Email Preview</h3><button class="modal-close" onclick="closeModal('previewModal')">&times;</button></div>
                         <div class="modal-body">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                                <div class="preview-subject"><label>From</label><div id="previewFrom">-</div></div>
+                                <div class="preview-subject"><label>To</label><div id="previewTo">-</div></div>
+                            </div>
                             <div class="preview-subject"><label>Subject</label><div id="previewSubject">-</div></div>
                             <iframe id="previewIframe" class="preview-iframe"></iframe>
                         </div>
@@ -5589,11 +5796,29 @@ router.get('/job-monitor', async (req, res) => {
                                 const s = data.scheduler;
                                 const card = document.getElementById('statusCard');
                                 const status = document.getElementById('schedulerStatus');
+                                const startBtn = document.getElementById('startSchedulerBtn');
+                                const stopBtn = document.getElementById('stopSchedulerBtn');
                                 
-                                if (s.isRunning) { status.textContent = '⏳ Running...'; card.className = 'scheduler-card idle'; }
-                                else if (s.lastRunStatus === 'success') { status.textContent = '✅ OK'; card.className = 'scheduler-card ok'; }
-                                else if (s.lastRunStatus === 'error') { status.textContent = '❌ Error'; card.className = 'scheduler-card error'; }
-                                else { status.textContent = '⏸️ Idle'; card.className = 'scheduler-card idle'; }
+                                // Update scheduler status display
+                                if (s.isRunning) { 
+                                    status.textContent = '⏳ Running Job...'; 
+                                    card.className = 'scheduler-card idle'; 
+                                } else if (s.schedulerRunning) { 
+                                    status.textContent = '✅ Active'; 
+                                    card.className = 'scheduler-card ok'; 
+                                } else { 
+                                    status.textContent = '⏹️ Stopped'; 
+                                    card.className = 'scheduler-card error'; 
+                                }
+                                
+                                // Toggle start/stop buttons
+                                if (s.schedulerRunning) {
+                                    startBtn.style.display = 'none';
+                                    stopBtn.style.display = 'inline-flex';
+                                } else {
+                                    startBtn.style.display = 'inline-flex';
+                                    stopBtn.style.display = 'none';
+                                }
                                 
                                 document.getElementById('lastRunTime').textContent = s.lastRunTime ? new Date(s.lastRunTime).toLocaleString() : 'Never';
                                 document.getElementById('nextRunTime').textContent = s.nextRunTime ? new Date(s.nextRunTime).toLocaleString() : '-';
@@ -5609,10 +5834,85 @@ router.get('/job-monitor', async (req, res) => {
                         try {
                             const res = await fetch('/admin/api/job-monitor/run-now', { method: 'POST' });
                             const data = await res.json();
-                            if (data.success) { showToast('Scheduler started!', 'success'); setTimeout(() => location.reload(), 3000); }
+                            if (data.success) { showToast('Scheduler executed successfully!', 'success'); setTimeout(() => location.reload(), 2000); }
                             else { showToast(data.error || 'Failed', 'error'); }
                         } catch (e) { showToast('Error: ' + e.message, 'error'); }
-                        finally { btn.innerHTML = '▶️ Run Scheduler Now'; btn.disabled = false; }
+                        finally { btn.innerHTML = '▶️ Run Now'; btn.disabled = false; }
+                    }
+                    
+                    async function startScheduler() {
+                        const btn = document.getElementById('startSchedulerBtn');
+                        btn.innerHTML = '<span class="loading"></span> Starting...'; btn.disabled = true;
+                        try {
+                            const res = await fetch('/admin/api/job-monitor/start-scheduler', { method: 'POST' });
+                            const data = await res.json();
+                            if (data.success) { showToast('Scheduler started!', 'success'); setTimeout(() => location.reload(), 1500); }
+                            else { showToast(data.error || 'Failed to start scheduler', 'error'); }
+                        } catch (e) { showToast('Error: ' + e.message, 'error'); }
+                        finally { btn.innerHTML = '⏵ Start Scheduler'; btn.disabled = false; }
+                    }
+                    
+                    async function stopScheduler() {
+                        const btn = document.getElementById('stopSchedulerBtn');
+                        btn.innerHTML = '<span class="loading"></span> Stopping...'; btn.disabled = true;
+                        try {
+                            const res = await fetch('/admin/api/job-monitor/stop-scheduler', { method: 'POST' });
+                            const data = await res.json();
+                            if (data.success) { showToast('Scheduler stopped!', 'success'); setTimeout(() => location.reload(), 1500); }
+                            else { showToast(data.error || 'Failed to stop scheduler', 'error'); }
+                        } catch (e) { showToast('Error: ' + e.message, 'error'); }
+                        finally { btn.innerHTML = '⏹ Stop Scheduler'; btn.disabled = false; }
+                    }
+                    
+                    async function previewDryRun() {
+                        const btn = document.getElementById('previewBtn');
+                        btn.innerHTML = '<span class="loading loading-dark"></span> Loading...'; btn.disabled = true;
+                        document.getElementById('dryrunTitle').textContent = '👁️ Preview (Dry Run) - Pending Notifications';
+                        document.getElementById('dryrunResults').innerHTML = '<div class="dryrun-empty"><span class="loading loading-dark"></span> Checking all pending notifications...</div>';
+                        document.getElementById('dryrunModal').style.display = 'flex';
+                        try {
+                            const res = await fetch('/admin/api/job-monitor/dry-run-all');
+                            const data = await res.json();
+                            if (data.success) {
+                                const results = data.results || { oe: { reminders: [], overdue: [] }, ohs: { reminders: [], overdue: [] } };
+                                let html = '';
+                                
+                                // OE Section
+                                html += '<h4 style="margin: 15px 0 10px; color: #333;">📋 OE Inspections</h4>';
+                                if (results.oe.overdue.length > 0) {
+                                    html += '<div style="margin-bottom: 10px;"><strong style="color: #dc3545;">🔴 Overdue (' + results.oe.overdue.length + ')</strong></div>';
+                                    html += results.oe.overdue.map(i => '<div class="dryrun-item" style="border-left-color: #dc3545;"><h4>' + i.storeName + ' - ' + i.documentNumber + '</h4><p><strong>Days Overdue:</strong> ' + (i.daysOverdue || 0) + '</p><p><strong>To:</strong> ' + (i.recipientEmail || 'N/A') + '</p></div>').join('');
+                                }
+                                if (results.oe.reminders.length > 0) {
+                                    html += '<div style="margin-bottom: 10px;"><strong style="color: #ffc107;">🟡 Reminders (' + results.oe.reminders.length + ')</strong></div>';
+                                    html += results.oe.reminders.map(i => '<div class="dryrun-item" style="border-left-color: #ffc107;"><h4>' + i.storeName + ' - ' + i.documentNumber + '</h4><p><strong>Days Until Deadline:</strong> ' + (i.daysUntilDeadline || 0) + '</p><p><strong>To:</strong> ' + (i.recipientEmail || 'N/A') + '</p></div>').join('');
+                                }
+                                if (results.oe.overdue.length === 0 && results.oe.reminders.length === 0) {
+                                    html += '<div class="dryrun-empty" style="padding: 15px;">✅ No pending OE notifications</div>';
+                                }
+                                
+                                // OHS Section
+                                html += '<h4 style="margin: 20px 0 10px; color: #333;">🦺 OHS Inspections</h4>';
+                                if (results.ohs.overdue.length > 0) {
+                                    html += '<div style="margin-bottom: 10px;"><strong style="color: #dc3545;">🔴 Overdue (' + results.ohs.overdue.length + ')</strong></div>';
+                                    html += results.ohs.overdue.map(i => '<div class="dryrun-item" style="border-left-color: #dc3545;"><h4>' + i.storeName + ' - ' + i.documentNumber + '</h4><p><strong>Days Overdue:</strong> ' + (i.daysOverdue || 0) + '</p><p><strong>To:</strong> ' + (i.recipientEmail || 'N/A') + '</p></div>').join('');
+                                }
+                                if (results.ohs.reminders.length > 0) {
+                                    html += '<div style="margin-bottom: 10px;"><strong style="color: #ffc107;">🟡 Reminders (' + results.ohs.reminders.length + ')</strong></div>';
+                                    html += results.ohs.reminders.map(i => '<div class="dryrun-item" style="border-left-color: #ffc107;"><h4>' + i.storeName + ' - ' + i.documentNumber + '</h4><p><strong>Days Until Deadline:</strong> ' + (i.daysUntilDeadline || 0) + '</p><p><strong>To:</strong> ' + (i.recipientEmail || 'N/A') + '</p></div>').join('');
+                                }
+                                if (results.ohs.overdue.length === 0 && results.ohs.reminders.length === 0) {
+                                    html += '<div class="dryrun-empty" style="padding: 15px;">✅ No pending OHS notifications</div>';
+                                }
+                                
+                                document.getElementById('dryrunResults').innerHTML = html || '<div class="dryrun-empty">✅ No pending notifications</div>';
+                            } else { 
+                                document.getElementById('dryrunResults').innerHTML = '<div class="dryrun-empty">❌ ' + (data.error || 'Error') + '</div>'; 
+                            }
+                        } catch (e) { 
+                            document.getElementById('dryrunResults').innerHTML = '<div class="dryrun-empty">❌ ' + e.message + '</div>'; 
+                        }
+                        finally { btn.innerHTML = '👁️ Preview (Dry Run)'; btn.disabled = false; }
                     }
                     
                     async function previewTemplate(key) {
@@ -5641,6 +5941,8 @@ router.get('/job-monitor', async (req, res) => {
                             const data = await res.json();
                             if (data.success) {
                                 document.getElementById('previewTitle').textContent = '📧 ' + inspection.documentNumber + ' - ' + (type === 'overdue' ? 'Overdue Notice' : 'Reminder');
+                                document.getElementById('previewFrom').textContent = data.preview.from || 'N/A';
+                                document.getElementById('previewTo').textContent = (data.preview.toName || '') + ' <' + (data.preview.to || 'N/A') + '>';
                                 document.getElementById('previewSubject').textContent = data.preview.subject;
                                 document.getElementById('previewIframe').srcdoc = data.preview.bodyHtml;
                                 document.getElementById('previewModal').style.display = 'flex';

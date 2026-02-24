@@ -27,6 +27,7 @@ const BASE_URL = process.env.BASE_URL || 'https://oeapp-uat.gmrlapps.com';
 // ============================================================================
 const schedulerStatus = {
     isRunning: false,
+    schedulerRunning: false,  // Whether the scheduler is active
     lastRunTime: null,
     lastRunStatus: null,  // 'success', 'error', 'partial'
     lastRunDuration: null,
@@ -638,12 +639,13 @@ async function checkInspectionReminders(module = 'OE') {
                         i.InspectionDate,
                         i.ActionPlanDeadline,
                         i.CreatedBy,
-                        u.Id as StoreManagerId,
+                        sma.UserId as StoreManagerId,
                         u.DisplayName as StoreManagerName,
                         u.Email as StoreManagerEmail
                     FROM ${tableName} i
                     INNER JOIN Stores s ON i.StoreId = s.Id
-                    LEFT JOIN Users u ON (u.StoreId = s.Id OR u.Email = i.CreatedBy) AND u.IsActive = 1
+                    LEFT JOIN StoreManagerAssignments sma ON sma.StoreId = i.StoreId AND sma.IsPrimary = 1
+                    LEFT JOIN Users u ON sma.UserId = u.Id AND u.IsActive = 1
                     WHERE i.Status = 'Completed'
                       AND i.ActionPlanDeadline IS NOT NULL
                       AND i.ActionPlanCompletedAt IS NULL
@@ -750,12 +752,13 @@ async function checkInspectionOverdue(module = 'OE') {
                 i.ActionPlanDeadline,
                 DATEDIFF(day, i.ActionPlanDeadline, GETDATE()) as DaysOverdue,
                 i.CreatedBy,
-                u.Id as StoreManagerId,
+                sma.UserId as StoreManagerId,
                 u.DisplayName as StoreManagerName,
                 u.Email as StoreManagerEmail
             FROM ${tableName} i
             INNER JOIN Stores s ON i.StoreId = s.Id
-            LEFT JOIN Users u ON (u.StoreId = s.Id OR u.Email = i.CreatedBy) AND u.IsActive = 1
+            LEFT JOIN StoreManagerAssignments sma ON sma.StoreId = i.StoreId AND sma.IsPrimary = 1
+            LEFT JOIN Users u ON sma.UserId = u.Id AND u.IsActive = 1
             WHERE i.Status = 'Completed'
               AND i.ActionPlanDeadline IS NOT NULL
               AND i.ActionPlanDeadline < GETDATE()
@@ -942,28 +945,44 @@ async function runAllInspectionChecks() {
     }
 }
 
+// Scheduler interval reference
+let schedulerInterval = null;
+let schedulerTimeout = null;
+
 /**
  * Start the scheduler (hourly checks)
  */
 function startScheduler() {
+    if (schedulerStatus.schedulerRunning) {
+        console.log('[Escalation Service] Scheduler already running.');
+        return;
+    }
+    
     const INTERVAL_MS = 60 * 60 * 1000; // 1 hour
     
     console.log('[Escalation Service] Starting scheduler...');
+    schedulerStatus.schedulerRunning = true;
     
     // Calculate next run time
     schedulerStatus.nextRunTime = new Date(Date.now() + 10000).toISOString();
     
     // Initial run after 10 seconds
-    setTimeout(async () => {
+    schedulerTimeout = setTimeout(async () => {
+        if (!schedulerStatus.schedulerRunning) return;
+        
         try {
             await runAllInspectionChecks();
         } catch (err) {
             console.error('[Escalation Service] Initial run failed:', err);
         }
         
+        if (!schedulerStatus.schedulerRunning) return;
+        
         // Schedule hourly runs
         schedulerStatus.nextRunTime = new Date(Date.now() + INTERVAL_MS).toISOString();
-        setInterval(async () => {
+        schedulerInterval = setInterval(async () => {
+            if (!schedulerStatus.schedulerRunning) return;
+            
             try {
                 schedulerStatus.nextRunTime = new Date(Date.now() + INTERVAL_MS).toISOString();
                 await runAllInspectionChecks();
@@ -977,6 +996,28 @@ function startScheduler() {
     console.log('[Escalation Service] Scheduler started. First run in 10 seconds, then hourly.');
 }
 
+/**
+ * Stop the scheduler
+ */
+function stopScheduler() {
+    console.log('[Escalation Service] Stopping scheduler...');
+    
+    schedulerStatus.schedulerRunning = false;
+    schedulerStatus.nextRunTime = null;
+    
+    if (schedulerTimeout) {
+        clearTimeout(schedulerTimeout);
+        schedulerTimeout = null;
+    }
+    
+    if (schedulerInterval) {
+        clearInterval(schedulerInterval);
+        schedulerInterval = null;
+    }
+    
+    console.log('[Escalation Service] Scheduler stopped.');
+}
+
 module.exports = {
     checkOverdueActionPlans,
     sendDeadlineReminders,
@@ -987,5 +1028,6 @@ module.exports = {
     checkInspectionOverdue,
     runAllInspectionChecks,
     getSchedulerStatus,
-    startScheduler
+    startScheduler,
+    stopScheduler
 };

@@ -6,7 +6,7 @@
 class EmailService {
     constructor() {
         // The email address to send from (must be a valid mailbox in your tenant)
-        this.fromEmail = process.env.EMAIL_FROM || 'noreply@gmrlgroup.com';
+        this.fromEmail = process.env.EMAIL_FROM || 'spnotification@spinneys-lebanon.com';
         
         console.log('[EMAIL] Email Service initialized');
         console.log('[EMAIL] From address:', this.fromEmail);
