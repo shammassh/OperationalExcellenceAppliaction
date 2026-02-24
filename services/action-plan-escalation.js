@@ -1,6 +1,7 @@
 /**
  * Action Plan Escalation Service
  * Automatically escalates overdue action plans to Area Managers
+ * Updated: 2026-02-25 - Added inspection-level notifications and scheduler status
  */
 
 const sql = require('mssql');
@@ -20,6 +21,71 @@ const dbConfig = {
 
 // Base URL for links in emails
 const BASE_URL = process.env.BASE_URL || 'https://oeapp-uat.gmrlapps.com';
+
+// ============================================================================
+// SCHEDULER STATUS TRACKING
+// ============================================================================
+const schedulerStatus = {
+    isRunning: false,
+    lastRunTime: null,
+    lastRunStatus: null,  // 'success', 'error', 'partial'
+    lastRunDuration: null,
+    lastError: null,
+    nextRunTime: null,
+    runCount: 0,
+    stats: {
+        escalationsCreated: 0,
+        remindersSent: 0,
+        overdueNotifications: 0,
+        emailsSent: 0,
+        errors: 0
+    },
+    history: []  // Last 20 runs
+};
+
+/**
+ * Get current scheduler status
+ */
+function getSchedulerStatus() {
+    return {
+        ...schedulerStatus,
+        uptime: process.uptime(),
+        currentTime: new Date().toISOString()
+    };
+}
+
+/**
+ * Update scheduler status after a run
+ */
+function updateSchedulerStatus(status, stats, error = null, duration = null) {
+    schedulerStatus.lastRunTime = new Date().toISOString();
+    schedulerStatus.lastRunStatus = status;
+    schedulerStatus.lastRunDuration = duration;
+    schedulerStatus.lastError = error ? error.message || String(error) : null;
+    schedulerStatus.runCount++;
+    
+    if (stats) {
+        schedulerStatus.stats.escalationsCreated += stats.escalationsCreated || 0;
+        schedulerStatus.stats.remindersSent += stats.remindersSent || 0;
+        schedulerStatus.stats.overdueNotifications += stats.overdueNotifications || 0;
+        schedulerStatus.stats.emailsSent += stats.emailsSent || 0;
+    }
+    if (error) {
+        schedulerStatus.stats.errors++;
+    }
+    
+    // Add to history (keep last 20)
+    schedulerStatus.history.unshift({
+        time: schedulerStatus.lastRunTime,
+        status: status,
+        duration: duration,
+        stats: stats ? { ...stats } : null,
+        error: schedulerStatus.lastError
+    });
+    if (schedulerStatus.history.length > 20) {
+        schedulerStatus.history.pop();
+    }
+}
 
 /**
  * Get email template from database
@@ -478,7 +544,7 @@ async function getEscalationStats() {
                 COUNT(CASE WHEN Status = 'Resolved' THEN 1 END) as ResolvedCount,
                 COUNT(*) as TotalCount
             FROM OE_ActionPlanEscalations
-            WHERE CreatedAt >= DATEADD(MONTH, -1, GETDATE())
+            WHERE EscalatedAt >= DATEADD(MONTH, -1, GETDATE())
         `);
         
         return result.recordset[0];
@@ -491,9 +557,435 @@ async function getEscalationStats() {
     }
 }
 
+// ============================================================================
+// INSPECTION-LEVEL NOTIFICATIONS (NEW)
+// ============================================================================
+
+/**
+ * Get escalation settings for a module (OE or OHS)
+ */
+async function getModuleSettings(pool, module) {
+    const settingsTable = module === 'OHS' ? 'OHS_EscalationSettings' : 'OE_EscalationSettings';
+    
+    try {
+        const result = await pool.request().query(`
+            SELECT SettingKey, SettingValue FROM ${settingsTable}
+        `);
+        
+        const settings = {};
+        result.recordset.forEach(s => {
+            settings[s.SettingKey] = s.SettingValue;
+        });
+        
+        return {
+            reminderDays: (settings.ReminderDays || '3,1').split(',').map(d => parseInt(d.trim())).filter(d => !isNaN(d)),
+            actionPlanDeadlineDays: parseInt(settings.ActionPlanDeadlineDays) || 7,
+            escalationEnabled: settings.EscalationEnabled === 'true' || settings.AutoEscalationEnabled === 'true',
+            emailEnabled: settings.EmailNotifications === 'true' || settings.EmailNotificationEnabled === 'true',
+            inAppEnabled: settings.InAppNotifications !== 'false'
+        };
+    } catch (err) {
+        console.log(`[Escalation Service] Could not load ${module} settings, using defaults:`, err.message);
+        return {
+            reminderDays: [3, 1],
+            actionPlanDeadlineDays: 7,
+            escalationEnabled: true,
+            emailEnabled: true,
+            inAppEnabled: true
+        };
+    }
+}
+
+/**
+ * Send inspection reminder notifications (X days before deadline)
+ * Reads ReminderDays from each module's settings
+ */
+async function checkInspectionReminders(module = 'OE') {
+    let pool;
+    const startTime = Date.now();
+    
+    try {
+        pool = await sql.connect(dbConfig);
+        
+        // Get module-specific settings
+        const settings = await getModuleSettings(pool, module);
+        const { reminderDays, emailEnabled, inAppEnabled } = settings;
+        
+        if (reminderDays.length === 0) {
+            console.log(`[Escalation Service] ${module}: No reminder days configured`);
+            return { remindersSent: 0 };
+        }
+        
+        console.log(`[Escalation Service] ${module}: Checking for inspection reminders (${reminderDays.join(', ')} days before deadline)`);
+        
+        const tableName = module === 'OHS' ? 'OHS_Inspections' : 'OE_Inspections';
+        const inspectionPath = module === 'OHS' ? 'ohs-inspection' : 'oe-inspection';
+        const templateKey = `${module}_INSPECTION_REMINDER`;
+        
+        let remindersSent = 0;
+        let emailsSent = 0;
+        
+        for (const daysBefore of reminderDays) {
+            // Find inspections where deadline is X days away
+            const inspectionsResult = await pool.request()
+                .input('daysBefore', sql.Int, daysBefore)
+                .query(`
+                    SELECT 
+                        i.Id as InspectionId,
+                        i.DocumentNumber,
+                        i.StoreId,
+                        s.StoreName,
+                        i.InspectionDate,
+                        i.ActionPlanDeadline,
+                        i.CreatedBy,
+                        u.Id as StoreManagerId,
+                        u.DisplayName as StoreManagerName,
+                        u.Email as StoreManagerEmail
+                    FROM ${tableName} i
+                    INNER JOIN Stores s ON i.StoreId = s.Id
+                    LEFT JOIN Users u ON (u.StoreId = s.Id OR u.Email = i.CreatedBy) AND u.IsActive = 1
+                    WHERE i.Status = 'Completed'
+                      AND i.ActionPlanDeadline IS NOT NULL
+                      AND i.ActionPlanCompletedAt IS NULL
+                      AND DATEDIFF(day, GETDATE(), i.ActionPlanDeadline) = @daysBefore
+                `);
+            
+            for (const inspection of inspectionsResult.recordset) {
+                try {
+                    // Check if reminder already sent today for this inspection
+                    const existingReminder = await pool.request()
+                        .input('inspectionId', sql.Int, inspection.InspectionId)
+                        .query(`
+                            SELECT Id FROM Notifications 
+                            WHERE Type = 'inspection-reminder'
+                            AND Link LIKE '%/${inspection.InspectionId}%'
+                            AND CAST(CreatedAt AS DATE) = CAST(GETDATE() AS DATE)
+                        `);
+                    
+                    if (existingReminder.recordset.length > 0) {
+                        continue; // Already sent today
+                    }
+                    
+                    // Create in-app notification
+                    if (inAppEnabled && inspection.StoreManagerId) {
+                        await pool.request()
+                            .input('userId', sql.Int, inspection.StoreManagerId)
+                            .input('userEmail', sql.NVarChar, inspection.StoreManagerEmail)
+                            .input('title', sql.NVarChar, `⏰ ${module} Action Plan: ${daysBefore} Day${daysBefore > 1 ? 's' : ''} Remaining`)
+                            .input('message', sql.NVarChar, `The action plan for ${module} inspection ${inspection.DocumentNumber} at ${inspection.StoreName} is due in ${daysBefore} day${daysBefore > 1 ? 's' : ''}. Please complete it before the deadline.`)
+                            .input('link', sql.NVarChar, `/${inspectionPath}/action-plan/${inspection.InspectionId}`)
+                            .query(`
+                                INSERT INTO Notifications (UserId, UserEmail, Title, Message, Link, Type, IsRead, CreatedAt)
+                                VALUES (@userId, @userEmail, @title, @message, @link, 'inspection-reminder', 0, GETDATE())
+                            `);
+                        
+                        remindersSent++;
+                    }
+                    
+                    // Send email reminder
+                    if (emailEnabled && inspection.StoreManagerEmail) {
+                        try {
+                            await sendInspectionEmail(pool, templateKey, {
+                                recipientName: inspection.StoreManagerName || 'Store Manager',
+                                recipientEmail: inspection.StoreManagerEmail,
+                                storeName: inspection.StoreName,
+                                documentNumber: inspection.DocumentNumber,
+                                inspectionDate: inspection.InspectionDate,
+                                deadline: inspection.ActionPlanDeadline,
+                                daysUntilDeadline: daysBefore,
+                                actionPlanUrl: `${BASE_URL}/${inspectionPath}/action-plan/${inspection.InspectionId}`
+                            }, module);
+                            emailsSent++;
+                        } catch (emailErr) {
+                            console.error(`[Escalation Service] ${module}: Failed to send reminder email:`, emailErr.message);
+                        }
+                    }
+                    
+                    console.log(`[Escalation Service] ${module}: Sent ${daysBefore}-day reminder for ${inspection.DocumentNumber}`);
+                } catch (err) {
+                    console.error(`[Escalation Service] ${module}: Error processing reminder for ${inspection.InspectionId}:`, err.message);
+                }
+            }
+        }
+        
+        console.log(`[Escalation Service] ${module}: Sent ${remindersSent} inspection reminders, ${emailsSent} emails`);
+        return { remindersSent, emailsSent, duration: Date.now() - startTime };
+        
+    } catch (err) {
+        console.error(`[Escalation Service] ${module}: Error checking reminders:`, err);
+        throw err;
+    } finally {
+        if (pool) await pool.close();
+    }
+}
+
+/**
+ * Check for overdue inspections and send notifications to store managers
+ * (before escalation to Area Manager)
+ */
+async function checkInspectionOverdue(module = 'OE') {
+    let pool;
+    const startTime = Date.now();
+    
+    try {
+        pool = await sql.connect(dbConfig);
+        
+        const settings = await getModuleSettings(pool, module);
+        const { emailEnabled, inAppEnabled } = settings;
+        
+        const tableName = module === 'OHS' ? 'OHS_Inspections' : 'OE_Inspections';
+        const inspectionPath = module === 'OHS' ? 'ohs-inspection' : 'oe-inspection';
+        const templateKey = `${module}_INSPECTION_OVERDUE`;
+        
+        console.log(`[Escalation Service] ${module}: Checking for overdue inspections...`);
+        
+        // Find overdue inspections (deadline passed, not completed, not yet escalated)
+        const overdueResult = await pool.request().query(`
+            SELECT 
+                i.Id as InspectionId,
+                i.DocumentNumber,
+                i.StoreId,
+                s.StoreName,
+                i.InspectionDate,
+                i.ActionPlanDeadline,
+                DATEDIFF(day, i.ActionPlanDeadline, GETDATE()) as DaysOverdue,
+                i.CreatedBy,
+                u.Id as StoreManagerId,
+                u.DisplayName as StoreManagerName,
+                u.Email as StoreManagerEmail
+            FROM ${tableName} i
+            INNER JOIN Stores s ON i.StoreId = s.Id
+            LEFT JOIN Users u ON (u.StoreId = s.Id OR u.Email = i.CreatedBy) AND u.IsActive = 1
+            WHERE i.Status = 'Completed'
+              AND i.ActionPlanDeadline IS NOT NULL
+              AND i.ActionPlanDeadline < GETDATE()
+              AND i.ActionPlanCompletedAt IS NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM OE_ActionPlanEscalations e 
+                  WHERE e.InspectionId = i.Id AND e.Module = '${module}' AND e.Status = 'Pending'
+              )
+        `);
+        
+        let overdueNotifications = 0;
+        let emailsSent = 0;
+        
+        for (const inspection of overdueResult.recordset) {
+            try {
+                // Check if overdue notification already sent today
+                const existingNotification = await pool.request()
+                    .input('inspectionId', sql.Int, inspection.InspectionId)
+                    .query(`
+                        SELECT Id FROM Notifications 
+                        WHERE Type = 'inspection-overdue'
+                        AND Link LIKE '%/${inspection.InspectionId}%'
+                        AND CAST(CreatedAt AS DATE) = CAST(GETDATE() AS DATE)
+                    `);
+                
+                if (existingNotification.recordset.length > 0) {
+                    continue; // Already notified today
+                }
+                
+                // Create in-app notification
+                if (inAppEnabled && inspection.StoreManagerId) {
+                    await pool.request()
+                        .input('userId', sql.Int, inspection.StoreManagerId)
+                        .input('userEmail', sql.NVarChar, inspection.StoreManagerEmail)
+                        .input('title', sql.NVarChar, `⚠️ ${module} Action Plan OVERDUE`)
+                        .input('message', sql.NVarChar, `The action plan for ${module} inspection ${inspection.DocumentNumber} at ${inspection.StoreName} is ${inspection.DaysOverdue} day(s) overdue. Please complete it immediately to avoid escalation.`)
+                        .input('link', sql.NVarChar, `/${inspectionPath}/action-plan/${inspection.InspectionId}`)
+                        .query(`
+                            INSERT INTO Notifications (UserId, UserEmail, Title, Message, Link, Type, IsRead, CreatedAt)
+                            VALUES (@userId, @userEmail, @title, @message, @link, 'inspection-overdue', 0, GETDATE())
+                        `);
+                    
+                    overdueNotifications++;
+                }
+                
+                // Send overdue email
+                if (emailEnabled && inspection.StoreManagerEmail) {
+                    try {
+                        await sendInspectionEmail(pool, templateKey, {
+                            recipientName: inspection.StoreManagerName || 'Store Manager',
+                            recipientEmail: inspection.StoreManagerEmail,
+                            storeName: inspection.StoreName,
+                            documentNumber: inspection.DocumentNumber,
+                            inspectionDate: inspection.InspectionDate,
+                            deadline: inspection.ActionPlanDeadline,
+                            daysOverdue: inspection.DaysOverdue,
+                            actionPlanUrl: `${BASE_URL}/${inspectionPath}/action-plan/${inspection.InspectionId}`
+                        }, module);
+                        emailsSent++;
+                    } catch (emailErr) {
+                        console.error(`[Escalation Service] ${module}: Failed to send overdue email:`, emailErr.message);
+                    }
+                }
+                
+                console.log(`[Escalation Service] ${module}: Sent overdue notification for ${inspection.DocumentNumber} (${inspection.DaysOverdue} days overdue)`);
+            } catch (err) {
+                console.error(`[Escalation Service] ${module}: Error processing overdue ${inspection.InspectionId}:`, err.message);
+            }
+        }
+        
+        console.log(`[Escalation Service] ${module}: Sent ${overdueNotifications} overdue notifications, ${emailsSent} emails`);
+        return { overdueNotifications, emailsSent, duration: Date.now() - startTime };
+        
+    } catch (err) {
+        console.error(`[Escalation Service] ${module}: Error checking overdue:`, err);
+        throw err;
+    } finally {
+        if (pool) await pool.close();
+    }
+}
+
+/**
+ * Send inspection notification email using database template
+ */
+async function sendInspectionEmail(pool, templateKey, data, module) {
+    try {
+        const template = await getEmailTemplate(pool, templateKey);
+        
+        const templateData = {
+            recipientName: data.recipientName,
+            storeName: data.storeName,
+            documentNumber: data.documentNumber,
+            inspectionDate: data.inspectionDate ? new Date(data.inspectionDate).toLocaleDateString() : 'N/A',
+            deadline: data.deadline ? new Date(data.deadline).toLocaleDateString() : 'N/A',
+            daysUntilDeadline: data.daysUntilDeadline || 0,
+            daysOverdue: data.daysOverdue || 0,
+            storeManagerName: data.storeManagerName || 'N/A',
+            actionPlanUrl: data.actionPlanUrl
+        };
+        
+        let subject, htmlBody;
+        
+        if (template) {
+            subject = replaceTemplateVariables(template.SubjectTemplate, templateData);
+            htmlBody = replaceTemplateVariables(template.BodyTemplate, templateData);
+        } else {
+            // Fallback
+            console.log(`[Escalation Service] Template ${templateKey} not found, using fallback`);
+            subject = `[${module}] Action Plan Notification - ${data.storeName}`;
+            htmlBody = `<p>Action plan for inspection ${data.documentNumber} at ${data.storeName} requires attention.</p>
+                        <p><a href="${data.actionPlanUrl}">View Action Plan</a></p>`;
+        }
+        
+        if (emailService && emailService.sendEmail) {
+            await emailService.sendEmail({
+                to: data.recipientEmail,
+                subject: subject,
+                html: htmlBody
+            });
+            console.log(`[Escalation Service] Sent ${templateKey} email to ${data.recipientEmail}`);
+        }
+    } catch (err) {
+        console.error(`[Escalation Service] Error sending ${templateKey} email:`, err);
+        throw err;
+    }
+}
+
+/**
+ * Run all inspection notification checks (called by scheduler)
+ */
+async function runAllInspectionChecks() {
+    const startTime = Date.now();
+    schedulerStatus.isRunning = true;
+    
+    const results = {
+        escalationsCreated: 0,
+        remindersSent: 0,
+        overdueNotifications: 0,
+        emailsSent: 0
+    };
+    
+    try {
+        console.log('[Escalation Service] ========== Starting scheduled run ==========');
+        
+        // 1. Check existing action plan escalations (original functionality)
+        const escalationResult = await checkOverdueActionPlans();
+        results.escalationsCreated += escalationResult.escalationsCreated || 0;
+        results.emailsSent += escalationResult.notificationsSent || 0;
+        
+        // 2. Send deadline reminders for OE
+        const oeReminders = await checkInspectionReminders('OE');
+        results.remindersSent += oeReminders.remindersSent || 0;
+        results.emailsSent += oeReminders.emailsSent || 0;
+        
+        // 3. Send deadline reminders for OHS
+        const ohsReminders = await checkInspectionReminders('OHS');
+        results.remindersSent += ohsReminders.remindersSent || 0;
+        results.emailsSent += ohsReminders.emailsSent || 0;
+        
+        // 4. Check overdue inspections for OE (before escalation)
+        const oeOverdue = await checkInspectionOverdue('OE');
+        results.overdueNotifications += oeOverdue.overdueNotifications || 0;
+        results.emailsSent += oeOverdue.emailsSent || 0;
+        
+        // 5. Check overdue inspections for OHS (before escalation)
+        const ohsOverdue = await checkInspectionOverdue('OHS');
+        results.overdueNotifications += ohsOverdue.overdueNotifications || 0;
+        results.emailsSent += ohsOverdue.emailsSent || 0;
+        
+        const duration = Date.now() - startTime;
+        console.log(`[Escalation Service] ========== Run completed in ${duration}ms ==========`);
+        console.log(`[Escalation Service] Summary: ${results.escalationsCreated} escalations, ${results.remindersSent} reminders, ${results.overdueNotifications} overdue notifications, ${results.emailsSent} emails`);
+        
+        updateSchedulerStatus('success', results, null, duration);
+        return results;
+        
+    } catch (err) {
+        const duration = Date.now() - startTime;
+        console.error('[Escalation Service] Run failed:', err);
+        updateSchedulerStatus('error', results, err, duration);
+        throw err;
+    } finally {
+        schedulerStatus.isRunning = false;
+    }
+}
+
+/**
+ * Start the scheduler (hourly checks)
+ */
+function startScheduler() {
+    const INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+    
+    console.log('[Escalation Service] Starting scheduler...');
+    
+    // Calculate next run time
+    schedulerStatus.nextRunTime = new Date(Date.now() + 10000).toISOString();
+    
+    // Initial run after 10 seconds
+    setTimeout(async () => {
+        try {
+            await runAllInspectionChecks();
+        } catch (err) {
+            console.error('[Escalation Service] Initial run failed:', err);
+        }
+        
+        // Schedule hourly runs
+        schedulerStatus.nextRunTime = new Date(Date.now() + INTERVAL_MS).toISOString();
+        setInterval(async () => {
+            try {
+                schedulerStatus.nextRunTime = new Date(Date.now() + INTERVAL_MS).toISOString();
+                await runAllInspectionChecks();
+            } catch (err) {
+                console.error('[Escalation Service] Scheduled run failed:', err);
+            }
+        }, INTERVAL_MS);
+        
+    }, 10000);
+    
+    console.log('[Escalation Service] Scheduler started. First run in 10 seconds, then hourly.');
+}
+
 module.exports = {
     checkOverdueActionPlans,
     sendDeadlineReminders,
     markActionPlanCompleted,
-    getEscalationStats
+    getEscalationStats,
+    // New exports
+    checkInspectionReminders,
+    checkInspectionOverdue,
+    runAllInspectionChecks,
+    getSchedulerStatus,
+    startScheduler
 };

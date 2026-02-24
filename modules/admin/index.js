@@ -4,6 +4,7 @@ const sql = require('mssql');
 const ExcelJS = require('exceljs');
 const config = require('../../config/default');
 const SharePointUsersService = require('../../gmrl-auth/admin/services/sharepoint-users-service');
+const escalationService = require('../../services/action-plan-escalation');
 
 const dbConfig = {
     server: config.database.server,
@@ -31,7 +32,8 @@ const requireSysAdmin = async (req, res, next) => {
         '/admin/impersonate': 'ADMIN_IMPERSONATE',
         '/admin/sessions': 'ADMIN_SESSIONS',
         '/admin/notification-history': 'ADMIN_NOTIFICATIONS',
-        '/admin/email-templates': 'ADMIN_EMAIL_TEMPLATES'
+        '/admin/email-templates': 'ADMIN_EMAIL_TEMPLATES',
+        '/admin/job-monitor': 'ADMIN_JOB_MONITOR'
     };
     
     // Find matching form code
@@ -69,6 +71,385 @@ const requireSysAdmin = async (req, res, next) => {
 
 // Apply sysadmin check to all routes
 router.use(requireSysAdmin);
+
+// ============================================================================
+// JOB MONITOR API ROUTES
+// ============================================================================
+
+// Get scheduler status
+router.get('/api/job-monitor', async (req, res) => {
+    try {
+        const status = escalationService.getSchedulerStatus();
+        const stats = await escalationService.getEscalationStats();
+        
+        res.json({
+            success: true,
+            scheduler: status,
+            escalationStats: stats
+        });
+    } catch (err) {
+        console.error('Error getting job monitor status:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Manually trigger a run
+router.post('/api/job-monitor/run-now', async (req, res) => {
+    try {
+        const status = escalationService.getSchedulerStatus();
+        
+        if (status.isRunning) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'A job is already running. Please wait for it to complete.' 
+            });
+        }
+        
+        // Run asynchronously
+        escalationService.runAllInspectionChecks()
+            .then(results => {
+                console.log('[Job Monitor] Manual run completed:', results);
+            })
+            .catch(err => {
+                console.error('[Job Monitor] Manual run failed:', err);
+            });
+        
+        res.json({ 
+            success: true, 
+            message: 'Job started successfully. Refresh to see results.' 
+        });
+    } catch (err) {
+        console.error('Error triggering manual run:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Get email template preview for job monitor
+router.get('/api/job-monitor/preview-template/:templateKey', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        const { templateKey } = req.params;
+        
+        const result = await pool.request()
+            .input('templateKey', sql.NVarChar, templateKey)
+            .query(`
+                SELECT TemplateKey, TemplateName, Module, ReportType, SubjectTemplate, BodyTemplate
+                FROM EmailTemplates
+                WHERE TemplateKey = @templateKey AND IsActive = 1
+            `);
+        
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ success: false, error: 'Template not found' });
+        }
+        
+        const template = result.recordset[0];
+        
+        // Sample data for preview
+        const sampleData = {
+            recipientName: 'John Smith',
+            storeName: 'Spinneys Marina Mall',
+            documentNumber: 'OE-2026-001',
+            inspectionDate: new Date().toLocaleDateString(),
+            deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+            daysUntilDeadline: 3,
+            daysOverdue: 2,
+            storeManagerName: 'Jane Doe',
+            actionPlanUrl: '#'
+        };
+        
+        // Replace placeholders
+        let subject = template.SubjectTemplate;
+        let body = template.BodyTemplate;
+        
+        for (const [key, value] of Object.entries(sampleData)) {
+            const regex = new RegExp(`{{${key}}}`, 'g');
+            subject = subject.replace(regex, value);
+            body = body.replace(regex, value);
+        }
+        
+        res.json({
+            success: true,
+            template: {
+                key: template.TemplateKey,
+                name: template.TemplateName,
+                module: template.Module,
+                type: template.ReportType
+            },
+            preview: {
+                subject: subject,
+                bodyHtml: body
+            }
+        });
+    } catch (err) {
+        console.error('Error previewing template:', err);
+        res.status(500).json({ success: false, error: err.message });
+    } finally {
+        if (pool) await pool.close();
+    }
+});
+
+// Preview email for a specific inspection
+router.post('/api/job-monitor/preview-inspection-email', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        const { module, type, inspection, templateKey } = req.body;
+        
+        // Get the template
+        const result = await pool.request()
+            .input('templateKey', sql.NVarChar, templateKey)
+            .query(`
+                SELECT TemplateKey, TemplateName, Module, ReportType, SubjectTemplate, BodyTemplate
+                FROM EmailTemplates
+                WHERE TemplateKey = @templateKey AND IsActive = 1
+            `);
+        
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ success: false, error: 'Template not found: ' + templateKey });
+        }
+        
+        const template = result.recordset[0];
+        
+        // Build data from the inspection
+        const data = {
+            recipientName: inspection.createdBy || 'Store Manager',
+            storeName: inspection.storeName || 'Unknown Store',
+            documentNumber: inspection.documentNumber || 'N/A',
+            inspectionDate: inspection.inspectionDate ? new Date(inspection.inspectionDate).toLocaleDateString() : 'N/A',
+            deadline: inspection.deadline ? new Date(inspection.deadline).toLocaleDateString() : 'Not Set',
+            daysUntilDeadline: inspection.daysLeft || 0,
+            daysOverdue: inspection.daysOverdue || 0,
+            storeManagerName: inspection.createdBy || 'Store Manager',
+            actionPlanUrl: '#'
+        };
+        
+        // Replace placeholders
+        let subject = template.SubjectTemplate;
+        let body = template.BodyTemplate;
+        
+        for (const [key, value] of Object.entries(data)) {
+            const regex = new RegExp(`{{${key}}}`, 'g');
+            subject = subject.replace(regex, value);
+            body = body.replace(regex, value);
+        }
+        
+        res.json({
+            success: true,
+            preview: {
+                subject: subject,
+                bodyHtml: body
+            }
+        });
+    } catch (err) {
+        console.error('Error previewing inspection email:', err);
+        res.status(500).json({ success: false, error: err.message });
+    } finally {
+        if (pool) await pool.close();
+    }
+});
+
+// Dry run API - check what notifications would be sent
+router.get('/api/job-monitor/dry-run', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        const { module, type } = req.query;
+        
+        let results = [];
+        
+        // Helper to get settings from key-value table
+        const getSettings = async (tableName) => {
+            const result = await pool.request().query(`SELECT SettingKey, SettingValue FROM ${tableName}`);
+            const settings = {};
+            result.recordset.forEach(r => { settings[r.SettingKey] = r.SettingValue; });
+            return {
+                reminderDays: parseInt(settings.ReminderDaysBefore?.split(',')[0]) || 3,
+                overdueDays: parseInt(settings.ActionPlanDeadlineDays) || 7,
+                escalationDays: parseInt(settings.ActionPlanDeadlineDays) || 7
+            };
+        };
+        
+        if (module === 'OE') {
+            // Get OE settings from key-value table
+            const settings = await getSettings('OE_EscalationSettings');
+            
+            if (type === 'inspection-reminder') {
+                const result = await pool.request()
+                    .input('reminderDays', sql.Int, settings.reminderDays)
+                    .query(`
+                        SELECT TOP 10
+                            i.DocumentNumber,
+                            i.InspectionDate,
+                            i.ActionPlanDeadline as Deadline,
+                            i.StoreName,
+                            i.CreatedBy as RecipientName,
+                            DATEDIFF(DAY, GETDATE(), i.ActionPlanDeadline) as DaysUntilDeadline
+                        FROM OE_Inspections i
+                        WHERE i.ActionPlanDeadline IS NOT NULL
+                          AND i.ActionPlanCompletedAt IS NULL
+                          AND DATEDIFF(DAY, GETDATE(), i.ActionPlanDeadline) BETWEEN 0 AND @reminderDays
+                        ORDER BY i.ActionPlanDeadline
+                    `);
+                results = result.recordset.map(r => ({
+                    documentNumber: r.DocumentNumber,
+                    inspectionDate: r.InspectionDate,
+                    deadline: r.Deadline,
+                    storeName: r.StoreName,
+                    recipientName: r.RecipientName,
+                    recipientEmail: 'Store Manager',
+                    daysUntilDeadline: r.DaysUntilDeadline
+                }));
+            } else if (type === 'inspection-overdue') {
+                const result = await pool.request()
+                    .input('overdueDays', sql.Int, 1)
+                    .query(`
+                        SELECT TOP 10
+                            i.DocumentNumber,
+                            i.InspectionDate,
+                            i.ActionPlanDeadline as Deadline,
+                            i.StoreName,
+                            i.CreatedBy as RecipientName,
+                            DATEDIFF(DAY, i.ActionPlanDeadline, GETDATE()) as DaysOverdue
+                        FROM OE_Inspections i
+                        WHERE i.ActionPlanDeadline IS NOT NULL
+                          AND i.ActionPlanCompletedAt IS NULL
+                          AND i.ActionPlanDeadline < GETDATE()
+                          AND DATEDIFF(DAY, i.ActionPlanDeadline, GETDATE()) >= @overdueDays
+                        ORDER BY i.ActionPlanDeadline
+                    `);
+                results = result.recordset.map(r => ({
+                    documentNumber: r.DocumentNumber,
+                    inspectionDate: r.InspectionDate,
+                    deadline: r.Deadline,
+                    storeName: r.StoreName,
+                    recipientName: r.RecipientName,
+                    recipientEmail: 'Store Manager',
+                    daysOverdue: r.DaysOverdue
+                }));
+            } else if (type === 'inspection-escalation' || type === 'escalation') {
+                const result = await pool.request()
+                    .input('escalationDays', sql.Int, settings.escalationDays)
+                    .query(`
+                        SELECT TOP 10
+                            i.DocumentNumber,
+                            i.InspectionDate,
+                            i.ActionPlanDeadline as Deadline,
+                            i.StoreName,
+                            i.CreatedBy as RecipientName,
+                            DATEDIFF(DAY, i.ActionPlanDeadline, GETDATE()) as DaysOverdue
+                        FROM OE_Inspections i
+                        WHERE i.ActionPlanDeadline IS NOT NULL
+                          AND i.ActionPlanCompletedAt IS NULL
+                          AND i.ActionPlanDeadline < GETDATE()
+                          AND DATEDIFF(DAY, i.ActionPlanDeadline, GETDATE()) >= @escalationDays
+                        ORDER BY i.ActionPlanDeadline
+                    `);
+                results = result.recordset.map(r => ({
+                    documentNumber: r.DocumentNumber,
+                    inspectionDate: r.InspectionDate,
+                    deadline: r.Deadline,
+                    storeName: r.StoreName,
+                    recipientName: r.RecipientName,
+                    recipientEmail: 'Operations Manager',
+                    daysOverdue: r.DaysOverdue
+                }));
+            }
+        } else if (module === 'OHS') {
+            // Get OHS settings from key-value table
+            const settings = await getSettings('OHS_EscalationSettings');
+            
+            if (type === 'inspection-reminder') {
+                const result = await pool.request()
+                    .input('reminderDays', sql.Int, settings.reminderDays)
+                    .query(`
+                        SELECT TOP 10
+                            i.DocumentNumber,
+                            i.InspectionDate,
+                            i.ActionPlanDeadline as Deadline,
+                            i.StoreName,
+                            i.CreatedBy as RecipientName,
+                            DATEDIFF(DAY, GETDATE(), i.ActionPlanDeadline) as DaysUntilDeadline
+                        FROM OHS_Inspections i
+                        WHERE i.ActionPlanDeadline IS NOT NULL
+                          AND i.ActionPlanCompletedAt IS NULL
+                          AND DATEDIFF(DAY, GETDATE(), i.ActionPlanDeadline) BETWEEN 0 AND @reminderDays
+                        ORDER BY i.ActionPlanDeadline
+                    `);
+                results = result.recordset.map(r => ({
+                    documentNumber: r.DocumentNumber,
+                    inspectionDate: r.InspectionDate,
+                    deadline: r.Deadline,
+                    storeName: r.StoreName,
+                    recipientName: r.RecipientName,
+                    recipientEmail: 'Store Manager',
+                    daysUntilDeadline: r.DaysUntilDeadline
+                }));
+            } else if (type === 'inspection-overdue') {
+                const result = await pool.request()
+                    .input('overdueDays', sql.Int, 1)
+                    .query(`
+                        SELECT TOP 10
+                            i.DocumentNumber,
+                            i.InspectionDate,
+                            i.ActionPlanDeadline as Deadline,
+                            i.StoreName,
+                            i.CreatedBy as RecipientName,
+                            DATEDIFF(DAY, i.ActionPlanDeadline, GETDATE()) as DaysOverdue
+                        FROM OHS_Inspections i
+                        WHERE i.ActionPlanDeadline IS NOT NULL
+                          AND i.ActionPlanCompletedAt IS NULL
+                          AND i.ActionPlanDeadline < GETDATE()
+                          AND DATEDIFF(DAY, i.ActionPlanDeadline, GETDATE()) >= @overdueDays
+                        ORDER BY i.ActionPlanDeadline
+                    `);
+                results = result.recordset.map(r => ({
+                    documentNumber: r.DocumentNumber,
+                    inspectionDate: r.InspectionDate,
+                    deadline: r.Deadline,
+                    storeName: r.StoreName,
+                    recipientName: r.RecipientName,
+                    recipientEmail: 'Store Manager',
+                    daysOverdue: r.DaysOverdue
+                }));
+            } else if (type === 'inspection-escalation' || type === 'escalation') {
+                const result = await pool.request()
+                    .input('escalationDays', sql.Int, settings.escalationDays)
+                    .query(`
+                        SELECT TOP 10
+                            i.DocumentNumber,
+                            i.InspectionDate,
+                            i.ActionPlanDeadline as Deadline,
+                            i.StoreName,
+                            i.CreatedBy as RecipientName,
+                            DATEDIFF(DAY, i.ActionPlanDeadline, GETDATE()) as DaysOverdue
+                        FROM OHS_Inspections i
+                        WHERE i.ActionPlanDeadline IS NOT NULL
+                          AND i.ActionPlanCompletedAt IS NULL
+                          AND i.ActionPlanDeadline < GETDATE()
+                          AND DATEDIFF(DAY, i.ActionPlanDeadline, GETDATE()) >= @escalationDays
+                        ORDER BY i.ActionPlanDeadline
+                    `);
+                results = result.recordset.map(r => ({
+                    documentNumber: r.DocumentNumber,
+                    inspectionDate: r.InspectionDate,
+                    deadline: r.Deadline,
+                    storeName: r.StoreName,
+                    recipientName: r.RecipientName,
+                    recipientEmail: 'Operations Manager',
+                    daysOverdue: r.DaysOverdue
+                }));
+            }
+        }
+        
+        res.json({ success: true, module, type, results });
+    } catch (err) {
+        console.error('Error in dry run:', err);
+        res.status(500).json({ success: false, error: err.message });
+    } finally {
+        if (pool) await pool.close();
+    }
+});
 
 // Download Permission Matrix as Excel
 router.get('/roles/download-matrix', async (req, res) => {
@@ -332,6 +713,11 @@ router.get('/', (req, res) => {
                         <div class="card-icon">📧</div>
                         <div class="card-title">Email Templates</div>
                         <div class="card-desc">View & edit OE/OHS report email templates</div>
+                    </a>
+                    <a href="/admin/job-monitor" class="admin-card">
+                        <div class="card-icon">⏱️</div>
+                        <div class="card-title">Job Monitor</div>
+                        <div class="card-desc">View scheduler status & notification jobs</div>
                     </a>
                 </div>
             </div>
@@ -4264,11 +4650,56 @@ router.get('/email-templates', async (req, res) => {
         
         const templates = result.recordset;
         
+        // Group templates by module
+        const oeTemplates = templates.filter(t => t.Module === 'OE');
+        const ohsTemplates = templates.filter(t => t.Module === 'OHS');
+        
+        // Helper to get description based on report type
+        const getDescription = (reportType) => {
+            const descriptions = {
+                'full': 'Sent when sharing the complete inspection report.',
+                'action-plan': 'Sent with findings requiring corrective actions.',
+                'escalation': 'Sent to Area Manager when action plan is overdue.',
+                'inspection-reminder': 'Sent X days before action plan deadline.',
+                'inspection-overdue': 'Sent to Store Manager when deadline passed.',
+                'inspection-escalation': 'Escalated to Area Manager for overdue action plans.'
+            };
+            return descriptions[reportType] || 'Email notification template.';
+        };
+        
+        // Helper to get icon based on report type
+        const getIcon = (reportType) => {
+            const icons = {
+                'full': '📊',
+                'action-plan': '📋',
+                'escalation': '🚨',
+                'inspection-reminder': '⏰',
+                'inspection-overdue': '⚠️',
+                'inspection-escalation': '🚨'
+            };
+            return icons[reportType] || '📧';
+        };
+        
+        // Helper to render template card
+        const renderCard = (t) => `
+            <div class="template-card">
+                <h3>${getIcon(t.ReportType)} ${t.TemplateName}</h3>
+                <span class="report-type">${t.ReportType}</span>
+                <p>${getDescription(t.ReportType)}</p>
+                <div class="meta">
+                    ${t.UpdatedAt ? `Last updated: ${new Date(t.UpdatedAt).toLocaleDateString('en-GB')}` : 'Never edited'}
+                    ${t.UpdatedBy ? ` by ${t.UpdatedBy}` : ''}
+                </div>
+                <button class="btn btn-preview" onclick="previewTemplate('${t.TemplateKey}')">👁️ Preview</button>
+                <button class="btn btn-edit" onclick="editTemplate('${t.TemplateKey}')">✏️ Edit</button>
+            </div>
+        `;
+        
         res.send(`
             <!DOCTYPE html>
             <html>
             <head>
-<meta charset="UTF-8">
+                <meta charset="UTF-8">
                 <title>Email Templates - Admin</title>
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -4278,18 +4709,28 @@ router.get('/email-templates', async (req, res) => {
                     .header a { color: white; text-decoration: none; opacity: 0.8; }
                     .header a:hover { opacity: 1; }
                     .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
-                    .info-box { background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; }
+                    .info-box { background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px 20px; border-radius: 8px; margin-bottom: 25px; }
                     .info-box h3 { color: #1565c0; margin-bottom: 8px; }
                     .info-box p { color: #1976d2; font-size: 14px; }
-                    .templates-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; margin-bottom: 30px; }
-                    .template-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-                    .template-card h3 { color: #333; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
-                    .template-card .module { font-size: 12px; padding: 4px 8px; border-radius: 4px; font-weight: 600; }
-                    .template-card .module.oe { background: #e8f5e9; color: #2e7d32; }
-                    .template-card .module.ohs { background: #ffebee; color: #c62828; }
-                    .template-card p { color: #666; font-size: 14px; margin-bottom: 15px; }
-                    .template-card .meta { font-size: 12px; color: #999; margin-bottom: 15px; }
-                    .btn { display: inline-block; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px; cursor: pointer; border: none; margin-right: 8px; }
+                    
+                    /* Module Sections */
+                    .module-section { margin-bottom: 35px; }
+                    .module-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #eee; }
+                    .module-header h2 { font-size: 22px; font-weight: 600; }
+                    .module-badge { padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+                    .module-badge.oe { background: linear-gradient(135deg, #e8f5e9, #c8e6c9); color: #2e7d32; }
+                    .module-badge.ohs { background: linear-gradient(135deg, #ffebee, #ffcdd2); color: #c62828; }
+                    .template-count { font-size: 13px; color: #888; margin-left: auto; }
+                    
+                    .templates-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+                    .template-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); transition: transform 0.2s, box-shadow 0.2s; }
+                    .template-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.12); }
+                    .template-card h3 { color: #333; margin-bottom: 8px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+                    .template-card .report-type { display: inline-block; font-size: 11px; padding: 3px 8px; border-radius: 4px; background: #f0f0f0; color: #666; margin-bottom: 10px; }
+                    .template-card p { color: #666; font-size: 13px; margin-bottom: 12px; line-height: 1.5; }
+                    .template-card .meta { font-size: 11px; color: #999; margin-bottom: 15px; }
+                    
+                    .btn { display: inline-block; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; cursor: pointer; border: none; margin-right: 8px; transition: all 0.2s; }
                     .btn-preview { background: #e3f2fd; color: #1976d2; }
                     .btn-preview:hover { background: #bbdefb; }
                     .btn-edit { background: #667eea; color: white; }
@@ -4298,6 +4739,7 @@ router.get('/email-templates', async (req, res) => {
                     .btn-save:hover { background: #218838; }
                     .btn-cancel { background: #6c757d; color: white; }
                     .btn-cancel:hover { background: #5a6268; }
+                    
                     .preview-modal, .editor-modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center; }
                     .preview-content { background: white; border-radius: 12px; width: 90%; max-width: 800px; max-height: 90vh; overflow: auto; }
                     .editor-content { background: white; border-radius: 12px; width: 95%; max-width: 1200px; max-height: 95vh; overflow: auto; }
@@ -4314,7 +4756,8 @@ router.get('/email-templates', async (req, res) => {
                     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
                     .variables-box { background: #f8f9fa; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
                     .variables-box h4 { margin-bottom: 10px; color: #333; }
-                    .variables-box code { background: #e9ecef; padding: 2px 6px; border-radius: 4px; font-size: 12px; margin: 2px; display: inline-block; }
+                    .variables-box code { background: #e9ecef; padding: 2px 6px; border-radius: 4px; font-size: 12px; margin: 2px; display: inline-block; cursor: pointer; }
+                    .variables-box code:hover { background: #667eea; color: white; }
                     .btn-container { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee; }
                     .toast { position: fixed; bottom: 20px; right: 20px; padding: 15px 25px; border-radius: 8px; color: white; font-weight: 600; z-index: 2000; animation: slideIn 0.3s ease; }
                     .toast.success { background: #28a745; }
@@ -4329,23 +4772,32 @@ router.get('/email-templates', async (req, res) => {
                 <div class="container">
                     <div class="info-box">
                         <h3>📝 About Email Templates</h3>
-                        <p>Email templates are used when sending OE and OHS inspection reports to store managers. 
-                           Click "Edit" to customize the subject and body HTML for each template. Changes are saved to the database and take effect immediately.</p>
+                        <p>Email templates are used for sending inspection reports, reminders, and escalation notifications. 
+                           Click "Edit" to customize the subject and body HTML. Changes take effect immediately.</p>
                     </div>
                     
-                    <div class="templates-grid">
-                        ${templates.map(t => `
-                            <div class="template-card">
-                                <h3><span class="module ${t.Module.toLowerCase()}">${t.Module}</span> ${t.TemplateName}</h3>
-                                <p>${t.ReportType === 'full' ? 'Sent when sharing the complete inspection report.' : 'Sent with findings requiring corrective actions.'}</p>
-                                <div class="meta">
-                                    ${t.UpdatedAt ? `Last updated: ${new Date(t.UpdatedAt).toLocaleDateString('en-GB')}` : 'Never edited'}
-                                    ${t.UpdatedBy ? ` by ${t.UpdatedBy}` : ''}
-                                </div>
-                                <button class="btn btn-preview" onclick="previewTemplate('${t.TemplateKey}')">👁️ Preview</button>
-                                <button class="btn btn-edit" onclick="editTemplate('${t.TemplateKey}')">✏️ Edit</button>
-                            </div>
-                        `).join('')}
+                    <!-- OE Templates Section -->
+                    <div class="module-section">
+                        <div class="module-header">
+                            <span class="module-badge oe">OE</span>
+                            <h2>Operational Excellence Templates</h2>
+                            <span class="template-count">${oeTemplates.length} templates</span>
+                        </div>
+                        <div class="templates-grid">
+                            ${oeTemplates.map(renderCard).join('')}
+                        </div>
+                    </div>
+                    
+                    <!-- OHS Templates Section -->
+                    <div class="module-section">
+                        <div class="module-header">
+                            <span class="module-badge ohs">OHS</span>
+                            <h2>Occupational Health & Safety Templates</h2>
+                            <span class="template-count">${ohsTemplates.length} templates</span>
+                        </div>
+                        <div class="templates-grid">
+                            ${ohsTemplates.map(renderCard).join('')}
+                        </div>
                     </div>
                 </div>
                 
@@ -4374,29 +4826,31 @@ router.get('/email-templates', async (req, res) => {
                             <input type="hidden" id="editTemplateKey">
                             
                             <div class="variables-box">
-                                <h4>📌 Available Variables (use double curly braces)</h4>
-                                <code>{{storeName}}</code>
-                                <code>{{storeCode}}</code>
-                                <code>{{documentNumber}}</code>
-                                <code>{{totalScore}}</code>
-                                <code>{{auditDate}}</code>
-                                <code>{{inspectionDate}}</code>
-                                <code>{{auditors}}</code>
-                                <code>{{inspectors}}</code>
-                                <code>{{status}}</code>
-                                <code>{{reportUrl}}</code>
-                                <code>{{brandColor}}</code>
-                                <code>{{brandGradient}}</code>
-                                <code>{{scoreClass}}</code>
-                                <code>{{scoreIcon}}</code>
-                                <code>{{scoreStatus}}</code>
-                                <code>{{totalFindings}}</code>
-                                <code>{{highFindings}}</code>
-                                <code>{{mediumFindings}}</code>
-                                <code>{{lowFindings}}</code>
-                                <code>{{criticalFindings}}</code>
-                                <code>{{deadline}}</code>
-                                <code>{{year}}</code>
+                                <h4>📌 Available Variables (click to copy)</h4>
+                                <code onclick="copyVar('storeName')">{{storeName}}</code>
+                                <code onclick="copyVar('storeCode')">{{storeCode}}</code>
+                                <code onclick="copyVar('documentNumber')">{{documentNumber}}</code>
+                                <code onclick="copyVar('totalScore')">{{totalScore}}</code>
+                                <code onclick="copyVar('auditDate')">{{auditDate}}</code>
+                                <code onclick="copyVar('inspectionDate')">{{inspectionDate}}</code>
+                                <code onclick="copyVar('auditors')">{{auditors}}</code>
+                                <code onclick="copyVar('inspectors')">{{inspectors}}</code>
+                                <code onclick="copyVar('status')">{{status}}</code>
+                                <code onclick="copyVar('reportUrl')">{{reportUrl}}</code>
+                                <code onclick="copyVar('actionPlanUrl')">{{actionPlanUrl}}</code>
+                                <code onclick="copyVar('recipientName')">{{recipientName}}</code>
+                                <code onclick="copyVar('deadline')">{{deadline}}</code>
+                                <code onclick="copyVar('daysUntilDeadline')">{{daysUntilDeadline}}</code>
+                                <code onclick="copyVar('daysOverdue')">{{daysOverdue}}</code>
+                                <code onclick="copyVar('storeManagerName')">{{storeManagerName}}</code>
+                                <code onclick="copyVar('brandColor')">{{brandColor}}</code>
+                                <code onclick="copyVar('brandGradient')">{{brandGradient}}</code>
+                                <code onclick="copyVar('totalFindings')">{{totalFindings}}</code>
+                                <code onclick="copyVar('highFindings')">{{highFindings}}</code>
+                                <code onclick="copyVar('mediumFindings')">{{mediumFindings}}</code>
+                                <code onclick="copyVar('lowFindings')">{{lowFindings}}</code>
+                                <code onclick="copyVar('criticalFindings')">{{criticalFindings}}</code>
+                                <code onclick="copyVar('year')">{{year}}</code>
                             </div>
                             
                             <div class="form-group">
@@ -4419,6 +4873,11 @@ router.get('/email-templates', async (req, res) => {
                 </div>
                 
                 <script>
+                    function copyVar(varName) {
+                        navigator.clipboard.writeText('{{' + varName + '}}');
+                        showToast('Copied {{' + varName + '}}', 'success');
+                    }
+                    
                     async function previewTemplate(templateKey) {
                         try {
                             const res = await fetch('/admin/api/email-templates/preview?templateKey=' + templateKey);
@@ -4714,6 +5173,516 @@ router.put('/api/email-templates/:templateKey', async (req, res) => {
     } catch (error) {
         console.error('Error updating template:', error);
         res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ============================================================================
+// JOB MONITOR PAGE - Action Plan Tracker
+// ============================================================================
+router.get('/job-monitor', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        // Get notification templates
+        const templatesResult = await pool.request().query(`
+            SELECT TemplateKey, TemplateName, Module, ReportType FROM EmailTemplates
+            WHERE ReportType IN ('inspection-reminder', 'inspection-overdue', 'inspection-escalation', 'escalation') AND IsActive = 1
+            ORDER BY Module, ReportType
+        `);
+        
+        const templates = templatesResult.recordset;
+        const oeTemplates = templates.filter(t => t.Module === 'OE');
+        const ohsTemplates = templates.filter(t => t.Module === 'OHS');
+        
+        // Get OE Inspections with action plan tracking
+        const oeInspectionsResult = await pool.request().query(`
+            SELECT i.DocumentNumber, i.StoreName, i.InspectionDate, i.Status, i.ActionPlanDeadline, i.ActionPlanCompletedAt,
+                ISNULL(u.DisplayName, 'Unknown') as CreatedByName,
+                CASE WHEN i.ActionPlanCompletedAt IS NOT NULL THEN 'Completed'
+                     WHEN i.ActionPlanDeadline IS NULL THEN 'No Deadline'
+                     WHEN i.ActionPlanDeadline < GETDATE() THEN 'Overdue'
+                     WHEN DATEDIFF(DAY, GETDATE(), i.ActionPlanDeadline) <= 3 THEN 'Due Soon'
+                     ELSE 'On Track' END as ActionPlanStatus,
+                CASE WHEN i.ActionPlanDeadline IS NOT NULL AND i.ActionPlanCompletedAt IS NULL AND i.ActionPlanDeadline < GETDATE() 
+                     THEN DATEDIFF(DAY, i.ActionPlanDeadline, GETDATE()) ELSE NULL END as DaysOverdue,
+                CASE WHEN i.ActionPlanDeadline IS NOT NULL AND i.ActionPlanCompletedAt IS NULL AND i.ActionPlanDeadline >= GETDATE() 
+                     THEN DATEDIFF(DAY, GETDATE(), i.ActionPlanDeadline) ELSE NULL END as DaysUntilDeadline
+            FROM OE_Inspections i
+            LEFT JOIN Users u ON i.CreatedBy = u.Id
+            WHERE i.Status = 'Completed' AND i.ActionPlanCompletedAt IS NULL
+            ORDER BY CASE WHEN i.ActionPlanDeadline < GETDATE() THEN 0 ELSE 1 END, i.ActionPlanDeadline
+        `);
+        const oeInspections = oeInspectionsResult.recordset;
+        
+        // Get OHS Inspections with action plan tracking
+        const ohsInspectionsResult = await pool.request().query(`
+            SELECT i.DocumentNumber, i.StoreName, i.InspectionDate, i.Status, i.ActionPlanDeadline, i.ActionPlanCompletedAt,
+                ISNULL(u.DisplayName, 'Unknown') as CreatedByName,
+                CASE WHEN i.ActionPlanCompletedAt IS NOT NULL THEN 'Completed'
+                     WHEN i.ActionPlanDeadline IS NULL THEN 'No Deadline'
+                     WHEN i.ActionPlanDeadline < GETDATE() THEN 'Overdue'
+                     WHEN DATEDIFF(DAY, GETDATE(), i.ActionPlanDeadline) <= 3 THEN 'Due Soon'
+                     ELSE 'On Track' END as ActionPlanStatus,
+                CASE WHEN i.ActionPlanDeadline IS NOT NULL AND i.ActionPlanCompletedAt IS NULL AND i.ActionPlanDeadline < GETDATE() 
+                     THEN DATEDIFF(DAY, i.ActionPlanDeadline, GETDATE()) ELSE NULL END as DaysOverdue,
+                CASE WHEN i.ActionPlanDeadline IS NOT NULL AND i.ActionPlanCompletedAt IS NULL AND i.ActionPlanDeadline >= GETDATE() 
+                     THEN DATEDIFF(DAY, GETDATE(), i.ActionPlanDeadline) ELSE NULL END as DaysUntilDeadline
+            FROM OHS_Inspections i
+            LEFT JOIN Users u ON i.CreatedBy = u.Id
+            WHERE i.Status = 'Completed' AND i.ActionPlanCompletedAt IS NULL
+            ORDER BY CASE WHEN i.ActionPlanDeadline < GETDATE() THEN 0 ELSE 1 END, i.ActionPlanDeadline
+        `);
+        const ohsInspections = ohsInspectionsResult.recordset;
+        
+        // Calculate stats
+        const oeOverdue = oeInspections.filter(i => i.ActionPlanStatus === 'Overdue').length;
+        const oeDueSoon = oeInspections.filter(i => i.ActionPlanStatus === 'Due Soon').length;
+        const oeNoDeadline = oeInspections.filter(i => i.ActionPlanStatus === 'No Deadline').length;
+        const ohsOverdue = ohsInspections.filter(i => i.ActionPlanStatus === 'Overdue').length;
+        const ohsDueSoon = ohsInspections.filter(i => i.ActionPlanStatus === 'Due Soon').length;
+        const ohsNoDeadline = ohsInspections.filter(i => i.ActionPlanStatus === 'No Deadline').length;
+        
+        // Render helper for inspection rows
+        const renderRow = (i, idx, arr, module) => {
+            const statusClass = i.ActionPlanStatus === 'Overdue' ? 'overdue' : 
+                               i.ActionPlanStatus === 'Due Soon' ? 'due-soon' : 
+                               i.ActionPlanStatus === 'Completed' ? 'completed' : 'no-deadline';
+            const statusIcon = i.ActionPlanStatus === 'Overdue' ? '🔴' : 
+                              i.ActionPlanStatus === 'Due Soon' ? '🟡' : 
+                              i.ActionPlanStatus === 'Completed' ? '✅' : '⚪';
+            const emailType = i.ActionPlanStatus === 'Overdue' ? 'overdue' : 
+                             i.ActionPlanStatus === 'Due Soon' ? 'reminder' : 'reminder';
+            // Use Base64 encoding to safely pass data
+            const inspectionData = Buffer.from(JSON.stringify({
+                documentNumber: i.DocumentNumber,
+                storeName: i.StoreName,
+                inspectionDate: i.InspectionDate,
+                deadline: i.ActionPlanDeadline,
+                daysOverdue: i.DaysOverdue,
+                daysLeft: i.DaysUntilDeadline,
+                createdBy: i.CreatedByName,
+                status: i.ActionPlanStatus
+            })).toString('base64');
+            return `
+                <tr class="${statusClass}">
+                    <td><strong>${i.DocumentNumber}</strong></td>
+                    <td>${i.StoreName}</td>
+                    <td>${i.InspectionDate ? new Date(i.InspectionDate).toLocaleDateString() : '-'}</td>
+                    <td>${i.ActionPlanDeadline ? new Date(i.ActionPlanDeadline).toLocaleDateString() : '<span class="no-deadline">Not Set</span>'}</td>
+                    <td>
+                        <span class="status-pill ${statusClass}">
+                            ${statusIcon} ${i.ActionPlanStatus}
+                            ${i.DaysOverdue ? `<small>(${i.DaysOverdue} days)</small>` : ''}
+                            ${i.DaysUntilDeadline !== null && i.DaysUntilDeadline >= 0 ? `<small>(${i.DaysUntilDeadline} days left)</small>` : ''}
+                        </span>
+                    </td>
+                    <td>${i.CreatedByName || '-'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline" onclick="previewInspectionEmail('${module}', '${emailType}', '${inspectionData}')">📧 Preview</button>
+                    </td>
+                </tr>
+            `;
+        };
+        
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Action Plan Tracker - Admin</title>
+                <style>
+                    * { box-sizing: border-box; margin: 0; padding: 0; }
+                    body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; min-height: 100vh; }
+                    .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 20px 30px; }
+                    .header h1 { font-size: 24px; display: flex; align-items: center; gap: 10px; }
+                    .header a { color: white; text-decoration: none; opacity: 0.8; }
+                    .header a:hover { opacity: 1; }
+                    .container { max-width: 1600px; margin: 0 auto; padding: 20px; }
+                    
+                    .info-banner { background: #e3f2fd; border-left: 4px solid #2196f3; padding: 12px 15px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; color: #1565c0; }
+                    
+                    .scheduler-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+                    .scheduler-card { background: white; border-radius: 10px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; align-items: center; gap: 12px; }
+                    .scheduler-card .icon { font-size: 24px; }
+                    .scheduler-card .info { flex: 1; }
+                    .scheduler-card .label { font-size: 11px; color: #888; }
+                    .scheduler-card .value { font-size: 14px; font-weight: 600; color: #333; }
+                    .scheduler-card.ok { border-left: 3px solid #28a745; }
+                    .scheduler-card.error { border-left: 3px solid #dc3545; }
+                    .scheduler-card.idle { border-left: 3px solid #6c757d; }
+                    
+                    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 25px; }
+                    .summary-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+                    .summary-card h3 { font-size: 14px; color: #666; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+                    .summary-card .badge { padding: 4px 10px; border-radius: 15px; font-size: 11px; font-weight: 600; }
+                    .summary-card .badge.oe { background: #e8f5e9; color: #2e7d32; }
+                    .summary-card .badge.ohs { background: #ffebee; color: #c62828; }
+                    .summary-stats { display: flex; gap: 20px; }
+                    .summary-stat { text-align: center; flex: 1; }
+                    .summary-stat .value { font-size: 28px; font-weight: 700; }
+                    .summary-stat .label { font-size: 11px; color: #888; margin-top: 4px; }
+                    .summary-stat.overdue .value { color: #dc3545; }
+                    .summary-stat.due-soon .value { color: #ffc107; }
+                    .summary-stat.pending .value { color: #6c757d; }
+                    
+                    .action-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
+                    .action-bar .meta { font-size: 12px; color: #888; }
+                    .action-buttons { display: flex; gap: 10px; }
+                    
+                    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 18px; border-radius: 8px; font-weight: 600; font-size: 13px; cursor: pointer; border: none; text-decoration: none; transition: all 0.2s; }
+                    .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+                    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(102,126,234,0.4); }
+                    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+                    .btn-secondary { background: #e9ecef; color: #495057; }
+                    .btn-secondary:hover { background: #dee2e6; }
+                    .btn-sm { padding: 6px 12px; font-size: 11px; }
+                    .btn-outline { background: white; color: #667eea; border: 1px solid #667eea; }
+                    .btn-outline:hover { background: #667eea; color: white; }
+                    
+                    .tabs { display: flex; gap: 5px; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 0; }
+                    .tab { padding: 10px 20px; cursor: pointer; font-weight: 600; font-size: 13px; color: #666; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
+                    .tab:hover { color: #333; }
+                    .tab.active { color: #667eea; border-bottom-color: #667eea; }
+                    .tab-content { display: none; }
+                    .tab-content.active { display: block; }
+                    
+                    .section { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+                    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #eee; }
+                    .section-header h2 { font-size: 16px; color: #333; display: flex; align-items: center; gap: 10px; }
+                    
+                    .tracking-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+                    .tracking-table th { background: #f8f9fa; padding: 12px 10px; text-align: left; font-weight: 600; color: #555; border-bottom: 2px solid #eee; }
+                    .tracking-table td { padding: 10px; border-bottom: 1px solid #eee; }
+                    .tracking-table tr:hover { background: #f8f9fa; }
+                    .tracking-table tr.overdue { background: #fff5f5; }
+                    .tracking-table tr.overdue:hover { background: #ffe0e0; }
+                    .tracking-table tr.due-soon { background: #fffbf0; }
+                    .tracking-table tr.due-soon:hover { background: #fff3cd; }
+                    
+                    .status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; }
+                    .status-pill.overdue { background: #f8d7da; color: #721c24; }
+                    .status-pill.due-soon { background: #fff3cd; color: #856404; }
+                    .status-pill.completed { background: #d4edda; color: #155724; }
+                    .status-pill.no-deadline { background: #e9ecef; color: #6c757d; }
+                    .status-pill small { font-weight: 400; opacity: 0.8; }
+                    .no-deadline { color: #999; font-style: italic; }
+                    
+                    .empty-state { text-align: center; padding: 40px; color: #888; }
+                    .empty-state .icon { font-size: 48px; margin-bottom: 10px; opacity: 0.5; }
+                    
+                    .templates-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin-top: 15px; }
+                    .template-card { background: #f8f9fa; border-radius: 8px; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; }
+                    .template-card:hover { background: #e9ecef; }
+                    .template-info { font-size: 13px; color: #333; }
+                    .template-info .type { font-size: 11px; color: #888; }
+                    .template-actions { display: flex; gap: 5px; }
+                    
+                    .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center; }
+                    .modal-content { background: white; border-radius: 12px; width: 90%; max-width: 900px; max-height: 90vh; overflow: auto; }
+                    .modal-header { padding: 15px 20px; background: #f5f5f5; border-radius: 12px 12px 0 0; display: flex; justify-content: space-between; align-items: center; }
+                    .modal-header h3 { margin: 0; font-size: 16px; }
+                    .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: #666; }
+                    .modal-body { padding: 20px; }
+                    .preview-subject { background: #f8f9fa; padding: 12px 15px; border-radius: 6px; margin-bottom: 15px; }
+                    .preview-subject label { font-size: 11px; color: #666; display: block; margin-bottom: 4px; }
+                    .preview-iframe { width: 100%; height: 400px; border: 1px solid #eee; border-radius: 8px; }
+                    
+                    .dryrun-results { margin-top: 15px; }
+                    .dryrun-item { background: #f8f9fa; border-radius: 8px; padding: 15px; margin-bottom: 10px; border-left: 4px solid #28a745; }
+                    .dryrun-item h4 { font-size: 14px; color: #333; margin-bottom: 8px; }
+                    .dryrun-item p { font-size: 13px; color: #666; margin: 4px 0; }
+                    .dryrun-empty { text-align: center; padding: 30px; color: #888; }
+                    
+                    .loading { display: inline-block; width: 14px; height: 14px; border: 2px solid #fff; border-radius: 50%; border-top-color: transparent; animation: spin 0.8s linear infinite; }
+                    .loading-dark { border-color: #667eea; border-top-color: transparent; }
+                    @keyframes spin { to { transform: rotate(360deg); } }
+                    
+                    .toast { position: fixed; bottom: 20px; right: 20px; padding: 15px 25px; border-radius: 8px; color: white; font-weight: 600; z-index: 2000; animation: slideIn 0.3s ease; }
+                    .toast.success { background: #28a745; }
+                    .toast.error { background: #dc3545; }
+                    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1><a href="/admin">← Admin</a> / 📋 Action Plan Tracker</h1>
+                </div>
+                <div class="container">
+                    <div class="info-banner">
+                        📋 <strong>Action Plan Tracker</strong> monitors all inspections with pending action plans. Overdue items are highlighted. The scheduler sends automatic reminders and escalations.
+                    </div>
+                    
+                    <!-- Scheduler Status -->
+                    <div class="scheduler-row">
+                        <div class="scheduler-card idle" id="statusCard">
+                            <div class="icon">⚡</div>
+                            <div class="info">
+                                <div class="label">Scheduler</div>
+                                <div class="value" id="schedulerStatus">Loading...</div>
+                            </div>
+                        </div>
+                        <div class="scheduler-card">
+                            <div class="icon">🕐</div>
+                            <div class="info">
+                                <div class="label">Last Run</div>
+                                <div class="value" id="lastRunTime">-</div>
+                            </div>
+                        </div>
+                        <div class="scheduler-card">
+                            <div class="icon">⏭️</div>
+                            <div class="info">
+                                <div class="label">Next Run</div>
+                                <div class="value" id="nextRunTime">-</div>
+                            </div>
+                        </div>
+                        <div class="scheduler-card">
+                            <div class="icon">📤</div>
+                            <div class="info">
+                                <div class="label">Emails Sent</div>
+                                <div class="value" id="emailsSent">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="action-bar">
+                        <div class="meta">Last refreshed: <span id="lastRefresh">just now</span> | Auto-refresh: 30s</div>
+                        <div class="action-buttons">
+                            <button class="btn btn-secondary" onclick="location.reload()">🔄 Refresh</button>
+                            <button class="btn btn-primary" id="runNowBtn" onclick="runNow()">▶️ Run Scheduler Now</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Summary Cards -->
+                    <div class="summary-grid">
+                        <div class="summary-card">
+                            <h3><span class="badge oe">OE</span> Operational Excellence</h3>
+                            <div class="summary-stats">
+                                <div class="summary-stat overdue"><div class="value">${oeOverdue}</div><div class="label">🔴 Overdue</div></div>
+                                <div class="summary-stat due-soon"><div class="value">${oeDueSoon}</div><div class="label">🟡 Due Soon</div></div>
+                                <div class="summary-stat pending"><div class="value">${oeNoDeadline}</div><div class="label">⚪ No Deadline</div></div>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <h3><span class="badge ohs">OHS</span> Occupational Health & Safety</h3>
+                            <div class="summary-stats">
+                                <div class="summary-stat overdue"><div class="value">${ohsOverdue}</div><div class="label">🔴 Overdue</div></div>
+                                <div class="summary-stat due-soon"><div class="value">${ohsDueSoon}</div><div class="label">🟡 Due Soon</div></div>
+                                <div class="summary-stat pending"><div class="value">${ohsNoDeadline}</div><div class="label">⚪ No Deadline</div></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tabs -->
+                    <div class="tabs">
+                        <div class="tab active" data-tab="oe-tab">📋 OE Inspections (${oeInspections.length})</div>
+                        <div class="tab" data-tab="ohs-tab">📋 OHS Inspections (${ohsInspections.length})</div>
+                        <div class="tab" data-tab="templates-tab">📧 Email Templates</div>
+                    </div>
+                    
+                    <!-- OE Tab -->
+                    <div class="tab-content active" id="oe-tab">
+                        <div class="section">
+                            <div class="section-header"><h2><span class="badge oe">OE</span> Pending Action Plans</h2></div>
+                            ${oeInspections.length > 0 ? `
+                                <table class="tracking-table">
+                                    <thead><tr><th>Document #</th><th>Store</th><th>Inspection Date</th><th>Deadline</th><th>Status</th><th>Created By</th><th>Actions</th></tr></thead>
+                                    <tbody>${oeInspections.map((i, idx, arr) => renderRow(i, idx, arr, 'OE')).join('')}</tbody>
+                                </table>
+                            ` : `<div class="empty-state"><div class="icon">✅</div><p>No pending action plans</p></div>`}
+                        </div>
+                    </div>
+                    
+                    <!-- OHS Tab -->
+                    <div class="tab-content" id="ohs-tab">
+                        <div class="section">
+                            <div class="section-header"><h2><span class="badge ohs">OHS</span> Pending Action Plans</h2></div>
+                            ${ohsInspections.length > 0 ? `
+                                <table class="tracking-table">
+                                    <thead><tr><th>Document #</th><th>Store</th><th>Inspection Date</th><th>Deadline</th><th>Status</th><th>Created By</th><th>Actions</th></tr></thead>
+                                    <tbody>${ohsInspections.map((i, idx, arr) => renderRow(i, idx, arr, 'OHS')).join('')}</tbody>
+                                </table>
+                            ` : `<div class="empty-state"><div class="icon">✅</div><p>No pending action plans</p></div>`}
+                        </div>
+                    </div>
+                    
+                    <!-- Templates Tab -->
+                    <div class="tab-content" id="templates-tab">
+                        <div class="section">
+                            <div class="section-header"><h2>📧 Notification Templates</h2></div>
+                            <p style="color: #666; margin-bottom: 20px; font-size: 13px;">Preview templates or run a <strong>Dry Run</strong> to see what would be sent.</p>
+                            
+                            <div style="margin-bottom: 25px;">
+                                <h4 style="font-size: 14px; color: #2e7d32; margin-bottom: 10px;">🟢 OE Templates (${oeTemplates.length})</h4>
+                                <div class="templates-grid">
+                                    ${oeTemplates.map(t => `
+                                        <div class="template-card">
+                                            <div class="template-info"><div>${t.TemplateName}</div><div class="type">${t.ReportType}</div></div>
+                                            <div class="template-actions">
+                                                <button class="btn btn-secondary btn-sm" onclick="previewTemplate('${t.TemplateKey}')">👁️</button>
+                                                <button class="btn btn-outline btn-sm" onclick="dryRunTemplate('${t.TemplateKey}', '${t.Module}', '${t.ReportType}')">🧪</button>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h4 style="font-size: 14px; color: #c62828; margin-bottom: 10px;">🔴 OHS Templates (${ohsTemplates.length})</h4>
+                                <div class="templates-grid">
+                                    ${ohsTemplates.map(t => `
+                                        <div class="template-card">
+                                            <div class="template-info"><div>${t.TemplateName}</div><div class="type">${t.ReportType}</div></div>
+                                            <div class="template-actions">
+                                                <button class="btn btn-secondary btn-sm" onclick="previewTemplate('${t.TemplateKey}')">👁️</button>
+                                                <button class="btn btn-outline btn-sm" onclick="dryRunTemplate('${t.TemplateKey}', '${t.Module}', '${t.ReportType}')">🧪</button>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Preview Modal -->
+                <div class="modal" id="previewModal">
+                    <div class="modal-content">
+                        <div class="modal-header"><h3 id="previewTitle">Email Preview</h3><button class="modal-close" onclick="closeModal('previewModal')">&times;</button></div>
+                        <div class="modal-body">
+                            <div class="preview-subject"><label>Subject</label><div id="previewSubject">-</div></div>
+                            <iframe id="previewIframe" class="preview-iframe"></iframe>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Dry Run Modal -->
+                <div class="modal" id="dryrunModal">
+                    <div class="modal-content">
+                        <div class="modal-header"><h3 id="dryrunTitle">🧪 Dry Run Results</h3><button class="modal-close" onclick="closeModal('dryrunModal')">&times;</button></div>
+                        <div class="modal-body">
+                            <p style="color: #666; margin-bottom: 15px; font-size: 13px;">These notifications <strong>would be sent</strong> if the scheduler runs now.</p>
+                            <div id="dryrunResults" class="dryrun-results"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <script>
+                    document.addEventListener('DOMContentLoaded', () => {
+                        refreshStatus();
+                        setInterval(refreshStatus, 30000);
+                        
+                        document.querySelectorAll('.tab').forEach(tab => {
+                            tab.addEventListener('click', () => {
+                                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                                tab.classList.add('active');
+                                document.getElementById(tab.dataset.tab).classList.add('active');
+                            });
+                        });
+                    });
+                    
+                    async function refreshStatus() {
+                        try {
+                            const res = await fetch('/admin/api/job-monitor');
+                            const data = await res.json();
+                            if (data.success) {
+                                const s = data.scheduler;
+                                const card = document.getElementById('statusCard');
+                                const status = document.getElementById('schedulerStatus');
+                                
+                                if (s.isRunning) { status.textContent = '⏳ Running...'; card.className = 'scheduler-card idle'; }
+                                else if (s.lastRunStatus === 'success') { status.textContent = '✅ OK'; card.className = 'scheduler-card ok'; }
+                                else if (s.lastRunStatus === 'error') { status.textContent = '❌ Error'; card.className = 'scheduler-card error'; }
+                                else { status.textContent = '⏸️ Idle'; card.className = 'scheduler-card idle'; }
+                                
+                                document.getElementById('lastRunTime').textContent = s.lastRunTime ? new Date(s.lastRunTime).toLocaleString() : 'Never';
+                                document.getElementById('nextRunTime').textContent = s.nextRunTime ? new Date(s.nextRunTime).toLocaleString() : '-';
+                                document.getElementById('emailsSent').textContent = s.stats?.emailsSent || 0;
+                                document.getElementById('lastRefresh').textContent = 'just now';
+                            }
+                        } catch (e) { console.error(e); }
+                    }
+                    
+                    async function runNow() {
+                        const btn = document.getElementById('runNowBtn');
+                        btn.innerHTML = '<span class="loading"></span> Running...'; btn.disabled = true;
+                        try {
+                            const res = await fetch('/admin/api/job-monitor/run-now', { method: 'POST' });
+                            const data = await res.json();
+                            if (data.success) { showToast('Scheduler started!', 'success'); setTimeout(() => location.reload(), 3000); }
+                            else { showToast(data.error || 'Failed', 'error'); }
+                        } catch (e) { showToast('Error: ' + e.message, 'error'); }
+                        finally { btn.innerHTML = '▶️ Run Scheduler Now'; btn.disabled = false; }
+                    }
+                    
+                    async function previewTemplate(key) {
+                        try {
+                            const res = await fetch('/admin/api/job-monitor/preview-template/' + key);
+                            const data = await res.json();
+                            if (data.success) {
+                                document.getElementById('previewTitle').textContent = data.template.name;
+                                document.getElementById('previewSubject').textContent = data.preview.subject;
+                                document.getElementById('previewIframe').srcdoc = data.preview.bodyHtml;
+                                document.getElementById('previewModal').style.display = 'flex';
+                            }
+                        } catch (e) { showToast('Error: ' + e.message, 'error'); }
+                    }
+                    
+                    async function previewInspectionEmail(module, type, base64Data) {
+                        // Decode Base64 data
+                        const inspection = JSON.parse(atob(base64Data));
+                        const templateKey = module.toLowerCase() + '_inspection_' + type;
+                        try {
+                            const res = await fetch('/admin/api/job-monitor/preview-inspection-email', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ module, type, inspection, templateKey })
+                            });
+                            const data = await res.json();
+                            if (data.success) {
+                                document.getElementById('previewTitle').textContent = '📧 ' + inspection.documentNumber + ' - ' + (type === 'overdue' ? 'Overdue Notice' : 'Reminder');
+                                document.getElementById('previewSubject').textContent = data.preview.subject;
+                                document.getElementById('previewIframe').srcdoc = data.preview.bodyHtml;
+                                document.getElementById('previewModal').style.display = 'flex';
+                            } else {
+                                showToast(data.error || 'Error loading preview', 'error');
+                            }
+                        } catch (e) { showToast('Error: ' + e.message, 'error'); }
+                    }
+                    
+                    async function dryRunTemplate(key, module, type) {
+                        document.getElementById('dryrunTitle').textContent = '🧪 Dry Run: ' + module + ' ' + type;
+                        document.getElementById('dryrunResults').innerHTML = '<div class="dryrun-empty"><span class="loading loading-dark"></span> Checking...</div>';
+                        document.getElementById('dryrunModal').style.display = 'flex';
+                        try {
+                            const res = await fetch('/admin/api/job-monitor/dry-run?module=' + module + '&type=' + type);
+                            const data = await res.json();
+                            if (data.success) {
+                                const r = data.results || [];
+                                document.getElementById('dryrunResults').innerHTML = r.length > 0 
+                                    ? r.map(i => '<div class="dryrun-item"><h4>' + i.storeName + ' - ' + i.documentNumber + '</h4><p><strong>Deadline:</strong> ' + (i.deadline ? new Date(i.deadline).toLocaleDateString() : 'N/A') + '</p><p><strong>' + (i.daysOverdue ? 'Days Overdue: ' + i.daysOverdue : 'Days Left: ' + (i.daysUntilDeadline || 'N/A')) + '</strong></p></div>').join('')
+                                    : '<div class="dryrun-empty">✅ No pending notifications</div>';
+                            } else { document.getElementById('dryrunResults').innerHTML = '<div class="dryrun-empty">❌ ' + (data.error || 'Error') + '</div>'; }
+                        } catch (e) { document.getElementById('dryrunResults').innerHTML = '<div class="dryrun-empty">❌ ' + e.message + '</div>'; }
+                    }
+                    
+                    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+                    
+                    function showToast(msg, type) {
+                        const t = document.createElement('div'); t.className = 'toast ' + type; t.textContent = msg;
+                        document.body.appendChild(t); setTimeout(() => t.remove(), 3000);
+                    }
+                    
+                    ['previewModal', 'dryrunModal'].forEach(id => {
+                        document.getElementById(id).addEventListener('click', function(e) { if (e.target === this) closeModal(id); });
+                    });
+                </script>
+            </body>
+            </html>
+        `);
+    } catch (err) {
+        console.error('Error loading job monitor:', err);
+        res.status(500).send('Error loading Job Monitor: ' + err.message);
     }
 });
 
