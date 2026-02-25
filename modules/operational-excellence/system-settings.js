@@ -491,6 +491,8 @@ router.get('/', (req, res) => {
                     <div class="section-header">
                         <div class="section-title">Manage Stores</div>
                         <div style="display: flex; gap: 10px;">
+                            <button class="btn" onclick="exportStores()" style="background: #06b6d4; color: white;">📤 Export JSON</button>
+                            <button class="btn" onclick="triggerImportStores()" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white;">📥 Import JSON</button>
                             <button class="btn btn-success" onclick="openBulkModal()">📥 Bulk Import</button>
                             <button class="btn btn-primary" onclick="openModal('store')">+ Add Store</button>
                         </div>
@@ -779,7 +781,11 @@ router.get('/', (req, res) => {
                 <div id="storeresponsibles-tab" class="tab-content">
                     <div class="section-header">
                         <div class="section-title">👤 Assign Area Managers to Stores</div>
-                        <button class="btn btn-primary" onclick="openStoreResponsibleModal()">+ Assign Manager</button>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn" onclick="exportStoreResponsibles()" style="background: #06b6d4; color: white;">📤 Export JSON</button>
+                            <button class="btn" onclick="triggerImportStoreResponsibles()" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white;">📥 Import JSON</button>
+                            <button class="btn btn-primary" onclick="openStoreResponsibleModal()">+ Assign Manager</button>
+                        </div>
                     </div>
                     <p style="color: #666; margin-bottom: 20px;">Assign which Area Manager is responsible for each store. This determines who receives escalation notifications.</p>
                     
@@ -814,7 +820,11 @@ router.get('/', (req, res) => {
                 <div id="brandresponsibles-tab" class="tab-content">
                     <div class="section-header">
                         <div class="section-title">👥 Assign Managers to Brands</div>
-                        <button class="btn btn-primary" onclick="openBrandResponsibleModal()">+ Assign Manager</button>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn" onclick="exportBrandResponsibles()" style="background: #06b6d4; color: white;">📤 Export JSON</button>
+                            <button class="btn" onclick="triggerImportBrandResponsibles()" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white;">📥 Import JSON</button>
+                            <button class="btn btn-primary" onclick="openBrandResponsibleModal()">+ Assign Manager</button>
+                        </div>
                     </div>
                     <p style="color: #666; margin-bottom: 20px;">Assign Area Managers and Head of Operations to each brand. These managers will be auto-suggested as CC recipients when sending inspection reports.</p>
                     
@@ -1477,6 +1487,27 @@ router.get('/', (req, res) => {
                 </div>
             </div>
             
+            <!-- Hidden file inputs for import -->
+            <input type="file" id="importStoresInput" accept=".json" style="display: none;" onchange="handleImportStores(event)">
+            <input type="file" id="importStoreResponsiblesInput" accept=".json" style="display: none;" onchange="handleImportStoreResponsibles(event)">
+            <input type="file" id="importBrandResponsiblesInput" accept=".json" style="display: none;" onchange="handleImportBrandResponsibles(event)">
+            
+            <!-- Import Progress Modal -->
+            <div id="importProgressModal" class="modal" style="display: none;">
+                <div class="modal-content" style="max-width: 450px;">
+                    <div class="modal-header">
+                        <div class="modal-title">📥 Importing Data...</div>
+                    </div>
+                    <div style="padding: 20px;">
+                        <div id="importProgressStatus" style="font-size: 14px; color: #666; margin-bottom: 15px;">Reading file...</div>
+                        <div style="background: #e0e0e0; border-radius: 10px; height: 20px; overflow: hidden; margin-bottom: 10px;">
+                            <div id="importProgressBar" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); height: 100%; width: 0%; transition: width 0.3s;"></div>
+                        </div>
+                        <div id="importProgressCount" style="text-align: center; font-size: 18px; font-weight: 600; color: #667eea;">0 / 0</div>
+                    </div>
+                </div>
+            </div>
+            
             <script>
                 // Tab switching - support both old tabs and new sidebar menu
                 function switchTab(tabName) {
@@ -1655,6 +1686,395 @@ router.get('/', (req, res) => {
                         showToast('Error saving store', 'error');
                     }
                 });
+                
+                // ========== EXPORT/IMPORT FUNCTIONS ==========
+                
+                // Progress Modal Functions
+                function showImportProgress(status, done, total) {
+                    document.getElementById('importProgressModal').style.display = 'flex';
+                    document.getElementById('importProgressStatus').textContent = status;
+                    document.getElementById('importProgressCount').textContent = done + ' / ' + total;
+                    const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+                    document.getElementById('importProgressBar').style.width = percent + '%';
+                }
+                
+                function hideImportProgress() {
+                    document.getElementById('importProgressModal').style.display = 'none';
+                }
+                
+                // Export Stores
+                async function exportStores() {
+                    try {
+                        showToast('Preparing export...', 'success');
+                        const res = await fetch('/operational-excellence/system-settings/api/stores?t=' + Date.now());
+                        const stores = await res.json();
+                        
+                        const exportData = {
+                            exportDate: new Date().toISOString(),
+                            exportedBy: 'System Settings - Stores',
+                            version: '1.0',
+                            type: 'stores',
+                            data: stores.map(s => ({
+                                storeName: s.StoreName,
+                                storeCode: s.StoreCode,
+                                isActive: s.IsActive,
+                                brandId: s.BrandId,
+                                storeSize: s.StoreSize
+                            }))
+                        };
+                        
+                        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = 'stores_export_' + new Date().toISOString().split('T')[0] + '.json';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                        
+                        showToast('Exported ' + stores.length + ' stores', 'success');
+                    } catch (err) {
+                        console.error('Export error:', err);
+                        showToast('Error exporting stores', 'error');
+                    }
+                }
+                
+                function triggerImportStores() {
+                    document.getElementById('importStoresInput').click();
+                }
+                
+                async function handleImportStores(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    
+                    try {
+                        showImportProgress('Reading file...', 0, 0);
+                        const text = await file.text();
+                        const importData = JSON.parse(text);
+                        
+                        if (!importData.data || !Array.isArray(importData.data)) {
+                            hideImportProgress();
+                            throw new Error('Invalid file format');
+                        }
+                        
+                        const stores = importData.data;
+                        const total = stores.length;
+                        let imported = 0;
+                        let skipped = 0;
+                        
+                        for (const store of stores) {
+                            showImportProgress('Importing: ' + store.storeName, imported, total);
+                            
+                            try {
+                                const res = await fetch('/operational-excellence/system-settings/api/stores', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        storeName: store.storeName,
+                                        storeCode: store.storeCode || '',
+                                        isActive: store.isActive !== false,
+                                        brandId: store.brandId || null,
+                                        storeSize: store.storeSize || null
+                                    })
+                                });
+                                
+                                if (res.ok) {
+                                    imported++;
+                                } else {
+                                    skipped++;
+                                }
+                            } catch (e) {
+                                skipped++;
+                            }
+                        }
+                        
+                        hideImportProgress();
+                        showToast('Imported ' + imported + ' stores, ' + skipped + ' skipped', 'success');
+                        loadStores();
+                        
+                    } catch (err) {
+                        hideImportProgress();
+                        console.error('Import error:', err);
+                        showToast('Error importing: ' + err.message, 'error');
+                    } finally {
+                        event.target.value = '';
+                    }
+                }
+                
+                // Export Store Responsibles
+                async function exportStoreResponsibles() {
+                    try {
+                        showToast('Preparing export...', 'success');
+                        const res = await fetch('/operational-excellence/system-settings/api/store-responsibles?t=' + Date.now());
+                        const data = await res.json();
+                        
+                        const exportData = {
+                            exportDate: new Date().toISOString(),
+                            exportedBy: 'System Settings - Store Responsibles',
+                            version: '1.0',
+                            type: 'store-responsibles',
+                            data: data.map(sr => ({
+                                storeName: sr.StoreName,
+                                storeCode: sr.StoreCode,
+                                areaManagerEmail: sr.AreaManagerEmail,
+                                areaManagerName: sr.AreaManagerName,
+                                headOfOpsEmail: sr.HeadOfOpsEmail,
+                                headOfOpsName: sr.HeadOfOpsName
+                            }))
+                        };
+                        
+                        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = 'store_responsibles_export_' + new Date().toISOString().split('T')[0] + '.json';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                        
+                        showToast('Exported ' + data.length + ' store assignments', 'success');
+                    } catch (err) {
+                        console.error('Export error:', err);
+                        showToast('Error exporting store responsibles', 'error');
+                    }
+                }
+                
+                function triggerImportStoreResponsibles() {
+                    document.getElementById('importStoreResponsiblesInput').click();
+                }
+                
+                async function handleImportStoreResponsibles(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    
+                    try {
+                        showImportProgress('Reading file...', 0, 0);
+                        const text = await file.text();
+                        const importData = JSON.parse(text);
+                        
+                        if (!importData.data || !Array.isArray(importData.data)) {
+                            hideImportProgress();
+                            throw new Error('Invalid file format');
+                        }
+                        
+                        const assignments = importData.data;
+                        const total = assignments.length;
+                        let imported = 0;
+                        let skipped = 0;
+                        
+                        for (const sr of assignments) {
+                            showImportProgress('Importing: ' + sr.storeName, imported, total);
+                            
+                            try {
+                                // Find store by name or code
+                                const store = storesData.find(s => 
+                                    s.StoreName === sr.storeName || 
+                                    (sr.storeCode && s.StoreCode === sr.storeCode)
+                                );
+                                
+                                if (!store) {
+                                    skipped++;
+                                    continue;
+                                }
+                                
+                                // Find area manager by email
+                                let areaManagerId = null;
+                                if (sr.areaManagerEmail) {
+                                    const userRes = await fetch('/operational-excellence/system-settings/api/users/by-email?email=' + encodeURIComponent(sr.areaManagerEmail));
+                                    if (userRes.ok) {
+                                        const user = await userRes.json();
+                                        if (user && user.Id) areaManagerId = user.Id;
+                                    }
+                                }
+                                
+                                // Find head of ops by email
+                                let headOfOpsId = null;
+                                if (sr.headOfOpsEmail) {
+                                    const userRes = await fetch('/operational-excellence/system-settings/api/users/by-email?email=' + encodeURIComponent(sr.headOfOpsEmail));
+                                    if (userRes.ok) {
+                                        const user = await userRes.json();
+                                        if (user && user.Id) headOfOpsId = user.Id;
+                                    }
+                                }
+                                
+                                if (!areaManagerId && !headOfOpsId) {
+                                    skipped++;
+                                    continue;
+                                }
+                                
+                                const res = await fetch('/operational-excellence/system-settings/api/store-responsibles', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        storeId: store.Id,
+                                        areaManagerId: areaManagerId,
+                                        headOfOpsId: headOfOpsId
+                                    })
+                                });
+                                
+                                if (res.ok) {
+                                    imported++;
+                                } else {
+                                    skipped++;
+                                }
+                            } catch (e) {
+                                skipped++;
+                            }
+                        }
+                        
+                        hideImportProgress();
+                        showToast('Imported ' + imported + ' assignments, ' + skipped + ' skipped', 'success');
+                        loadStoreResponsibles();
+                        
+                    } catch (err) {
+                        hideImportProgress();
+                        console.error('Import error:', err);
+                        showToast('Error importing: ' + err.message, 'error');
+                    } finally {
+                        event.target.value = '';
+                    }
+                }
+                
+                // Export Brand Responsibles
+                async function exportBrandResponsibles() {
+                    try {
+                        showToast('Preparing export...', 'success');
+                        const res = await fetch('/operational-excellence/system-settings/api/brand-responsibles?t=' + Date.now());
+                        const data = await res.json();
+                        
+                        const exportData = {
+                            exportDate: new Date().toISOString(),
+                            exportedBy: 'System Settings - Brand Responsibles',
+                            version: '1.0',
+                            type: 'brand-responsibles',
+                            data: data.map(br => ({
+                                brandName: br.BrandName,
+                                brandCode: br.BrandCode,
+                                areaManagerEmail: br.AreaManagerEmail,
+                                areaManagerName: br.AreaManagerName,
+                                headOfOpsEmail: br.HeadOfOpsEmail,
+                                headOfOpsName: br.HeadOfOpsName
+                            }))
+                        };
+                        
+                        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = 'brand_responsibles_export_' + new Date().toISOString().split('T')[0] + '.json';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                        
+                        showToast('Exported ' + data.length + ' brand assignments', 'success');
+                    } catch (err) {
+                        console.error('Export error:', err);
+                        showToast('Error exporting brand responsibles', 'error');
+                    }
+                }
+                
+                function triggerImportBrandResponsibles() {
+                    document.getElementById('importBrandResponsiblesInput').click();
+                }
+                
+                async function handleImportBrandResponsibles(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    
+                    try {
+                        showImportProgress('Reading file...', 0, 0);
+                        const text = await file.text();
+                        const importData = JSON.parse(text);
+                        
+                        if (!importData.data || !Array.isArray(importData.data)) {
+                            hideImportProgress();
+                            throw new Error('Invalid file format');
+                        }
+                        
+                        const assignments = importData.data;
+                        const total = assignments.length;
+                        let imported = 0;
+                        let skipped = 0;
+                        
+                        // Load brands first
+                        const brandsRes = await fetch('/operational-excellence/system-settings/api/brands?t=' + Date.now());
+                        const brands = await brandsRes.json();
+                        
+                        for (const br of assignments) {
+                            showImportProgress('Importing: ' + br.brandName, imported, total);
+                            
+                            try {
+                                // Find brand by name or code
+                                const brand = brands.find(b => 
+                                    b.BrandName === br.brandName || 
+                                    (br.brandCode && b.BrandCode === br.brandCode)
+                                );
+                                
+                                if (!brand) {
+                                    skipped++;
+                                    continue;
+                                }
+                                
+                                // Find area manager by email
+                                let areaManagerId = null;
+                                if (br.areaManagerEmail) {
+                                    const userRes = await fetch('/operational-excellence/system-settings/api/users/by-email?email=' + encodeURIComponent(br.areaManagerEmail));
+                                    if (userRes.ok) {
+                                        const user = await userRes.json();
+                                        if (user && user.Id) areaManagerId = user.Id;
+                                    }
+                                }
+                                
+                                // Find head of ops by email
+                                let headOfOpsId = null;
+                                if (br.headOfOpsEmail) {
+                                    const userRes = await fetch('/operational-excellence/system-settings/api/users/by-email?email=' + encodeURIComponent(br.headOfOpsEmail));
+                                    if (userRes.ok) {
+                                        const user = await userRes.json();
+                                        if (user && user.Id) headOfOpsId = user.Id;
+                                    }
+                                }
+                                
+                                if (!areaManagerId && !headOfOpsId) {
+                                    skipped++;
+                                    continue;
+                                }
+                                
+                                const res = await fetch('/operational-excellence/system-settings/api/brand-responsibles', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        brandId: brand.Id,
+                                        areaManagerId: areaManagerId,
+                                        headOfOpsId: headOfOpsId
+                                    })
+                                });
+                                
+                                if (res.ok) {
+                                    imported++;
+                                } else {
+                                    skipped++;
+                                }
+                            } catch (e) {
+                                skipped++;
+                            }
+                        }
+                        
+                        hideImportProgress();
+                        showToast('Imported ' + imported + ' assignments, ' + skipped + ' skipped', 'success');
+                        loadBrandResponsibles();
+                        
+                    } catch (err) {
+                        hideImportProgress();
+                        console.error('Import error:', err);
+                        showToast('Error importing: ' + err.message, 'error');
+                    } finally {
+                        event.target.value = '';
+                    }
+                }
                 
                 // ========== CATEGORIES ==========
                 let categoriesData = [];
@@ -3860,6 +4280,30 @@ router.delete('/api/stores/:id', async (req, res) => {
     } catch (err) {
         console.error('Error deleting store:', err);
         res.status(500).json({ error: 'Failed to delete store' });
+    }
+});
+
+// ========== USERS API (for import/export) ==========
+router.get('/api/users/by-email', async (req, res) => {
+    try {
+        const { email } = req.query;
+        if (!email) {
+            return res.status(400).json({ error: 'Email is required' });
+        }
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request()
+            .input('email', sql.NVarChar, email)
+            .query('SELECT Id, DisplayName, Email FROM Users WHERE Email = @email');
+        await pool.close();
+        
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
+        res.json(result.recordset[0]);
+    } catch (err) {
+        console.error('Error finding user by email:', err);
+        res.status(500).json({ error: 'Failed to find user' });
     }
 });
 
