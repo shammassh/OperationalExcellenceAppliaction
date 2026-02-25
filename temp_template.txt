@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: "Segoe UI", Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        .header { background: {{brandGradient}}; color: white; padding: 30px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .header .subtitle { margin-top: 8px; opacity: 0.9; }
+        .content { padding: 30px; }
+        .score-badge { display: inline-block; padding: 10px 25px; border-radius: 25px; font-size: 20px; font-weight: 700; margin: 15px 0; }
+        .score-pass { background: rgba(40, 167, 69, 0.15); color: #28a745; }
+        .score-fail { background: rgba(220, 53, 69, 0.15); color: #dc3545; }
+        .details-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .details-table td { padding: 12px; border-bottom: 1px solid #eee; }
+        .details-table .label { color: #666; width: 40%; }
+        .details-table .value { font-weight: 600; }
+        .btn { display: inline-block; padding: 14px 30px; background: {{brandColor}}; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; }
+        .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>?? OE Inspection Report</h1>
+            <div class="subtitle">{{storeName}}</div>
+        </div>
+        <div class="content">
+            <p>Dear Store Manager,</p>
+            <p>Please find below the summary of the Operational Excellence inspection conducted at your store:</p>
+            
+            <div style="text-align: center;">
+                <div class="score-badge {{scoreClass}}">
+                    {{scoreIcon}} Score: {{totalScore}}% ({{scoreStatus}})
+                </div>
+            </div>
+            
+            <table class="details-table">
+                <tr><td class="label">Document Number</td><td class="value">{{documentNumber}}</td></tr>
+                <tr><td class="label">Store</td><td class="value">{{storeName}} ({{storeCode}})</td></tr>
+                <tr><td class="label">Inspection Date</td><td class="value">{{auditDate}}</td></tr>
+                <tr><td class="label">Inspector</td><td class="value">{{auditors}}</td></tr>
+                <tr><td class="label">Status</td><td class="value">{{status}}</td></tr>
+            </table>
+            
+            <div style="text-align: center; margin: 25px 0;">
+                <a href="{{reportUrl}}" class="btn">?? View Full Report</a>
+            </div>
+            
+            <p style="color: #666; font-size: 14px;">Please review the report and address any findings within the required timeframe.</p>
+        </div>
+        <div class="footer">
+            <p>This is an automated message from the Operational Excellence Application.</p>
+           
+        </div>
+    </div>
+</body>
+</html>
+
+(1 rows affected)

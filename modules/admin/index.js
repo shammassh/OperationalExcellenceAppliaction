@@ -4885,7 +4885,8 @@ router.get('/email-templates', async (req, res) => {
                 'escalation': 'Sent to Area Manager when action plan is overdue.',
                 'inspection-reminder': 'Sent X days before action plan deadline.',
                 'inspection-overdue': 'Sent to Store Manager when deadline passed.',
-                'inspection-escalation': 'Escalated to Area Manager for overdue action plans.'
+                'inspection-escalation': 'Escalated to Area Manager for overdue action plans.',
+                'verification-submitted': 'Sent to Store Manager when action item verification is submitted.'
             };
             return descriptions[reportType] || 'Email notification template.';
         };
@@ -4898,7 +4899,8 @@ router.get('/email-templates', async (req, res) => {
                 'escalation': '🚨',
                 'inspection-reminder': '⏰',
                 'inspection-overdue': '⚠️',
-                'inspection-escalation': '🚨'
+                'inspection-escalation': '🚨',
+                'verification-submitted': '✅'
             };
             return icons[reportType] || '📧';
         };
@@ -5074,6 +5076,13 @@ router.get('/email-templates', async (req, res) => {
                                 <code onclick="copyVar('lowFindings')">{{lowFindings}}</code>
                                 <code onclick="copyVar('criticalFindings')">{{criticalFindings}}</code>
                                 <code onclick="copyVar('year')">{{year}}</code>
+                                <br><strong style="font-size:11px; color:#666; margin-top:8px; display:inline-block;">Verification Variables:</strong><br>
+                                <code onclick="copyVar('sectionName')">{{sectionName}}</code>
+                                <code onclick="copyVar('findingDescription')">{{findingDescription}}</code>
+                                <code onclick="copyVar('submittedBy')">{{submittedBy}}</code>
+                                <code onclick="copyVar('submittedAt')">{{submittedAt}}</code>
+                                <code onclick="copyVar('verificationNotes')">{{verificationNotes}}</code>
+                                <code onclick="copyVar('verificationUrl')">{{verificationUrl}}</code>
                             </div>
                             
                             <div class="form-group">
@@ -5282,7 +5291,14 @@ router.get('/api/email-templates/preview', async (req, res) => {
             daysOverdue: '3',
             recipientName: 'Ahmed Al Maktoum',
             actionPlanUrl: 'https://oeapp.gmrlapps.com/oe-inspection/action-plan/1',
-            year: new Date().getFullYear().toString()
+            year: new Date().getFullYear().toString(),
+            // Verification template variables
+            sectionName: 'Food Safety & Hygiene',
+            findingDescription: 'Temperature logs not properly maintained',
+            submittedBy: 'Mohamed Hassan',
+            submittedAt: new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+            verificationNotes: 'All temperature logs have been updated and properly documented. Training conducted for staff on correct recording procedures.',
+            verificationUrl: 'https://oeapp.gmrlapps.com/oe-inspection/action-plan/1?verification=123'
         };
         
         // Replace variables in template
@@ -5333,7 +5349,14 @@ router.post('/api/email-templates/preview-custom', (req, res) => {
             daysOverdue: '3',
             recipientName: 'Ahmed Al Maktoum',
             actionPlanUrl: 'https://oeapp.gmrlapps.com/oe-inspection/action-plan/1',
-            year: new Date().getFullYear().toString()
+            year: new Date().getFullYear().toString(),
+            // Verification template variables
+            sectionName: 'Food Safety & Hygiene',
+            findingDescription: 'Temperature logs not properly maintained',
+            submittedBy: 'Mohamed Hassan',
+            submittedAt: new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+            verificationNotes: 'All temperature logs have been updated and properly documented. Training conducted for staff on correct recording procedures.',
+            verificationUrl: 'https://oeapp.gmrlapps.com/oe-inspection/action-plan/1?verification=123'
         };
         
         // Replace variables in template

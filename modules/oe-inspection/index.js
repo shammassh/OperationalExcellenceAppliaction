@@ -3715,6 +3715,286 @@ router.get('/api/verification/stats', async (req, res) => {
     }
 });
 
+// Get email template for verification notification
+router.get('/api/verification/email-template/:actionItemId', async (req, res) => {
+    try {
+        const { actionItemId } = req.params;
+        const pool = await sql.connect(dbConfig);
+        
+        // Get action item details with inspection and store info
+        const itemResult = await pool.request()
+            .input('actionItemId', sql.Int, actionItemId)
+            .query(`
+                SELECT ai.*, i.DocumentNumber, i.StoreName, i.StoreCode, i.InspectionDate,
+                       s.SectionName, v.VerificationStatus, v.VerificationNotes, v.VerifiedAt,
+                       u.DisplayName as VerifiedByName, u.Email as VerifiedByEmail,
+                       sm.Email as StoreManagerEmail, sm.DisplayName as StoreManagerName
+                FROM OE_InspectionActionItems ai
+                JOIN OE_Inspections i ON ai.InspectionId = i.Id
+                LEFT JOIN OE_InspectionSections s ON ai.SectionId = s.Id
+                LEFT JOIN OE_ActionItemVerification v ON ai.Id = v.ActionItemId
+                LEFT JOIN Users u ON v.VerifiedBy = u.Id
+                LEFT JOIN Stores st ON i.StoreId = st.Id
+                LEFT JOIN Users sm ON st.ManagerId = sm.Id
+                WHERE ai.Id = @actionItemId
+            `);
+        
+        if (itemResult.recordset.length === 0) {
+            return res.status(404).json({ success: false, error: 'Action item not found' });
+        }
+        
+        const item = itemResult.recordset[0];
+        
+        // Get email template
+        const templateResult = await pool.request()
+            .input('templateKey', sql.NVarChar, 'OE_VERIFICATION_SUBMITTED')
+            .query('SELECT SubjectTemplate, BodyTemplate FROM EmailTemplates WHERE TemplateKey = @templateKey');
+        
+        await pool.close();
+        
+        if (templateResult.recordset.length === 0) {
+            return res.status(404).json({ success: false, error: 'Email template not found' });
+        }
+        
+        const template = templateResult.recordset[0];
+        
+        // Prepare template variables
+        const variables = {
+            storeName: item.StoreName || '',
+            storeCode: item.StoreCode || '',
+            documentNumber: item.DocumentNumber || '',
+            sectionName: item.SectionName || 'N/A',
+            findingDescription: item.Finding || item.ReferenceValue || 'N/A',
+            submittedBy: item.VerifiedByName || req.session?.user?.name || 'Inspector',
+            submittedAt: item.VerifiedAt ? new Date(item.VerifiedAt).toLocaleString('en-GB') : new Date().toLocaleString('en-GB'),
+            verificationNotes: item.VerificationNotes || 'No notes provided',
+            verificationUrl: `https://oeapp.gmrlapps.com/oe-inspection/implementation-verification/${item.InspectionId}`,
+            recipientName: item.StoreManagerName || 'Store Manager',
+            year: new Date().getFullYear().toString()
+        };
+        
+        // Replace variables in template
+        let subject = template.SubjectTemplate;
+        let html = template.BodyTemplate;
+        
+        for (const [key, value] of Object.entries(variables)) {
+            const regex = new RegExp(`{{${key}}}`, 'g');
+            subject = subject.replace(regex, value);
+            html = html.replace(regex, value);
+        }
+        
+        res.json({ 
+            success: true, 
+            subject, 
+            html, 
+            storeManagerEmail: item.StoreManagerEmail || '' 
+        });
+    } catch (error) {
+        console.error('Error loading email template:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Send verification email
+router.post('/api/verification/send-email', async (req, res) => {
+    try {
+        const { actionItemId, toEmail, subject, html } = req.body;
+        
+        if (!toEmail || !subject || !html) {
+            return res.status(400).json({ success: false, error: 'Missing required fields' });
+        }
+        
+        // Use email service to send email
+        const emailService = require('../../services/email-service');
+        
+        await emailService.sendEmail({
+            to: toEmail,
+            subject: subject,
+            html: html,
+            from: req.session?.user?.email || 'noreply@gmrlapps.com'
+        }, req);
+        
+        // Log the email
+        const pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('actionItemId', sql.Int, actionItemId)
+            .input('toEmail', sql.NVarChar, toEmail)
+            .input('subject', sql.NVarChar, subject)
+            .input('sentBy', sql.Int, req.session?.user?.id || null)
+            .query(`
+                INSERT INTO OE_VerificationEmailLog (ActionItemId, ToEmail, Subject, SentBy, SentAt)
+                VALUES (@actionItemId, @toEmail, @subject, @sentBy, GETDATE())
+            `);
+        await pool.close();
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error sending verification email:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get email template for FULL inspection verification (all action items)
+router.get('/api/verification/email-template-full/:inspectionId', async (req, res) => {
+    try {
+        const { inspectionId } = req.params;
+        const pool = await sql.connect(dbConfig);
+        
+        // Get inspection details with store manager from StoreManagerAssignments
+        const inspectionResult = await pool.request()
+            .input('inspectionId', sql.Int, inspectionId)
+            .query(`
+                SELECT i.*, 
+                       sm.Email as StoreManagerEmail, sm.DisplayName as StoreManagerName
+                FROM OE_Inspections i
+                LEFT JOIN Stores st ON i.StoreId = st.Id
+                LEFT JOIN StoreManagerAssignments sma ON st.Id = sma.StoreId AND sma.IsPrimary = 1
+                LEFT JOIN Users sm ON sma.UserId = sm.Id
+                WHERE i.Id = @inspectionId
+            `);
+        
+        if (inspectionResult.recordset.length === 0) {
+            return res.status(404).json({ success: false, error: 'Inspection not found' });
+        }
+        
+        const inspection = inspectionResult.recordset[0];
+        
+        // Get all action items with verification status
+        const actionItemsResult = await pool.request()
+            .input('inspectionId', sql.Int, inspectionId)
+            .query(`
+                SELECT ai.Id, ai.SectionName, ai.ReferenceValue, ai.Finding, ai.Action, 
+                       ai.Status, ai.Priority, ai.Deadline,
+                       v.VerificationStatus, v.VerificationNotes, v.VerifiedAt,
+                       u.DisplayName as VerifiedByName
+                FROM OE_InspectionActionItems ai
+                LEFT JOIN OE_ActionItemVerification v ON ai.Id = v.ActionItemId
+                LEFT JOIN Users u ON v.VerifiedBy = u.Id
+                WHERE ai.InspectionId = @inspectionId
+                ORDER BY ai.SectionName, ai.Id
+            `);
+        
+        await pool.close();
+        
+        const actionItems = actionItemsResult.recordset;
+        const verifiedComplete = actionItems.filter(i => i.VerificationStatus === 'Verified Complete').length;
+        const verifiedNotComplete = actionItems.filter(i => i.VerificationStatus === 'Verified Not Complete').length;
+        const pending = actionItems.filter(i => !i.VerificationStatus).length;
+        
+        // Build custom HTML email with all action items
+        const subject = '[OE] Verification Summary - ' + inspection.StoreName + ' - ' + inspection.DocumentNumber;
+        
+        const html = buildVerificationSummaryEmail(inspection, actionItems, {
+            verifiedComplete,
+            verifiedNotComplete,
+            pending,
+            submittedBy: req.session?.user?.name || 'Inspector'
+        });
+        
+        res.json({ 
+            success: true, 
+            subject, 
+            html, 
+            storeManagerEmail: inspection.StoreManagerEmail || '' 
+        });
+    } catch (error) {
+        console.error('Error loading full email template:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Helper function to build verification summary email
+function buildVerificationSummaryEmail(inspection, actionItems, stats) {
+    const itemsHtml = actionItems.map(item => {
+        let statusBadge = '<span style="background:#fef3c7;color:#d97706;padding:4px 10px;border-radius:12px;font-size:12px;">⏳ Pending</span>';
+        if (item.VerificationStatus === 'Verified Complete') {
+            statusBadge = '<span style="background:#d1fae5;color:#059669;padding:4px 10px;border-radius:12px;font-size:12px;">✅ Complete</span>';
+        } else if (item.VerificationStatus === 'Verified Not Complete') {
+            statusBadge = '<span style="background:#fee2e2;color:#dc2626;padding:4px 10px;border-radius:12px;font-size:12px;">❌ Not Complete</span>';
+        }
+        
+        return '<tr style="border-bottom:1px solid #eee;">' +
+            '<td style="padding:12px;">' + (item.SectionName || 'N/A') + '</td>' +
+            '<td style="padding:12px;">' + (item.Finding || item.ReferenceValue || 'N/A') + '</td>' +
+            '<td style="padding:12px;">' + statusBadge + '</td>' +
+            '<td style="padding:12px;font-size:12px;color:#666;">' + (item.VerificationNotes || '-') + '</td>' +
+            '</tr>';
+    }).join('');
+    
+    return '<!DOCTYPE html>' +
+        '<html><head><meta charset="utf-8"></head><body style="font-family:Segoe UI,Arial,sans-serif;margin:0;padding:0;background:#f5f5f5;">' +
+        '<div style="max-width:700px;margin:20px auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1);">' +
+        '<div style="background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:white;padding:30px;text-align:center;">' +
+        '<h1 style="margin:0;font-size:24px;">✅ Verification Summary</h1>' +
+        '<div style="margin-top:8px;opacity:0.9;">' + inspection.StoreName + '</div>' +
+        '</div>' +
+        '<div style="padding:30px;">' +
+        '<p>Dear Store Manager,</p>' +
+        '<p>Please find below the verification summary for the following inspection:</p>' +
+        '<table style="width:100%;border-collapse:collapse;margin:20px 0;">' +
+        '<tr><td style="padding:12px;border-bottom:1px solid #eee;color:#666;width:40%;">Document Number</td><td style="padding:12px;border-bottom:1px solid #eee;font-weight:600;">' + inspection.DocumentNumber + '</td></tr>' +
+        '<tr><td style="padding:12px;border-bottom:1px solid #eee;color:#666;">Store</td><td style="padding:12px;border-bottom:1px solid #eee;font-weight:600;">' + inspection.StoreName + '</td></tr>' +
+        '<tr><td style="padding:12px;border-bottom:1px solid #eee;color:#666;">Inspection Date</td><td style="padding:12px;border-bottom:1px solid #eee;font-weight:600;">' + new Date(inspection.InspectionDate).toLocaleDateString('en-GB') + '</td></tr>' +
+        '</table>' +
+        '<div style="display:flex;gap:15px;margin:25px 0;text-align:center;">' +
+        '<div style="flex:1;background:#d1fae5;padding:15px;border-radius:10px;"><div style="font-size:28px;font-weight:700;color:#059669;">' + stats.verifiedComplete + '</div><div style="font-size:12px;color:#059669;">Verified Complete</div></div>' +
+        '<div style="flex:1;background:#fee2e2;padding:15px;border-radius:10px;"><div style="font-size:28px;font-weight:700;color:#dc2626;">' + stats.verifiedNotComplete + '</div><div style="font-size:12px;color:#dc2626;">Not Complete</div></div>' +
+        '<div style="flex:1;background:#fef3c7;padding:15px;border-radius:10px;"><div style="font-size:28px;font-weight:700;color:#d97706;">' + stats.pending + '</div><div style="font-size:12px;color:#d97706;">Pending</div></div>' +
+        '</div>' +
+        '<h3 style="margin-top:30px;border-bottom:2px solid #10b981;padding-bottom:10px;">📋 Action Items</h3>' +
+        '<table style="width:100%;border-collapse:collapse;margin-top:15px;">' +
+        '<thead><tr style="background:#f8f9fa;"><th style="padding:12px;text-align:left;font-size:13px;color:#555;">Section</th><th style="padding:12px;text-align:left;font-size:13px;color:#555;">Finding</th><th style="padding:12px;text-align:left;font-size:13px;color:#555;">Status</th><th style="padding:12px;text-align:left;font-size:13px;color:#555;">Notes</th></tr></thead>' +
+        '<tbody>' + itemsHtml + '</tbody></table>' +
+        '<div style="text-align:center;margin:30px 0;">' +
+        '<a href="https://oeapp.gmrlapps.com/oe-inspection/implementation-verification/' + inspection.Id + '" style="display:inline-block;padding:14px 30px;background:#10b981;color:white;text-decoration:none;border-radius:8px;font-weight:600;">🔍 View Full Details</a>' +
+        '</div>' +
+        '<p style="color:#666;font-size:14px;">Verified by: ' + stats.submittedBy + '</p>' +
+        '</div>' +
+        '<div style="background:#f8f9fa;padding:20px;text-align:center;color:#666;font-size:13px;">' +
+        '<p>This is an automated message from the Operational Excellence Application.</p>' +
+        '<p>© ' + new Date().getFullYear() + ' GMRL Apps</p>' +
+        '</div></div></body></html>';
+}
+
+// Send FULL inspection verification email
+router.post('/api/verification/send-email-full', async (req, res) => {
+    try {
+        const { inspectionId, toEmail, subject, html } = req.body;
+        
+        if (!toEmail || !subject || !html) {
+            return res.status(400).json({ success: false, error: 'Missing required fields' });
+        }
+        
+        // Use email service to send email
+        const emailService = require('../../services/email-service');
+        
+        await emailService.sendEmail({
+            to: toEmail,
+            subject: subject,
+            html: html,
+            from: req.session?.user?.email || 'noreply@gmrlapps.com'
+        }, req);
+        
+        // Log the email
+        const pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('inspectionId', sql.Int, inspectionId)
+            .input('toEmail', sql.NVarChar, toEmail)
+            .input('subject', sql.NVarChar, subject)
+            .input('sentBy', sql.Int, req.session?.user?.id || null)
+            .query(`
+                INSERT INTO OE_VerificationEmailLog (InspectionId, ToEmail, Subject, SentBy, SentAt)
+                VALUES (@inspectionId, @toEmail, @subject, @sentBy, GETDATE())
+            `);
+        await pool.close();
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error sending verification email:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // ==========================================
 // Email Report Endpoints
 // ==========================================
