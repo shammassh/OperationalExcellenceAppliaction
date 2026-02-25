@@ -1043,6 +1043,11 @@ router.get('/', (req, res) => {
                         <div class="card-title">Job Monitor</div>
                         <div class="card-desc">View scheduler status & notification jobs</div>
                     </a>
+                    <a href="/admin/org-tree" class="admin-card">
+                        <div class="card-icon">🌳</div>
+                        <div class="card-title">Org Tree</div>
+                        <div class="card-desc">View organization hierarchy: Brands → Managers → Stores</div>
+                    </a>
                 </div>
             </div>
         </body>
@@ -6483,6 +6488,562 @@ router.get('/job-monitor', async (req, res) => {
     } catch (err) {
         console.error('Error loading job monitor:', err);
         res.status(500).send('Error loading Job Monitor: ' + err.message);
+    }
+});
+
+// ============================================================================
+// ORG TREE PAGE - Organization Hierarchy View
+// ============================================================================
+
+// API to get organization hierarchy data
+router.get('/api/org-hierarchy', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        const brandFilter = req.query.brand || '';
+        const module = req.query.module || 'OE'; // OE or OHS
+        
+        // Get all brands
+        let brandsQuery = 'SELECT Id, BrandName, BrandCode, PrimaryColor, LogoUrl FROM Brands WHERE IsActive = 1';
+        if (brandFilter) {
+            brandsQuery += " AND BrandName = @brandFilter";
+        }
+        brandsQuery += ' ORDER BY BrandName';
+        
+        const brandsRequest = pool.request();
+        if (brandFilter) brandsRequest.input('brandFilter', sql.NVarChar, brandFilter);
+        const brandsResult = await brandsRequest.query(brandsQuery);
+        const brands = brandsResult.recordset;
+        
+        // Build hierarchy data
+        const hierarchyData = [];
+        let totalHO = 0, totalAM = 0, totalSM = 0, totalStores = 0;
+        
+        for (const brand of brands) {
+            // Get Head of Operations for this brand
+            const hoResult = await pool.request()
+                .input('brandId', sql.Int, brand.Id)
+                .query(`
+                    SELECT DISTINCT br.HeadOfOpsId as userId, u.DisplayName as displayName, u.Email as email
+                    FROM OE_BrandResponsibles br
+                    INNER JOIN Users u ON br.HeadOfOpsId = u.Id
+                    WHERE br.BrandId = @brandId AND br.IsActive = 1 AND br.HeadOfOpsId IS NOT NULL
+                `);
+            
+            // Get Area Managers for this brand
+            const amResult = await pool.request()
+                .input('brandId', sql.Int, brand.Id)
+                .query(`
+                    SELECT DISTINCT br.AreaManagerId as userId, u.DisplayName as displayName, u.Email as email
+                    FROM OE_BrandResponsibles br
+                    INNER JOIN Users u ON br.AreaManagerId = u.Id
+                    WHERE br.BrandId = @brandId AND br.IsActive = 1 AND br.AreaManagerId IS NOT NULL
+                `);
+            
+            // Get stores for this brand with their managers
+            const storesResult = await pool.request()
+                .input('brandId', sql.Int, brand.Id)
+                .query(`
+                    SELECT 
+                        s.Id as storeId,
+                        s.StoreName as storeName,
+                        s.StoreCode as storeCode,
+                        sr.AreaManagerId,
+                        am.DisplayName as areaManagerName,
+                        am.Email as areaManagerEmail,
+                        sr.HeadOfOpsId,
+                        ho.DisplayName as headOfOpsName,
+                        ho.Email as headOfOpsEmail
+                    FROM Stores s
+                    ${module === 'OHS' ? "INNER JOIN OHSStores ohs ON s.Id = ohs.StoreId AND ohs.IsActive = 1" : ""}
+                    LEFT JOIN OE_StoreResponsibles sr ON s.Id = sr.StoreId AND sr.IsActive = 1
+                    LEFT JOIN Users am ON sr.AreaManagerId = am.Id
+                    LEFT JOIN Users ho ON sr.HeadOfOpsId = ho.Id
+                    WHERE s.BrandId = @brandId AND s.IsActive = 1
+                    ORDER BY s.StoreName
+                `);
+            
+            // Get store managers for each store
+            const stores = [];
+            for (const store of storesResult.recordset) {
+                const smResult = await pool.request()
+                    .input('storeId', sql.Int, store.storeId)
+                    .query(`
+                        SELECT 
+                            sma.UserId as userId,
+                            u.DisplayName as displayName,
+                            u.Email as email,
+                            sma.IsPrimary as isPrimary
+                        FROM StoreManagerAssignments sma
+                        INNER JOIN Users u ON sma.UserId = u.Id
+                        WHERE sma.StoreId = @storeId
+                        ORDER BY sma.IsPrimary DESC, u.DisplayName
+                    `);
+                
+                stores.push({
+                    storeId: store.storeId,
+                    storeName: store.storeName,
+                    storeCode: store.storeCode,
+                    areaManager: store.AreaManagerId ? {
+                        userId: store.AreaManagerId,
+                        displayName: store.areaManagerName,
+                        email: store.areaManagerEmail
+                    } : null,
+                    headOfOps: store.HeadOfOpsId ? {
+                        userId: store.HeadOfOpsId,
+                        displayName: store.headOfOpsName,
+                        email: store.headOfOpsEmail
+                    } : null,
+                    storeManagers: smResult.recordset
+                });
+                
+                totalSM += smResult.recordset.length;
+            }
+            
+            totalStores += stores.length;
+            totalHO += hoResult.recordset.length;
+            totalAM += amResult.recordset.length;
+            
+            hierarchyData.push({
+                brandId: brand.Id,
+                brandName: brand.BrandName,
+                brandCode: brand.BrandCode,
+                brandColor: brand.PrimaryColor,
+                logoUrl: brand.LogoUrl,
+                headsOfOps: hoResult.recordset,
+                areaManagers: amResult.recordset,
+                stores: stores
+            });
+        }
+        
+        res.json({
+            success: true,
+            data: hierarchyData,
+            stats: {
+                brands: brands.length,
+                headsOfOps: totalHO,
+                areaManagers: totalAM,
+                stores: totalStores,
+                storeManagers: totalSM
+            }
+        });
+        
+    } catch (err) {
+        console.error('Error getting org hierarchy:', err);
+        res.status(500).json({ success: false, error: err.message });
+    } finally {
+        if (pool) await pool.close();
+    }
+});
+
+// Org Tree Page
+router.get('/org-tree', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        // Get brands for filter dropdown
+        const brandsResult = await pool.request().query(`
+            SELECT Id, BrandName, BrandCode, PrimaryColor FROM Brands WHERE IsActive = 1 ORDER BY BrandName
+        `);
+        const brands = brandsResult.recordset;
+        
+        await pool.close();
+        
+        res.send(`
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Organization Hierarchy - Admin</title>
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); min-height: 100vh; color: #333; }
+                    
+                    .page-header { background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); color: white; padding: 25px 40px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+                    .page-header h1 { font-size: 26px; margin-bottom: 5px; }
+                    .page-header p { opacity: 0.9; font-size: 14px; }
+                    .back-btn { display: inline-flex; align-items: center; gap: 8px; color: white; text-decoration: none; margin-bottom: 12px; padding: 6px 14px; background: rgba(255,255,255,0.15); border-radius: 8px; transition: all 0.2s; font-size: 14px; }
+                    .back-btn:hover { background: rgba(255,255,255,0.25); }
+                    
+                    .container { max-width: 1600px; margin: 0 auto; padding: 25px; }
+                    
+                    .controls-bar { background: white; border-radius: 12px; padding: 15px 20px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
+                    .control-group { display: flex; align-items: center; gap: 8px; }
+                    .control-group label { font-weight: 600; color: #374151; font-size: 13px; }
+                    .control-group select { padding: 8px 14px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 13px; min-width: 160px; cursor: pointer; }
+                    .control-group select:focus { outline: none; border-color: #7c3aed; }
+                    
+                    .btn { padding: 8px 16px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+                    .btn-primary { background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); color: white; }
+                    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4); }
+                    .btn-secondary { background: #f3f4f6; color: #374151; }
+                    .btn-secondary:hover { background: #e5e7eb; }
+                    
+                    .stats-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+                    .stat-card { background: white; border-radius: 10px; padding: 12px 20px; display: flex; align-items: center; gap: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); flex: 1; min-width: 120px; }
+                    .stat-card .icon { font-size: 24px; }
+                    .stat-card .info .number { font-size: 22px; font-weight: 700; color: #7c3aed; }
+                    .stat-card .info .label { font-size: 11px; color: #6b7280; }
+                    
+                    .tree-container { background: white; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; }
+                    .tree-header { background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); padding: 15px 20px; border-bottom: 2px solid #ddd6fe; display: flex; justify-content: space-between; align-items: center; }
+                    .tree-header h2 { font-size: 16px; color: #5b21b6; display: flex; align-items: center; gap: 8px; }
+                    .tree-body { padding: 30px; min-height: 500px; background: linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%); overflow-x: auto; }
+                    
+                    .org-chart { display: flex; justify-content: center; gap: 40px; flex-wrap: wrap; }
+                    .brand-column { display: flex; flex-direction: column; align-items: center; min-width: 350px; }
+                    
+                    .node-box { background: white; border-radius: 12px; padding: 16px 24px; min-width: 220px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 3px solid #e5e7eb; position: relative; transition: all 0.3s; }
+                    .node-box:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+                    .node-box .node-icon { font-size: 36px; margin-bottom: 8px; }
+                    .node-box .node-title { font-weight: 700; font-size: 15px; color: #1f2937; margin-bottom: 4px; }
+                    .node-box .node-subtitle { font-size: 12px; color: #6b7280; }
+                    .node-box .node-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-top: 10px; }
+                    
+                    .node-brand { border-color: #f59e0b; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); }
+                    .node-brand .node-badge { background: #f59e0b; color: white; }
+                    .node-ho { border-color: #7c3aed; background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); }
+                    .node-ho .node-badge { background: #7c3aed; color: white; }
+                    .node-am { border-color: #2563eb; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); }
+                    .node-am .node-badge { background: #2563eb; color: white; }
+                    .node-sm { border-color: #059669; background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); }
+                    .node-sm .node-badge { background: #059669; color: white; }
+                    
+                    .connector { width: 3px; height: 40px; background: linear-gradient(180deg, #9ca3af 0%, #6b7280 100%); position: relative; }
+                    .connector::after { content: '▼'; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); font-size: 10px; color: #6b7280; }
+                    
+                    .level-container { display: flex; flex-direction: column; align-items: center; }
+                    .items-row { display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; max-width: 600px; }
+                    .items-row .node-box { min-width: 180px; padding: 12px 16px; }
+                    .items-row .node-box .node-icon { font-size: 28px; }
+                    .items-row .node-box .node-title { font-size: 13px; }
+                    
+                    .sm-card { background: white; border-radius: 10px; padding: 12px 16px; min-width: 220px; text-align: left; box-shadow: 0 2px 10px rgba(0,0,0,0.08); border-left: 4px solid #059669; display: flex; align-items: center; gap: 12px; transition: all 0.2s; }
+                    .sm-card:hover { transform: translateX(5px); box-shadow: 0 4px 15px rgba(0,0,0,0.12); }
+                    .sm-card .sm-icon { font-size: 28px; }
+                    .sm-card .sm-info { flex: 1; }
+                    .sm-card .sm-name { font-weight: 600; font-size: 13px; color: #1f2937; }
+                    .sm-card .sm-store { font-size: 11px; color: #059669; font-weight: 600; }
+                    .sm-card .sm-email { font-size: 10px; color: #9ca3af; }
+                    .sm-card.primary { border-left-color: #f59e0b; background: linear-gradient(135deg, #fffbeb 0%, white 100%); }
+                    .sm-card.primary::after { content: '⭐'; font-size: 14px; }
+                    
+                    .empty-slot { background: #fef3c7; border: 2px dashed #f59e0b; border-radius: 10px; padding: 12px 20px; text-align: center; color: #92400e; font-size: 12px; min-width: 180px; }
+                    .empty-slot .warning-icon { font-size: 20px; margin-bottom: 5px; }
+                    
+                    .level-label { background: #e5e7eb; color: #374151; padding: 4px 12px; border-radius: 20px; font-size: 10px; font-weight: 600; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px; }
+                    
+                    .loading { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 80px; gap: 15px; }
+                    .spinner { width: 50px; height: 50px; border: 4px solid #e5e7eb; border-top-color: #7c3aed; border-radius: 50%; animation: spin 1s linear infinite; }
+                    @keyframes spin { to { transform: rotate(360deg); } }
+                    
+                    .empty-state { text-align: center; padding: 60px 20px; color: #6b7280; }
+                    .empty-state .icon { font-size: 64px; margin-bottom: 20px; }
+                    .empty-state h3 { font-size: 20px; color: #374151; margin-bottom: 10px; }
+                    
+                    .legend { display: flex; gap: 25px; flex-wrap: wrap; padding: 15px 20px; background: #f9fafb; border-top: 1px solid #e5e7eb; justify-content: center; }
+                    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #6b7280; }
+                    .legend-color { width: 20px; height: 20px; border-radius: 6px; border: 2px solid; }
+                    .legend-color.brand { border-color: #f59e0b; background: #fef3c7; }
+                    .legend-color.ho { border-color: #7c3aed; background: #ede9fe; }
+                    .legend-color.am { border-color: #2563eb; background: #dbeafe; }
+                    .legend-color.sm { border-color: #059669; background: #d1fae5; }
+                    
+                    @media (max-width: 768px) {
+                        .org-chart { flex-direction: column; align-items: center; }
+                        .brand-column { min-width: 100%; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="page-header">
+                    <a href="/admin" class="back-btn">← Back to Admin</a>
+                    <h1>🌳 Organization Hierarchy</h1>
+                    <p>Brand → Head of Operations → Area Managers → Store Managers</p>
+                </div>
+                
+                <div class="container">
+                    <!-- Controls Bar -->
+                    <div class="controls-bar">
+                        <div class="control-group">
+                            <label for="moduleFilter">📱 Module:</label>
+                            <select id="moduleFilter" onchange="loadHierarchy()" style="min-width: 180px; font-weight: 600;">
+                                <option value="OE">🏆 Operational Excellence (OE)</option>
+                                <option value="OHS">🦺 Occupational Health & Safety (OHS)</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label for="brandFilter">🏷️ Filter by Brand:</label>
+                            <select id="brandFilter" onchange="loadHierarchy()">
+                                <option value="">All Brands</option>
+                                ${brands.map(b => `<option value="${b.BrandName}">${b.BrandName}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div style="flex: 1;"></div>
+                        <button class="btn btn-secondary" onclick="expandAll()">📂 Expand All</button>
+                        <button class="btn btn-secondary" onclick="collapseAll()">📁 Collapse All</button>
+                        <button class="btn btn-primary" onclick="loadHierarchy()">🔄 Refresh</button>
+                    </div>
+                    
+                    <!-- Stats Row -->
+                    <div class="stats-row">
+                        <div class="stat-card">
+                            <div class="icon">🏷️</div>
+                            <div class="info">
+                                <div class="number" id="statBrands">0</div>
+                                <div class="label">Brands</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="icon">👔</div>
+                            <div class="info">
+                                <div class="number" id="statHO">0</div>
+                                <div class="label">Heads of Ops</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="icon">👥</div>
+                            <div class="info">
+                                <div class="number" id="statAM">0</div>
+                                <div class="label">Area Managers</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="icon">🏪</div>
+                            <div class="info">
+                                <div class="number" id="statStores">0</div>
+                                <div class="label">Stores</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="icon">👤</div>
+                            <div class="info">
+                                <div class="number" id="statSM">0</div>
+                                <div class="label">Store Managers</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tree Container -->
+                    <div class="tree-container">
+                        <div class="tree-header">
+                            <h2>🌳 Organization Tree</h2>
+                            <span style="color: #6b7280; font-size: 12px;" id="lastUpdated"></span>
+                        </div>
+                        <div class="tree-body" id="treeBody">
+                            <div class="loading">
+                                <div class="spinner"></div>
+                                <span style="color: #6b7280;">Loading hierarchy...</span>
+                            </div>
+                        </div>
+                        <div class="legend">
+                            <div class="legend-item"><div class="legend-color brand"></div><span>Brand</span></div>
+                            <div class="legend-item"><div class="legend-color ho"></div><span>Head of Operations</span></div>
+                            <div class="legend-item"><div class="legend-color am"></div><span>Area Manager</span></div>
+                            <div class="legend-item"><div class="legend-color sm"></div><span>Store Manager</span></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <script>
+                    let hierarchyData = null;
+                    
+                    document.addEventListener('DOMContentLoaded', () => {
+                        loadHierarchy();
+                    });
+                    
+                    async function loadHierarchy() {
+                        const treeBody = document.getElementById('treeBody');
+                        treeBody.innerHTML = '<div class="loading"><div class="spinner"></div><span style="color: #6b7280;">Loading hierarchy...</span></div>';
+                        
+                        const moduleFilter = document.getElementById('moduleFilter').value;
+                        const brandFilter = document.getElementById('brandFilter').value;
+                        
+                        let url = '/admin/api/org-hierarchy?module=' + encodeURIComponent(moduleFilter);
+                        if (brandFilter) {
+                            url += '&brand=' + encodeURIComponent(brandFilter);
+                        }
+                        
+                        // Update header based on selected module
+                        const moduleLabel = moduleFilter === 'OHS' ? '🦺 OHS' : '🏆 OE';
+                        document.querySelector('.tree-header h2').innerHTML = '🌳 ' + moduleLabel + ' Organization Tree';
+                        
+                        try {
+                            const response = await fetch(url);
+                            const result = await response.json();
+                            
+                            if (result.success) {
+                                hierarchyData = result.data;
+                                updateStats(result.stats);
+                                renderOrgChart(hierarchyData);
+                                document.getElementById('lastUpdated').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+                            } else {
+                                throw new Error(result.error || 'Failed to load hierarchy');
+                            }
+                        } catch (error) {
+                            console.error('Error loading hierarchy:', error);
+                            treeBody.innerHTML = '<div class="empty-state"><div class="icon">❌</div><h3>Error Loading Data</h3><p>' + error.message + '</p><button class="btn btn-primary" onclick="loadHierarchy()" style="margin-top: 15px;">🔄 Try Again</button></div>';
+                        }
+                    }
+                    
+                    function updateStats(stats) {
+                        if (!stats) return;
+                        document.getElementById('statBrands').textContent = stats.brands || 0;
+                        document.getElementById('statHO').textContent = stats.headsOfOps || 0;
+                        document.getElementById('statAM').textContent = stats.areaManagers || 0;
+                        document.getElementById('statStores').textContent = stats.stores || 0;
+                        document.getElementById('statSM').textContent = stats.storeManagers || 0;
+                    }
+                    
+                    function renderOrgChart(data) {
+                        const treeBody = document.getElementById('treeBody');
+                        
+                        if (!data || data.length === 0) {
+                            treeBody.innerHTML = '<div class="empty-state"><div class="icon">🏢</div><h3>No Data Found</h3><p>No organizational hierarchy data available.</p></div>';
+                            return;
+                        }
+                        
+                        let html = '<div class="org-chart">';
+                        data.forEach(brand => {
+                            html += renderBrandColumn(brand);
+                        });
+                        html += '</div>';
+                        treeBody.innerHTML = html;
+                    }
+                    
+                    function renderBrandColumn(brand) {
+                        // Collect unique area managers and store managers
+                        const uniqueAMs = new Map();
+                        const allStoreManagers = [];
+                        
+                        if (brand.stores) {
+                            brand.stores.forEach(store => {
+                                // Collect area managers from store level
+                                if (store.areaManager) {
+                                    uniqueAMs.set(store.areaManager.userId, store.areaManager);
+                                }
+                                // Collect store managers
+                                if (store.storeManagers) {
+                                    store.storeManagers.forEach(sm => {
+                                        allStoreManagers.push({
+                                            ...sm,
+                                            storeName: store.storeName,
+                                            storeCode: store.storeCode
+                                        });
+                                    });
+                                }
+                            });
+                        }
+                        
+                        // Also add brand-level area managers
+                        if (brand.areaManagers) {
+                            brand.areaManagers.forEach(am => {
+                                if (!uniqueAMs.has(am.userId)) {
+                                    uniqueAMs.set(am.userId, am);
+                                }
+                            });
+                        }
+                        
+                        let html = '<div class="brand-column">';
+                        
+                        // LEVEL 1: Brand
+                        html += '<div class="level-container">';
+                        html += '<div class="level-label">Brand</div>';
+                        html += '<div class="node-box node-brand">';
+                        html += '<div class="node-icon">🏷️</div>';
+                        html += '<div class="node-title">' + brand.brandName + '</div>';
+                        html += '<div class="node-subtitle">' + (brand.stores?.length || 0) + ' stores</div>';
+                        html += '<span class="node-badge">Brand</span>';
+                        html += '</div></div>';
+                        
+                        // Connector
+                        html += '<div class="connector"></div>';
+                        
+                        // LEVEL 2: Head of Operations
+                        html += '<div class="level-container">';
+                        html += '<div class="level-label">Head of Operations</div>';
+                        if (brand.headsOfOps && brand.headsOfOps.length > 0) {
+                            html += '<div class="items-row">';
+                            brand.headsOfOps.forEach(ho => {
+                                html += '<div class="node-box node-ho">';
+                                html += '<div class="node-icon">👔</div>';
+                                html += '<div class="node-title">' + (ho.displayName || 'Unknown') + '</div>';
+                                html += '<div class="node-subtitle">' + (ho.email || '') + '</div>';
+                                html += '<span class="node-badge">Head of Ops</span>';
+                                html += '</div>';
+                            });
+                            html += '</div>';
+                        } else {
+                            html += '<div class="empty-slot"><div class="warning-icon">⚠️</div><div>No Head of Operations assigned</div></div>';
+                        }
+                        html += '</div>';
+                        
+                        // Connector
+                        html += '<div class="connector"></div>';
+                        
+                        // LEVEL 3: Area Managers
+                        html += '<div class="level-container">';
+                        html += '<div class="level-label">Area Managers</div>';
+                        if (uniqueAMs.size > 0) {
+                            html += '<div class="items-row">';
+                            uniqueAMs.forEach(am => {
+                                html += '<div class="node-box node-am">';
+                                html += '<div class="node-icon">👥</div>';
+                                html += '<div class="node-title">' + (am.displayName || 'Unknown') + '</div>';
+                                html += '<div class="node-subtitle">' + (am.email || '') + '</div>';
+                                html += '<span class="node-badge">Area Manager</span>';
+                                html += '</div>';
+                            });
+                            html += '</div>';
+                        } else {
+                            html += '<div class="empty-slot"><div class="warning-icon">⚠️</div><div>No Area Managers assigned</div></div>';
+                        }
+                        html += '</div>';
+                        
+                        // Connector
+                        html += '<div class="connector"></div>';
+                        
+                        // LEVEL 4: Store Managers with Store Names
+                        html += '<div class="level-container">';
+                        html += '<div class="level-label">Store Managers</div>';
+                        if (allStoreManagers.length > 0) {
+                            html += '<div class="items-row" style="max-width: 900px;">';
+                            allStoreManagers.forEach(sm => {
+                                html += '<div class="sm-card ' + (sm.isPrimary ? 'primary' : '') + '">';
+                                html += '<div class="sm-icon">👤</div>';
+                                html += '<div class="sm-info">';
+                                html += '<div class="sm-name">' + (sm.displayName || 'Unknown') + '</div>';
+                                html += '<div class="sm-store">🏪 ' + sm.storeName + '</div>';
+                                html += '<div class="sm-email">' + (sm.email || '') + '</div>';
+                                html += '</div></div>';
+                            });
+                            html += '</div>';
+                        } else {
+                            html += '<div class="empty-slot"><div class="warning-icon">⚠️</div><div>No Store Managers assigned</div></div>';
+                        }
+                        html += '</div>';
+                        
+                        html += '</div>'; // brand-column
+                        return html;
+                    }
+                    
+                    function expandAll() {
+                        // Future: implement collapsible sections
+                        alert('All sections expanded');
+                    }
+                    
+                    function collapseAll() {
+                        // Future: implement collapsible sections
+                        alert('All sections collapsed');
+                    }
+                </script>
+            </body>
+            </html>
+        `);
+    } catch (err) {
+        console.error('Error loading org tree:', err);
+        res.status(500).send('Error loading Org Tree: ' + err.message);
     }
 });
 
