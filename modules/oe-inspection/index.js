@@ -721,6 +721,49 @@ router.post('/api/templates/schemas/:schemaId/sections', async (req, res) => {
     }
 });
 
+// Update section
+router.put('/api/templates/sections/:sectionId', async (req, res) => {
+    try {
+        const { sectionNumber, sectionName, sectionIcon } = req.body;
+        const pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('sectionId', sql.Int, req.params.sectionId)
+            .input('name', sql.NVarChar, sectionName)
+            .input('icon', sql.NVarChar, sectionIcon || '📋')
+            .input('order', sql.Int, sectionNumber)
+            .query(`
+                UPDATE OE_InspectionTemplateSections 
+                SET SectionName = @name, SectionIcon = @icon, SectionOrder = @order
+                WHERE Id = @sectionId
+            `);
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating section:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Delete section (and its items)
+router.delete('/api/templates/sections/:sectionId', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        // Delete items first
+        await pool.request()
+            .input('sectionId', sql.Int, req.params.sectionId)
+            .query('DELETE FROM OE_InspectionTemplateItems WHERE SectionId = @sectionId');
+        // Delete section
+        await pool.request()
+            .input('sectionId', sql.Int, req.params.sectionId)
+            .query('DELETE FROM OE_InspectionTemplateSections WHERE Id = @sectionId');
+        await pool.close();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting section:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
 // Get items for a section
 router.get('/api/templates/sections/:sectionId/items', async (req, res) => {
     try {

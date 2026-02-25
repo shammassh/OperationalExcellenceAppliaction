@@ -766,8 +766,9 @@
                                 <label>Description</label>
                                 <input type="text" id="schemaDescription" placeholder="Brief description...">
                             </div>
-                            <div class="form-group" style="justify-content: flex-end;">
+                            <div class="form-group" style="justify-content: flex-end; display: flex; gap: 10px; align-items: flex-end;">
                                 <button type="submit" class="btn btn-primary">➕ Create Template</button>
+                                <button type="button" class="btn" onclick="triggerImportBackup()" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white;">📤 Import from Backup</button>
                             </div>
                         </div>
                     </form>
@@ -962,10 +963,16 @@
         </div>
     </div>
 
+    <!-- Hidden file input for restore -->
+    <input type="file" id="restoreFileInput" accept=".json" style="display: none;" onchange="handleRestoreFile(event)">
+    <!-- Hidden file input for import new -->
+    <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="handleImportFile(event)">
+
     <script>
         // State
         let currentSchemaId = null;
         let currentSectionId = null;
+        let restoreTargetSchemaId = null;
         let schemas = [];
         let sections = [];
         let items = [];
@@ -1080,6 +1087,7 @@
                         <div class="schema-actions">
                             <button class="btn btn-view btn-sm" onclick="event.stopPropagation(); viewFullTemplate(${schema.schemaId});">👁️ View</button>
                             <button class="btn btn-download btn-sm" onclick="event.stopPropagation(); downloadSchema(${schema.schemaId});">📥 Backup</button>
+                            <button class="btn btn-upload btn-sm" onclick="event.stopPropagation(); triggerRestore(${schema.schemaId});" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white;">📤 Restore</button>
                             <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); selectSchema(${schema.schemaId});">📝 Edit</button>
                             <button class="btn btn-warning btn-sm" onclick="event.stopPropagation(); openEditSchemaModal(${schema.schemaId});">✏️ Rename</button>
                             <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); confirmDeleteSchema(${schema.schemaId});">🗑️ Delete</button>
@@ -1228,6 +1236,212 @@
             }
         }
 
+        // Restore template from backup
+        function triggerRestore(schemaId) {
+            restoreTargetSchemaId = schemaId;
+            const schema = schemas.find(s => s.schemaId === schemaId);
+            if (schema && !confirm(`⚠️ Restore will REPLACE all sections and items in "${schema.schemaName}" with the backup file content.\n\nThis action cannot be undone. Continue?`)) {
+                return;
+            }
+            document.getElementById('restoreFileInput').click();
+        }
+
+        async function handleRestoreFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            try {
+                showToast('Reading backup file...', 'success');
+                const text = await file.text();
+                const backup = JSON.parse(text);
+
+                // Validate backup structure
+                if (!backup.schema || !backup.schema.sections) {
+                    throw new Error('Invalid backup file format. Missing schema or sections.');
+                }
+
+                const schemaId = restoreTargetSchemaId;
+                const schema = schemas.find(s => s.schemaId === schemaId);
+                
+                showToast('Restoring template... This may take a moment.', 'success');
+
+                // Step 1: Delete all existing sections (which cascades to items)
+                const currentResult = await apiCall(`/schemas/${schemaId}`);
+                if (currentResult.success && currentResult.data.sections) {
+                    for (const section of currentResult.data.sections) {
+                        await apiCall(`/sections/${section.sectionId}`, { method: 'DELETE' });
+                    }
+                }
+
+                // Step 2: Create sections and items from backup
+                let sectionCount = 0;
+                let itemCount = 0;
+
+                for (const sectionData of backup.schema.sections) {
+                    // Create section
+                    const sectionResult = await apiCall(`/schemas/${schemaId}/sections`, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            sectionNumber: sectionData.sectionNumber,
+                            sectionName: sectionData.sectionName,
+                            sectionIcon: sectionData.sectionIcon || '📋'
+                        })
+                    });
+
+                    if (!sectionResult.success) {
+                        console.error('Failed to create section:', sectionData.sectionName);
+                        continue;
+                    }
+
+                    sectionCount++;
+                    const newSectionId = sectionResult.data.sectionId;
+
+                    // Create items for this section
+                    if (sectionData.items && sectionData.items.length > 0) {
+                        for (const itemData of sectionData.items) {
+                            const itemResult = await apiCall(`/sections/${newSectionId}/items`, {
+                                method: 'POST',
+                                body: JSON.stringify({
+                                    referenceValue: itemData.referenceValue,
+                                    title: itemData.title,
+                                    coeff: itemData.coeff || 1,
+                                    answer: itemData.answer || 'Yes/No',
+                                    cr: itemData.cr || false
+                                })
+                            });
+
+                            if (itemResult.success) {
+                                itemCount++;
+                            }
+                        }
+                    }
+                }
+
+                showToast(`✅ Restored successfully! ${sectionCount} sections, ${itemCount} items`, 'success');
+                
+                // Refresh the view
+                await loadSchemas();
+                if (currentSchemaId === schemaId) {
+                    await selectSchema(schemaId);
+                }
+
+            } catch (error) {
+                console.error('Restore error:', error);
+                showToast('Error restoring template: ' + error.message, 'error');
+            } finally {
+                // Reset the file input
+                event.target.value = '';
+                restoreTargetSchemaId = null;
+            }
+        }
+
+        // Import new template from backup file
+        function triggerImportBackup() {
+            document.getElementById('importFileInput').click();
+        }
+
+        async function handleImportFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            try {
+                showToast('Reading backup file...', 'success');
+                const text = await file.text();
+                const backup = JSON.parse(text);
+
+                // Validate backup structure
+                if (!backup.schema || !backup.schema.sections) {
+                    throw new Error('Invalid backup file format. Missing schema or sections.');
+                }
+
+                const templateName = backup.schema.schemaName || 'Imported Template';
+                const description = backup.schema.description || 'Imported from backup';
+
+                // Check if template name already exists
+                const existingSchema = schemas.find(s => s.schemaName === templateName);
+                let finalName = templateName;
+                if (existingSchema) {
+                    finalName = `${templateName} (Imported ${new Date().toLocaleDateString()})`;
+                }
+
+                showToast('Creating template from backup...', 'success');
+
+                // Step 1: Create new schema
+                const schemaResult = await apiCall('/schemas', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        schemaName: finalName,
+                        description: description
+                    })
+                });
+
+                if (!schemaResult.success) {
+                    throw new Error(schemaResult.error || 'Failed to create template');
+                }
+
+                const newSchemaId = schemaResult.data.schemaId;
+
+                // Step 2: Create sections and items from backup
+                let sectionCount = 0;
+                let itemCount = 0;
+
+                console.log('Importing sections:', backup.schema.sections.length);
+                
+                for (const sectionData of backup.schema.sections) {
+                    console.log('Creating section:', sectionData.sectionName);
+                    const sectionResult = await apiCall(`/schemas/${newSchemaId}/sections`, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            sectionNumber: sectionData.sectionNumber,
+                            sectionName: sectionData.sectionName,
+                            sectionIcon: sectionData.sectionIcon || '📋'
+                        })
+                    });
+
+                    console.log('Section result:', sectionResult);
+                    
+                    if (!sectionResult.success) {
+                        console.error('Failed to create section:', sectionData.sectionName, sectionResult);
+                        continue;
+                    }
+
+                    sectionCount++;
+                    const newSectionId = sectionResult.data.sectionId;
+
+                    if (sectionData.items && sectionData.items.length > 0) {
+                        console.log('Creating', sectionData.items.length, 'items for section', sectionData.sectionName);
+                        for (const itemData of sectionData.items) {
+                            const itemResult = await apiCall(`/sections/${newSectionId}/items`, {
+                                method: 'POST',
+                                body: JSON.stringify({
+                                    referenceValue: itemData.referenceValue,
+                                    title: itemData.title,
+                                    coeff: itemData.coeff || 1,
+                                    answer: itemData.answer || 'Yes/No',
+                                    cr: itemData.cr || false
+                                })
+                            });
+
+                            if (itemResult.success) {
+                                itemCount++;
+                            }
+                        }
+                    }
+                }
+
+                showToast(`✅ Imported "${finalName}": ${sectionCount} sections, ${itemCount} items`, 'success');
+                
+                // Refresh the list
+                await loadSchemas();
+
+            } catch (error) {
+                console.error('Import error:', error);
+                showToast('Error importing template: ' + error.message, 'error');
+            } finally {
+                event.target.value = '';
+            }
+        }
+
         async function viewFullTemplate(schemaId) {
             const modal = document.getElementById('viewTemplateModal');
             const content = document.getElementById('templateViewContent');
@@ -1330,7 +1544,11 @@
                                 <div class="section-count">${section.itemCount || 0} items</div>
                             </div>
                         </div>
-                        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); selectSection(${section.sectionId})">📝 Manage Items</button>
+                        <div style="display: flex; gap: 5px;">
+                            <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); selectSection(${section.sectionId})">📝 Items</button>
+                            <button class="btn btn-warning btn-sm" onclick="event.stopPropagation(); openEditSectionModal(${section.sectionId});" title="Edit Section">✏️</button>
+                            <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); confirmDeleteSection(${section.sectionId});" title="Delete Section">🗑️</button>
+                        </div>
                     </div>
                 `).join('');
             } catch (error) {
@@ -1354,6 +1572,68 @@
                 loadSections();
             } catch (error) {
                 showToast('Error creating section: ' + error.message, 'error');
+            }
+        }
+
+        // Edit Section Modal
+        function openEditSectionModal(sectionId) {
+            const section = sections.find(s => s.sectionId === sectionId);
+            if (!section) return;
+            document.getElementById('editSectionId').value = sectionId;
+            document.getElementById('editSectionNumber').value = section.sectionNumber;
+            document.getElementById('editSectionName').value = section.sectionName;
+            document.getElementById('editSectionIcon').value = section.sectionIcon || '📋';
+            document.getElementById('editSectionModal').classList.add('active');
+        }
+
+        function closeEditSectionModal() {
+            document.getElementById('editSectionModal').classList.remove('active');
+        }
+
+        async function saveSectionEdit(e) {
+            e.preventDefault();
+            const sectionId = document.getElementById('editSectionId').value;
+            const sectionNumber = parseInt(document.getElementById('editSectionNumber').value);
+            const sectionName = document.getElementById('editSectionName').value;
+            const sectionIcon = document.getElementById('editSectionIcon').value;
+
+            try {
+                await apiCall(`/sections/${sectionId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ sectionNumber, sectionName, sectionIcon })
+                });
+                showToast('Section updated successfully!', 'success');
+                closeEditSectionModal();
+                loadSections();
+            } catch (error) {
+                showToast('Error updating section: ' + error.message, 'error');
+            }
+        }
+
+        // Delete Section
+        function confirmDeleteSection(sectionId) {
+            const section = sections.find(s => s.sectionId === sectionId);
+            if (!section) return;
+            
+            if (confirm(`⚠️ Delete section "${section.sectionName}"?\n\nThis will also delete all ${section.itemCount || 0} items in this section.\n\nThis action cannot be undone.`)) {
+                deleteSection(sectionId);
+            }
+        }
+
+        async function deleteSection(sectionId) {
+            try {
+                await apiCall(`/sections/${sectionId}`, { method: 'DELETE' });
+                showToast('Section deleted successfully!', 'success');
+                
+                // If we deleted the currently selected section, hide items panel
+                if (currentSectionId === sectionId) {
+                    currentSectionId = null;
+                    document.getElementById('itemsSection').style.display = 'none';
+                }
+                
+                loadSections();
+            } catch (error) {
+                showToast('Error deleting section: ' + error.message, 'error');
             }
         }
 
@@ -1668,6 +1948,35 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn" onclick="closeEditSchemaModal()" style="background: #6b7280;">Cancel</button>
+                    <button type="submit" class="btn btn-success">💾 Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Section Modal -->
+    <div id="editSectionModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>✏️ Edit Section</h3>
+                <button class="modal-close" onclick="closeEditSectionModal()">&times;</button>
+            </div>
+            <form id="editSectionForm" onsubmit="saveSectionEdit(event)">
+                <input type="hidden" id="editSectionId">
+                <div class="form-group">
+                    <label>Section Number <span class="required">*</span></label>
+                    <input type="number" id="editSectionNumber" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label>Section Name <span class="required">*</span></label>
+                    <input type="text" id="editSectionName" required>
+                </div>
+                <div class="form-group">
+                    <label>Section Icon</label>
+                    <input type="text" id="editSectionIcon" placeholder="📋">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeEditSectionModal()" style="background: #6b7280;">Cancel</button>
                     <button type="submit" class="btn btn-success">💾 Save</button>
                 </div>
             </form>
