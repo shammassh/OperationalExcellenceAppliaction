@@ -149,7 +149,10 @@ app.get('/dashboard', requireAuth, (req, res) => {
     const formToMenu = {
         // Stores module
         'THEFT_INCIDENT': 'stores', 'COMPLAINT': 'stores', 'EXTRA_CLEANING': 'stores',
-        'WEEKLY_FEEDBACK': 'stores', 'PRODUCTION_EXTRAS': 'stores', 'FIVE_DAYS_ENTRY': 'stores',
+        'WEEKLY_FEEDBACK': 'stores', 'FIVE_DAYS_ENTRY': 'stores',
+        
+        // Maknezi F&B module
+        'PRODUCTION_EXTRAS': 'maknezi-fnb',
         
         // Security Services module
         'SECURITY_SCHEDULE': 'security-services',
@@ -216,33 +219,113 @@ app.get('/dashboard', requireAuth, (req, res) => {
     
     // System Administrator always has full access (no SQL check needed)
     if (roleNames.includes('System Administrator')) {
-        ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel', 'escalation', 'broadcast'].forEach(m => accessibleMenus.add(m));
+        ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel', 'escalation', 'broadcast', 'maknezi-fnb'].forEach(m => accessibleMenus.add(m));
     }
     
-    // Build menu items based on permissions
-    const allMenuItems = [
-        { id: 'stores', icon: '🏪', title: 'Stores', href: '/stores', desc: 'Store operations & management' },
-        { id: 'security-services', icon: '🏢', title: 'Facility Management', href: '/security-services', desc: 'Facility services & management' },
-        { id: 'personnel', icon: '👤', title: 'Personnel', href: '/personnel', desc: 'Personnel forms & requests' },
-        { id: 'ohs', icon: '🦺', title: 'Occupational Health & Safety', href: '/ohs', desc: 'OHS incidents & inspections' },
-        { id: 'ohs-inspection', icon: '🛡️', title: 'OHS Inspection', href: '/ohs-inspection', desc: 'OHS safety inspections & audits' },
-        { id: 'oe', icon: '📋', title: 'Operational Excellence', href: '/operational-excellence', desc: 'Audits, action plans & reports' },
-        { id: 'oe-inspection', icon: '🔍', title: 'OE Inspection', href: '/oe-inspection', desc: 'OE inspections, reports & action plans' },
-        { id: 'escalation', icon: '🔴', title: 'Escalation', href: '/escalation', desc: 'Escalate & track overdue action items' },
-        { id: 'thirdparty', icon: '🤝', title: 'Third-Party Services', href: '/third-party', desc: 'Service providers & compliance' },
-        { id: 'security', icon: '🏢', title: 'Facility Management Department', href: '/security', desc: 'Facility incidents & inspections' },
-        { id: 'hr', icon: '👥', title: 'HR & Talent', href: '/hr', desc: 'Employee relations & cases' },
-        { id: 'broadcast', icon: '📢', title: 'Broadcast', href: '/admin/broadcast', desc: 'Send announcements to users' }
+    // Build menu items based on permissions - organized by department/category
+    const menuCategories = [
+        {
+            category: 'Operational Excellence',
+            icon: '📊',
+            color: '#0078d4',
+            items: [
+                { id: 'oe', icon: '📋', title: 'OE Dashboard', href: '/operational-excellence', desc: 'Audits, action plans & reports' },
+                { id: 'oe-inspection', icon: '🔍', title: 'OE Inspection', href: '/oe-inspection', desc: 'OE inspections, reports & action plans' },
+                { id: 'escalation', icon: '🔴', title: 'Escalation', href: '/escalation', desc: 'Escalate & track overdue action items' }
+            ]
+        },
+        {
+            category: 'Occupational Health & Safety',
+            icon: '🦺',
+            color: '#28a745',
+            items: [
+                { id: 'ohs', icon: '🦺', title: 'OHS Incidents', href: '/ohs', desc: 'OHS incidents & reports' },
+                { id: 'ohs-inspection', icon: '🛡️', title: 'OHS Inspection', href: '/ohs-inspection', desc: 'OHS safety inspections & audits' }
+            ]
+        },
+        {
+            category: 'Facility Management',
+            icon: '🏢',
+            color: '#6f42c1',
+            items: [
+                { id: 'security-services', icon: '🏢', title: 'Facility Services', href: '/security-services', desc: 'Facility services & management' },
+                { id: 'security', icon: '🔧', title: 'Facility Department', href: '/security', desc: 'Facility incidents & inspections' }
+            ]
+        },
+        {
+            category: 'Security Department',
+            icon: '🔒',
+            color: '#343a40',
+            items: [
+                // Add security department apps here when available
+            ]
+        },
+        {
+            category: 'Store Operations',
+            icon: '🏪',
+            color: '#fd7e14',
+            items: [
+                { id: 'stores', icon: '🏪', title: 'Store Forms', href: '/stores', desc: 'Store operations & management' },
+                { id: 'personnel', icon: '👤', title: 'Personnel', href: '/personnel', desc: 'Personnel forms & requests' },
+                { id: 'thirdparty', icon: '🤝', title: 'Third-Party Services', href: '/third-party', desc: 'Service providers & compliance' }
+            ]
+        },
+        {
+            category: 'Maknezi F&B',
+            icon: '🍽️',
+            color: '#dc3545',
+            items: [
+                { id: 'maknezi-fnb', icon: '👷', title: 'Production Extras Request', href: '/stores/production-extras', desc: 'Request extra production items' }
+            ]
+        },
+        {
+            category: 'HR & Talent',
+            icon: '👥',
+            color: '#e83e8c',
+            items: [
+                { id: 'hr', icon: '👥', title: 'HR Dashboard', href: '/hr', desc: 'Employee relations & cases' }
+            ]
+        },
+        {
+            category: 'Communication',
+            icon: '📢',
+            color: '#17a2b8',
+            items: [
+                { id: 'broadcast', icon: '📢', title: 'Broadcast', href: '/admin/broadcast', desc: 'Send announcements to users' }
+            ]
+        }
     ];
     
-    const visibleMenuItems = allMenuItems.filter(item => accessibleMenus.has(item.id));
+    // Filter categories - show all categories, filter items based on access
+    const visibleCategories = menuCategories
+        .map(cat => ({
+            ...cat,
+            items: cat.items.filter(item => accessibleMenus.has(item.id))
+        }));
     
-    const menuHtml = visibleMenuItems.map(item => `
-        <a href="${item.href}" class="menu-item">
-            <div class="menu-icon">${item.icon}</div>
-            <div class="menu-title">${item.title}</div>
-            <div class="menu-desc">${item.desc}</div>
-        </a>
+    // Generate HTML for categorized menu with collapsible sections
+    const menuHtml = visibleCategories.map((cat, index) => `
+        <div class="category-section${cat.items.length === 0 ? ' empty-category' : ''}">
+            <div class="category-header" style="border-left-color: ${cat.color};" onclick="toggleCategory(${index})">
+                <div class="category-header-left">
+                    <span class="category-icon">${cat.icon}</span>
+                    <span class="category-title">${cat.category}</span>
+                    <span class="category-count">${cat.items.length} app${cat.items.length !== 1 ? 's' : ''}</span>
+                </div>
+                <span class="category-toggle" id="toggle-${index}">▼</span>
+            </div>
+            <div class="category-items" id="items-${index}">
+                ${cat.items.length > 0 ? cat.items.map(item => `
+                    <a href="${item.href}" class="menu-item" style="--hover-color: ${cat.color};">
+                        <div class="menu-icon">${item.icon}</div>
+                        <div class="menu-content">
+                            <div class="menu-title">${item.title}</div>
+                            <div class="menu-desc">${item.desc}</div>
+                        </div>
+                    </a>
+                `).join('') : `<div class="empty-message">🚧 Coming soon - No apps available yet</div>`}
+            </div>
+        </div>
     `).join('');
     
     res.send(`
@@ -288,42 +371,109 @@ app.get('/dashboard', requireAuth, (req, res) => {
                     text-decoration: none;
                 }
                 .menu-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-                    gap: 20px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 25px;
                     margin-top: 20px;
                 }
-                .menu-item {
-                    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-                    padding: 25px;
+                .category-section {
+                    background: white;
                     border-radius: 12px;
-                    text-align: center;
+                    overflow: hidden;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+                }
+                .category-header {
+                    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                    padding: 15px 20px;
+                    border-left: 4px solid #0078d4;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    cursor: pointer;
+                    transition: background 0.2s ease;
+                }
+                .category-header:hover {
+                    background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+                }
+                .category-header-left {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                }
+                .category-icon {
+                    font-size: 24px;
+                }
+                .category-title {
+                    font-size: 16px;
+                    font-weight: 600;
+                    color: #333;
+                }
+                .category-count {
+                    font-size: 12px;
+                    color: #666;
+                    background: #e9ecef;
+                    padding: 3px 10px;
+                    border-radius: 12px;
+                }
+                .category-toggle {
+                    font-size: 14px;
+                    color: #666;
+                    transition: transform 0.3s ease;
+                }
+                .category-toggle.collapsed {
+                    transform: rotate(-90deg);
+                }
+                .category-items {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                    gap: 15px;
+                    padding: 20px;
+                }
+                .menu-item {
+                    background: #f8f9fa;
+                    padding: 18px;
+                    border-radius: 10px;
                     text-decoration: none;
                     color: #333;
                     transition: all 0.3s ease;
-                    border: 1px solid #dee2e6;
+                    border: 1px solid #e9ecef;
                     display: flex;
-                    flex-direction: column;
                     align-items: center;
+                    gap: 15px;
                 }
                 .menu-item:hover {
-                    background: linear-gradient(135deg, #0078d4 0%, #005a9e 100%);
+                    background: var(--hover-color, #0078d4);
                     color: white;
-                    transform: translateY(-5px);
-                    box-shadow: 0 10px 30px rgba(0,120,212,0.3);
+                    transform: translateX(5px);
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
                 }
                 .menu-icon {
-                    font-size: 48px;
-                    margin-bottom: 15px;
+                    font-size: 32px;
+                    flex-shrink: 0;
+                }
+                .menu-content {
+                    flex: 1;
                 }
                 .menu-title {
-                    font-size: 18px;
+                    font-size: 15px;
                     font-weight: 600;
-                    margin-bottom: 8px;
+                    margin-bottom: 4px;
                 }
                 .menu-desc {
-                    font-size: 13px;
-                    opacity: 0.8;
+                    font-size: 12px;
+                    opacity: 0.75;
+                }
+                .empty-category {
+                    opacity: 0.7;
+                }
+                .empty-message {
+                    grid-column: 1 / -1;
+                    text-align: center;
+                    padding: 30px;
+                    color: #888;
+                    font-style: italic;
+                    background: #f8f9fa;
+                    border-radius: 8px;
                 }
                 .no-access {
                     text-align: center;
@@ -468,6 +618,41 @@ app.get('/dashboard', requireAuth, (req, res) => {
             </div>
             
             <script>
+                // Toggle category collapse/expand
+                function toggleCategory(index) {
+                    const items = document.getElementById('items-' + index);
+                    const toggle = document.getElementById('toggle-' + index);
+                    
+                    if (items.style.display === 'none') {
+                        items.style.display = 'grid';
+                        toggle.classList.remove('collapsed');
+                        localStorage.setItem('cat-' + index, 'open');
+                    } else {
+                        items.style.display = 'none';
+                        toggle.classList.add('collapsed');
+                        localStorage.setItem('cat-' + index, 'closed');
+                    }
+                }
+                
+                // Restore collapsed state from localStorage
+                function restoreCollapseState() {
+                    const categories = document.querySelectorAll('.category-section');
+                    categories.forEach((cat, index) => {
+                        const state = localStorage.getItem('cat-' + index);
+                        if (state === 'closed') {
+                            const items = document.getElementById('items-' + index);
+                            const toggle = document.getElementById('toggle-' + index);
+                            if (items && toggle) {
+                                items.style.display = 'none';
+                                toggle.classList.add('collapsed');
+                            }
+                        }
+                    });
+                }
+                
+                // Restore state on page load
+                restoreCollapseState();
+                
                 // Load notification count
                 async function loadNotificationCount() {
                     try {

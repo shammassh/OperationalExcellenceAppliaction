@@ -20,7 +20,6 @@ router.get('/', (req, res) => {
     const forms = [
         { id: 'theft-incident', icon: '🚨', title: 'Theft Incident Report', href: '/stores/theft-incident', desc: 'Report theft incidents at stores', color: '#dc3545' },
         { id: 'extra-cleaning', icon: '🧹', title: 'Extra Cleaning Agents Request', href: '/stores/extra-cleaning', desc: 'Request extra cleaning agents for your store', color: '#17a2b8' },
-        { id: 'production-extras', icon: '👷', title: 'Production Extras Request', href: '/stores/production-extras', desc: 'Request extra production agents', color: '#667eea' },
         { id: 'weekly-feedback', icon: '📋', title: 'Weekly Third Party Feedback', href: '/stores/weekly-feedback', desc: 'Submit weekly feedback about third party services', color: '#6c5ce7' },
         { id: 'complaint', icon: '📝', title: 'Complaint', href: '/stores/complaint', desc: 'Submit and track complaints', color: '#e17055' },
         { id: 'five-days', icon: '📅', title: '5 Days - Expired Items', href: '/stores/five-days', desc: 'Track expired items during 5-day cycles', color: '#667eea' },

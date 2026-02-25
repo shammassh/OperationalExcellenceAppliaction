@@ -4682,10 +4682,10 @@ router.get('/broadcast', requireSysAdmin, async (req, res) => {
                         
                         <div class="quick-templates">
                             <span style="color:#666;margin-right:10px;">Quick Templates:</span>
-                            <button class="template-btn" onclick="useTemplate('5days')">📅 5 Days Check Reminder</button>
-                            <button class="template-btn" onclick="useTemplate('inspection')">🔍 Inspection Reminder</button>
-                            <button class="template-btn" onclick="useTemplate('cleaning')">🧹 Cleaning Checklist</button>
-                            <button class="template-btn" onclick="useTemplate('safety')">⚠️ Safety Reminder</button>
+                            <button type="button" class="template-btn" data-template="5days" onclick="useTemplate('5days')">📅 5 Days Check</button>
+                            <button type="button" class="template-btn" data-template="inspection" onclick="useTemplate('inspection')">🔍 Inspection</button>
+                            <button type="button" class="template-btn" data-template="cleaning" onclick="useTemplate('cleaning')">🧹 Cleaning</button>
+                            <button type="button" class="template-btn" data-template="safety" onclick="useTemplate('safety')">⚠️ Safety</button>
                         </div>
                         
                         <form id="broadcastForm" onsubmit="sendBroadcast(event)">
@@ -4738,6 +4738,14 @@ router.get('/broadcast', requireSysAdmin, async (req, res) => {
                                 </div>
                             </div>
                             
+                            <div class="form-group" style="margin-top: 15px;">
+                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                    <input type="checkbox" id="sendEmail" style="width: 20px; height: 20px;">
+                                    <span>📧 Also send email to all target users</span>
+                                </label>
+                                <p style="font-size: 12px; color: #666; margin-top: 5px;">Check this to send the broadcast via email using the Broadcast Message template</p>
+                            </div>
+                            
                             <button type="submit" class="btn btn-primary">📢 Send Broadcast</button>
                         </form>
                     </div>
@@ -4766,22 +4774,28 @@ router.get('/broadcast', requireSysAdmin, async (req, res) => {
                 <div id="toast" class="toast"></div>
                 
                 <script>
+                    let selectedTemplate = 'custom'; // Track which template is selected
+                    
                     const templates = {
                         '5days': {
                             title: '📅 5 Days Expired Items Check Reminder',
-                            message: 'Dear Team,\\n\\nThis is a friendly reminder to complete the 5 Days Expired Items Check for your store.\\n\\nPlease ensure all products within 5 days of expiry are properly identified and managed.\\n\\nThank you for your cooperation!'
+                            message: 'Dear Team,\\n\\nThis is a friendly reminder to complete the 5 Days Expired Items Check for your store.\\n\\nPlease ensure all products within 5 days of expiry are properly identified and managed.\\n\\nThank you for your cooperation!',
+                            templateKey: 'BROADCAST_5DAYS'
                         },
                         'inspection': {
                             title: '🔍 Inspection Due Reminder',
-                            message: 'Dear Team,\\n\\nPlease be reminded that your store inspection is due soon.\\n\\nKindly prepare all required documentation and ensure all areas are in compliance.\\n\\nThank you!'
+                            message: 'Dear Team,\\n\\nPlease be reminded that your store inspection is due soon.\\n\\nKindly prepare all required documentation and ensure all areas are in compliance.\\n\\nThank you!',
+                            templateKey: 'BROADCAST_INSPECTION'
                         },
                         'cleaning': {
                             title: '🧹 Cleaning Checklist Reminder',
-                            message: 'Dear Team,\\n\\nPlease ensure the daily cleaning checklist is completed and submitted.\\n\\nMaintaining cleanliness standards is essential for food safety compliance.\\n\\nThank you!'
+                            message: 'Dear Team,\\n\\nPlease ensure the daily cleaning checklist is completed and submitted.\\n\\nMaintaining cleanliness standards is essential for food safety compliance.\\n\\nThank you!',
+                            templateKey: 'BROADCAST_CLEANING'
                         },
                         'safety': {
                             title: '⚠️ Safety Compliance Reminder',
-                            message: 'Dear Team,\\n\\nThis is a reminder to review and ensure all safety protocols are being followed in your store.\\n\\nSafety is our top priority!\\n\\nThank you for your attention to this matter.'
+                            message: 'Dear Team,\\n\\nThis is a reminder to review and ensure all safety protocols are being followed in your store.\\n\\nSafety is our top priority!\\n\\nThank you for your attention to this matter.',
+                            templateKey: 'BROADCAST_SAFETY'
                         }
                     };
                     
@@ -4790,8 +4804,31 @@ router.get('/broadcast', requireSysAdmin, async (req, res) => {
                         if (template) {
                             document.getElementById('title').value = template.title;
                             document.getElementById('message').value = template.message;
+                            selectedTemplate = key;
+                            updateTemplateButtons(key);
                         }
                     }
+                    
+                    function updateTemplateButtons(activeKey) {
+                        // Update button styles to show which is selected
+                        document.querySelectorAll('.template-btn').forEach(btn => {
+                            btn.style.background = btn.dataset.template === activeKey ? '#0078d4' : '#f8f9fa';
+                            btn.style.color = btn.dataset.template === activeKey ? 'white' : '#333';
+                        });
+                    }
+                    
+                    // Reset to custom when user manually edits
+                    document.addEventListener('DOMContentLoaded', function() {
+                        const titleInput = document.getElementById('title');
+                        const messageInput = document.getElementById('message');
+                        
+                        [titleInput, messageInput].forEach(input => {
+                            input.addEventListener('input', function() {
+                                selectedTemplate = 'custom';
+                                updateTemplateButtons(null);
+                            });
+                        });
+                    });
                     
                     async function sendBroadcast(e) {
                         e.preventDefault();
@@ -4803,12 +4840,22 @@ router.get('/broadcast', requireSysAdmin, async (req, res) => {
                             return;
                         }
                         
+                        const sendEmailChecked = document.getElementById('sendEmail').checked;
+                        
+                        // Get the template key for the email
+                        let emailTemplateKey = 'BROADCAST_MESSAGE'; // default
+                        if (selectedTemplate && templates[selectedTemplate]) {
+                            emailTemplateKey = templates[selectedTemplate].templateKey;
+                        }
+                        
                         const data = {
                             title: document.getElementById('title').value,
                             message: document.getElementById('message').value,
                             targetRoles: selectedRoles.join(', '),
                             priority: document.getElementById('priority').value,
-                            expiresAt: document.getElementById('expiresAt').value || null
+                            expiresAt: document.getElementById('expiresAt').value || null,
+                            sendEmail: sendEmailChecked,
+                            emailTemplateKey: emailTemplateKey
                         };
                         
                         try {
@@ -4821,8 +4868,10 @@ router.get('/broadcast', requireSysAdmin, async (req, res) => {
                             const result = await response.json();
                             
                             if (result.success) {
-                                showToast('Broadcast sent successfully!', 'success');
+                                showToast('Broadcast sent successfully!' + (sendEmailChecked ? ' Emails are being sent.' : ''), 'success');
                                 document.getElementById('broadcastForm').reset();
+                                selectedTemplate = 'custom';
+                                updateTemplateButtons(null);
                                 setTimeout(() => location.reload(), 1500);
                             } else {
                                 showToast(result.error || 'Failed to send broadcast', 'error');
@@ -4868,10 +4917,11 @@ router.get('/broadcast', requireSysAdmin, async (req, res) => {
 // Send broadcast API
 router.post('/api/broadcast', requireSysAdmin, async (req, res) => {
     try {
-        const { title, message, targetRoles, priority, expiresAt } = req.body;
+        const { title, message, targetRoles, priority, expiresAt, sendEmail, emailTemplateKey } = req.body;
         
         const pool = await sql.connect(dbConfig);
         
+        // Insert the broadcast
         await pool.request()
             .input('title', sql.NVarChar, title)
             .input('message', sql.NVarChar, message)
@@ -4883,6 +4933,79 @@ router.post('/api/broadcast', requireSysAdmin, async (req, res) => {
                 INSERT INTO Broadcasts (Title, Message, TargetRoles, Priority, ExpiresAt, CreatedBy)
                 VALUES (@title, @message, @targetRoles, @priority, @expiresAt, @createdBy)
             `);
+        
+        // If sendEmail is enabled, send emails to target users using the template
+        if (sendEmail) {
+            try {
+                // Get the appropriate template (use provided key or default)
+                const templateKey = emailTemplateKey || 'BROADCAST_MESSAGE';
+                const templateResult = await pool.request()
+                    .input('templateKey', sql.NVarChar, templateKey)
+                    .query('SELECT * FROM EmailTemplates WHERE TemplateKey = @templateKey AND IsActive = 1');
+                
+                if (templateResult.recordset.length > 0) {
+                    const template = templateResult.recordset[0];
+                    
+                    // Get target users based on roles
+                    let userQuery = 'SELECT DISTINCT u.Email, u.DisplayName FROM Users u WHERE u.IsActive = 1';
+                    if (targetRoles && targetRoles.trim()) {
+                        const rolesList = targetRoles.split(',').map(r => r.trim());
+                        userQuery = `
+                            SELECT DISTINCT u.Email, u.DisplayName 
+                            FROM Users u
+                            JOIN UserRoleAssignments ura ON u.Id = ura.UserId
+                            JOIN UserRoles r ON ura.RoleId = r.Id
+                            WHERE u.IsActive = 1 AND r.RoleName IN (${rolesList.map((_, i) => '@role' + i).join(',')})
+                        `;
+                    }
+                    
+                    const usersRequest = pool.request();
+                    if (targetRoles && targetRoles.trim()) {
+                        const rolesList = targetRoles.split(',').map(r => r.trim());
+                        rolesList.forEach((role, i) => {
+                            usersRequest.input('role' + i, sql.NVarChar, role);
+                        });
+                    }
+                    const usersResult = await usersRequest.query(userQuery);
+                    
+                    // Prepare email data
+                    const isHighPriority = priority === 'High';
+                    const baseUrl = process.env.BASE_URL || 'https://oeapp.gmrlapps.com';
+                    
+                    // Send emails to each user
+                    const emailService = require('../../services/email-service');
+                    for (const user of usersResult.recordset) {
+                        let subject = template.SubjectTemplate
+                            .replace(/{{title}}/g, title);
+                        
+                        let body = template.BodyTemplate
+                            .replace(/{{title}}/g, title)
+                            .replace(/{{message}}/g, message)
+                            .replace(/{{recipientName}}/g, user.DisplayName)
+                            .replace(/{{senderName}}/g, req.currentUser.displayName)
+                            .replace(/{{sentDate}}/g, new Date().toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' }))
+                            .replace(/{{priority}}/g, priority || 'Normal')
+                            .replace(/{{priorityClass}}/g, isHighPriority ? 'high-priority' : '')
+                            .replace(/{{priorityBadgeClass}}/g, isHighPriority ? 'priority-high' : 'priority-normal')
+                            .replace(/{{priorityBoxClass}}/g, isHighPriority ? 'high-priority' : '')
+                            .replace(/{{priorityLabel}}/g, isHighPriority ? '⚠️ HIGH PRIORITY' : '📌 Announcement')
+                            .replace(/{{dashboardUrl}}/g, baseUrl + '/dashboard')
+                            .replace(/{{year}}/g, new Date().getFullYear());
+                        
+                        await emailService.sendEmail({
+                            to: user.Email,
+                            subject: subject,
+                            html: body
+                        });
+                    }
+                    
+                    console.log(`Broadcast email sent to ${usersResult.recordset.length} users`);
+                }
+            } catch (emailErr) {
+                console.error('Error sending broadcast emails:', emailErr);
+                // Don't fail the request if email fails
+            }
+        }
         
         await pool.close();
         
