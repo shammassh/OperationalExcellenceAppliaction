@@ -968,6 +968,31 @@
     <!-- Hidden file input for import new -->
     <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="handleImportFile(event)">
 
+    <!-- Import Progress Modal -->
+    <div id="importProgressModal" class="modal-overlay">
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>📥 Importing Template...</h3>
+            </div>
+            <div style="padding: 20px;">
+                <div id="importProgressStatus" style="font-size: 14px; color: #666; margin-bottom: 15px;">Reading file...</div>
+                <div style="background: #e0e0e0; border-radius: 10px; height: 20px; overflow: hidden; margin-bottom: 10px;">
+                    <div id="importProgressBar" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); height: 100%; width: 0%; transition: width 0.3s;"></div>
+                </div>
+                <div style="display: flex; justify-content: space-around; margin-top: 20px;">
+                    <div style="text-align: center;">
+                        <div id="importSectionCount" style="font-size: 24px; font-weight: 700; color: #10b981;">0</div>
+                        <div style="font-size: 12px; color: #666;">Sections</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div id="importItemCount" style="font-size: 24px; font-weight: 700; color: #3b82f6;">0</div>
+                        <div style="font-size: 12px; color: #666;">Items</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // State
         let currentSchemaId = null;
@@ -1000,6 +1025,23 @@
         document.addEventListener('DOMContentLoaded', () => {
             loadSchemas();
         });
+
+        // Import Progress Functions
+        function showImportProgress(status, totalSections, doneSections, totalItems, doneItems) {
+            document.getElementById('importProgressModal').classList.add('active');
+            document.getElementById('importProgressStatus').textContent = status;
+            document.getElementById('importSectionCount').textContent = `${doneSections}/${totalSections}`;
+            document.getElementById('importItemCount').textContent = `${doneItems}/${totalItems}`;
+            
+            const totalWork = totalSections + totalItems;
+            const doneWork = doneSections + doneItems;
+            const percent = totalWork > 0 ? Math.round((doneWork / totalWork) * 100) : 0;
+            document.getElementById('importProgressBar').style.width = percent + '%';
+        }
+
+        function hideImportProgress() {
+            document.getElementById('importProgressModal').classList.remove('active');
+        }
 
         // Tab switching
         function switchTab(tab) {
@@ -1250,20 +1292,26 @@
             const file = event.target.files[0];
             if (!file) return;
 
+            // Show progress
+            showImportProgress('Reading backup file...', 0, 0, 0, 0);
+
             try {
-                showToast('Reading backup file...', 'success');
                 const text = await file.text();
                 const backup = JSON.parse(text);
 
                 // Validate backup structure
                 if (!backup.schema || !backup.schema.sections) {
+                    hideImportProgress();
                     throw new Error('Invalid backup file format. Missing schema or sections.');
                 }
 
                 const schemaId = restoreTargetSchemaId;
                 const schema = schemas.find(s => s.schemaId === schemaId);
                 
-                showToast('Restoring template... This may take a moment.', 'success');
+                const totalSections = backup.schema.sections.length;
+                const totalItems = backup.schema.sections.reduce((sum, s) => sum + (s.items?.length || 0), 0);
+                
+                showImportProgress('Deleting existing sections...', totalSections, 0, totalItems, 0);
 
                 // Step 1: Delete all existing sections (which cascades to items)
                 const currentResult = await apiCall(`/schemas/${schemaId}`);
@@ -1278,6 +1326,8 @@
                 let itemCount = 0;
 
                 for (const sectionData of backup.schema.sections) {
+                    showImportProgress(`Restoring section: ${sectionData.sectionName}`, totalSections, sectionCount, totalItems, itemCount);
+                    
                     // Create section
                     const sectionResult = await apiCall(`/schemas/${schemaId}/sections`, {
                         method: 'POST',
@@ -1314,9 +1364,11 @@
                                 itemCount++;
                             }
                         }
+                        showImportProgress(`Restored ${sectionData.items.length} items`, totalSections, sectionCount, totalItems, itemCount);
                     }
                 }
 
+                hideImportProgress();
                 showToast(`✅ Restored successfully! ${sectionCount} sections, ${itemCount} items`, 'success');
                 
                 // Refresh the view
@@ -1326,6 +1378,7 @@
                 }
 
             } catch (error) {
+                hideImportProgress();
                 console.error('Restore error:', error);
                 showToast('Error restoring template: ' + error.message, 'error');
             } finally {
@@ -1344,18 +1397,23 @@
             const file = event.target.files[0];
             if (!file) return;
 
+            // Show import progress modal
+            showImportProgress('Reading backup file...', 0, 0, 0, 0);
+
             try {
-                showToast('Reading backup file...', 'success');
                 const text = await file.text();
                 const backup = JSON.parse(text);
 
                 // Validate backup structure
                 if (!backup.schema || !backup.schema.sections) {
+                    hideImportProgress();
                     throw new Error('Invalid backup file format. Missing schema or sections.');
                 }
 
                 const templateName = backup.schema.schemaName || 'Imported Template';
                 const description = backup.schema.description || 'Imported from backup';
+                const totalSections = backup.schema.sections.length;
+                const totalItems = backup.schema.sections.reduce((sum, s) => sum + (s.items?.length || 0), 0);
 
                 // Check if template name already exists
                 const existingSchema = schemas.find(s => s.schemaName === templateName);
@@ -1364,7 +1422,7 @@
                     finalName = `${templateName} (Imported ${new Date().toLocaleDateString()})`;
                 }
 
-                showToast('Creating template from backup...', 'success');
+                showImportProgress(`Creating template "${finalName}"...`, totalSections, 0, totalItems, 0);
 
                 // Step 1: Create new schema
                 const schemaResult = await apiCall('/schemas', {
@@ -1376,6 +1434,7 @@
                 });
 
                 if (!schemaResult.success) {
+                    hideImportProgress();
                     throw new Error(schemaResult.error || 'Failed to create template');
                 }
 
@@ -1385,10 +1444,9 @@
                 let sectionCount = 0;
                 let itemCount = 0;
 
-                console.log('Importing sections:', backup.schema.sections.length);
-                
                 for (const sectionData of backup.schema.sections) {
-                    console.log('Creating section:', sectionData.sectionName);
+                    showImportProgress(`Importing section: ${sectionData.sectionName}`, totalSections, sectionCount, totalItems, itemCount);
+                    
                     const sectionResult = await apiCall(`/schemas/${newSchemaId}/sections`, {
                         method: 'POST',
                         body: JSON.stringify({
@@ -1398,8 +1456,6 @@
                         })
                     });
 
-                    console.log('Section result:', sectionResult);
-                    
                     if (!sectionResult.success) {
                         console.error('Failed to create section:', sectionData.sectionName, sectionResult);
                         continue;
@@ -1409,7 +1465,6 @@
                     const newSectionId = sectionResult.data.sectionId;
 
                     if (sectionData.items && sectionData.items.length > 0) {
-                        console.log('Creating', sectionData.items.length, 'items for section', sectionData.sectionName);
                         for (const itemData of sectionData.items) {
                             const itemResult = await apiCall(`/sections/${newSectionId}/items`, {
                                 method: 'POST',
@@ -1426,15 +1481,18 @@
                                 itemCount++;
                             }
                         }
+                        showImportProgress(`Imported ${sectionData.items.length} items for ${sectionData.sectionName}`, totalSections, sectionCount, totalItems, itemCount);
                     }
                 }
 
+                hideImportProgress();
                 showToast(`✅ Imported "${finalName}": ${sectionCount} sections, ${itemCount} items`, 'success');
                 
                 // Refresh the list
                 await loadSchemas();
 
             } catch (error) {
+                hideImportProgress();
                 console.error('Import error:', error);
                 showToast('Error importing template: ' + error.message, 'error');
             } finally {

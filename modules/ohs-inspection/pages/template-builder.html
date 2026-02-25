@@ -552,6 +552,40 @@
         <span id="toastMessage"></span>
     </div>
 
+    <!-- Hidden file input for restore -->
+    <input type="file" id="restoreFileInput" accept=".json" style="display: none;" onchange="handleRestoreFile(event)">
+    <!-- Hidden file input for import new -->
+    <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="handleImportFile(event)">
+
+    <!-- Import Progress Modal -->
+    <div id="importProgressModal" class="modal-overlay">
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>📥 Importing Template...</h3>
+            </div>
+            <div style="padding: 20px;">
+                <div id="importProgressStatus" style="font-size: 14px; color: #666; margin-bottom: 15px;">Reading file...</div>
+                <div style="background: #e0e0e0; border-radius: 10px; height: 20px; overflow: hidden; margin-bottom: 10px;">
+                    <div id="importProgressBar" style="background: linear-gradient(135deg, #e17055 0%, #d63031 100%); height: 100%; width: 0%; transition: width 0.3s;"></div>
+                </div>
+                <div style="display: flex; justify-content: space-around; margin-top: 20px;">
+                    <div style="text-align: center;">
+                        <div id="importDeptCount" style="font-size: 24px; font-weight: 700; color: #e17055;">0</div>
+                        <div style="font-size: 12px; color: #666;">Departments</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div id="importSectionCount" style="font-size: 24px; font-weight: 700; color: #3b82f6;">0</div>
+                        <div style="font-size: 12px; color: #666;">Sections</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div id="importItemCount" style="font-size: 24px; font-weight: 700; color: #10b981;">0</div>
+                        <div style="font-size: 12px; color: #666;">Items</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="container">
         <!-- Header -->
         <div class="header">
@@ -771,6 +805,8 @@
             items: []
         };
 
+        let restoreTargetSchemaId = null;
+
         const API_BASE = '/ohs-inspection/api/templates';
 
         // ==========================================
@@ -779,6 +815,26 @@
         document.addEventListener('DOMContentLoaded', () => {
             loadTemplates();
         });
+
+        // ==========================================
+        // Import Progress Functions
+        // ==========================================
+        function showImportProgress(status, totalDepts, doneDepts, totalSections, doneSections, totalItems, doneItems) {
+            document.getElementById('importProgressModal').classList.add('active');
+            document.getElementById('importProgressStatus').textContent = status;
+            document.getElementById('importDeptCount').textContent = `${doneDepts}/${totalDepts}`;
+            document.getElementById('importSectionCount').textContent = `${doneSections}/${totalSections}`;
+            document.getElementById('importItemCount').textContent = `${doneItems}/${totalItems}`;
+            
+            const totalWork = totalDepts + totalSections + totalItems;
+            const doneWork = doneDepts + doneSections + doneItems;
+            const percent = totalWork > 0 ? Math.round((doneWork / totalWork) * 100) : 0;
+            document.getElementById('importProgressBar').style.width = percent + '%';
+        }
+
+        function hideImportProgress() {
+            document.getElementById('importProgressModal').classList.remove('active');
+        }
 
         // ==========================================
         // Utility Functions
@@ -913,8 +969,9 @@
                                 <label>Description</label>
                                 <input type="text" id="templateDescription" placeholder="Brief description...">
                             </div>
-                            <div class="form-group" style="justify-content: flex-end;">
+                            <div class="form-group" style="justify-content: flex-end; display: flex; gap: 10px; align-items: flex-end;">
                                 <button type="submit" class="btn btn-primary">➕ Create Template</button>
+                                <button type="button" class="btn" onclick="triggerImportBackup()" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white;">📤 Import from Backup</button>
                             </div>
                         </div>
                     </form>
@@ -945,6 +1002,8 @@
                             <span class="card-badge">${template.sectionCount || 0} sections</span>
                             <div class="card-actions">
                                 <button class="btn btn-view btn-sm" onclick="event.stopPropagation(); viewTemplatePreview(${template.schemaId});">👁️ View</button>
+                                <button class="btn btn-sm" style="background: #06b6d4; color: white;" onclick="event.stopPropagation(); downloadTemplate(${template.schemaId});">📥 Backup</button>
+                                <button class="btn btn-sm" onclick="event.stopPropagation(); triggerRestore(${template.schemaId});" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white;">📤 Restore</button>
                                 <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); selectTemplate(${template.schemaId});">🏬 Departments</button>
                                 <button class="btn btn-warning btn-sm" onclick="event.stopPropagation(); openEditTemplate(${template.schemaId});">✏️</button>
                                 <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deleteTemplate(${template.schemaId});">🗑️</button>
@@ -1012,6 +1071,348 @@
                 loadTemplates();
             } catch (error) {
                 showToast('Error: ' + error.message, 'error');
+            }
+        }
+
+        // ==========================================
+        // BACKUP / RESTORE / IMPORT FUNCTIONS
+        // ==========================================
+        async function downloadTemplate(templateId) {
+            try {
+                showToast('Preparing download...', 'success');
+                const result = await apiCall(`/schemas/${templateId}`);
+                
+                if (!result.success || !result.data) {
+                    throw new Error(result.error || 'Template not found');
+                }
+                
+                const template = result.data;
+                template.departments = template.departments || [];
+
+                const backup = {
+                    exportDate: new Date().toISOString(),
+                    exportedBy: 'OHS Inspection Template Builder',
+                    version: '1.0',
+                    schema: {
+                        schemaName: template.schemaName,
+                        description: template.description,
+                        departments: template.departments.map(dept => ({
+                            departmentName: dept.departmentName,
+                            departmentIcon: dept.departmentIcon,
+                            departmentOrder: dept.departmentOrder,
+                            passingGrade: dept.passingGrade,
+                            sections: (dept.sections || []).map(section => ({
+                                sectionNumber: section.sectionNumber,
+                                sectionName: section.sectionName,
+                                sectionIcon: section.sectionIcon,
+                                items: (section.items || []).map(item => ({
+                                    referenceValue: item.referenceValue,
+                                    title: item.title,
+                                    coeff: item.coeff,
+                                    answer: item.answer,
+                                    cr: item.cr
+                                }))
+                            }))
+                        }))
+                    }
+                };
+
+                const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                const safeName = template.schemaName.replace(/[^a-z0-9]/gi, '_').substring(0, 50);
+                link.download = `OHS_${safeName}_backup_${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+
+                const totalDepts = template.departments.length;
+                const totalSections = template.departments.reduce((sum, d) => sum + (d.sections?.length || 0), 0);
+                const totalItems = template.departments.reduce((sum, d) => 
+                    sum + (d.sections?.reduce((s2, sec) => s2 + (sec.items?.length || 0), 0) || 0), 0);
+                showToast(`Downloaded: ${totalDepts} departments, ${totalSections} sections, ${totalItems} items`, 'success');
+            } catch (error) {
+                showToast('Error downloading template: ' + error.message, 'error');
+            }
+        }
+
+        // Restore template from backup
+        function triggerRestore(schemaId) {
+            restoreTargetSchemaId = schemaId;
+            const template = state.templates.find(t => t.schemaId === schemaId);
+            if (template && !confirm(`⚠️ Restore will REPLACE all departments, sections and items in "${template.schemaName}" with the backup file content.\n\nThis action cannot be undone. Continue?`)) {
+                return;
+            }
+            document.getElementById('restoreFileInput').click();
+        }
+
+        async function handleRestoreFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Show progress
+            showImportProgress('Reading backup file...', 0, 0, 0, 0, 0, 0);
+
+            try {
+                const text = await file.text();
+                const backup = JSON.parse(text);
+
+                // Validate backup structure
+                if (!backup.schema || !backup.schema.departments) {
+                    hideImportProgress();
+                    throw new Error('Invalid backup file format. Missing schema or departments.');
+                }
+
+                const schemaId = restoreTargetSchemaId;
+                const template = state.templates.find(t => t.schemaId === schemaId);
+                
+                // Calculate totals
+                const totalDepts = backup.schema.departments.length;
+                const totalSections = backup.schema.departments.reduce((sum, d) => sum + (d.sections?.length || 0), 0);
+                const totalItems = backup.schema.departments.reduce((sum, d) => 
+                    sum + (d.sections?.reduce((s2, sec) => s2 + (sec.items?.length || 0), 0) || 0), 0);
+                
+                showImportProgress('Deleting existing departments...', totalDepts, 0, totalSections, 0, totalItems, 0);
+
+                // Step 1: Delete all existing departments (which cascades to sections and items)
+                const currentResult = await apiCall(`/schemas/${schemaId}`);
+                if (currentResult.success && currentResult.data.departments) {
+                    for (const dept of currentResult.data.departments) {
+                        await apiCall(`/departments/${dept.departmentId}`, { method: 'DELETE' });
+                    }
+                }
+
+                // Step 2: Create departments, sections and items from backup
+                let deptCount = 0;
+                let sectionCount = 0;
+                let itemCount = 0;
+
+                for (const deptData of backup.schema.departments) {
+                    showImportProgress(`Restoring department: ${deptData.departmentName}`, totalDepts, deptCount, totalSections, sectionCount, totalItems, itemCount);
+                    
+                    // Create department
+                    const deptResult = await apiCall(`/schemas/${schemaId}/departments`, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            departmentName: deptData.departmentName,
+                            departmentIcon: deptData.departmentIcon || '🏬',
+                            departmentOrder: deptData.departmentOrder || 1,
+                            passingGrade: deptData.passingGrade || 80
+                        })
+                    });
+
+                    if (!deptResult.success) {
+                        console.error('Failed to create department:', deptData.departmentName);
+                        continue;
+                    }
+
+                    deptCount++;
+                    const newDeptId = deptResult.data.departmentId;
+
+                    // Create sections for this department
+                    if (deptData.sections && deptData.sections.length > 0) {
+                        for (const sectionData of deptData.sections) {
+                            showImportProgress(`Restoring section: ${sectionData.sectionName}`, totalDepts, deptCount, totalSections, sectionCount, totalItems, itemCount);
+                            
+                            const sectionResult = await apiCall(`/departments/${newDeptId}/sections`, {
+                                method: 'POST',
+                                body: JSON.stringify({
+                                    templateId: schemaId,
+                                    sectionNumber: sectionData.sectionNumber,
+                                    sectionName: sectionData.sectionName,
+                                    sectionIcon: sectionData.sectionIcon || '📋'
+                                })
+                            });
+
+                            if (!sectionResult.success) {
+                                console.error('Failed to create section:', sectionData.sectionName);
+                                continue;
+                            }
+
+                            sectionCount++;
+                            const newSectionId = sectionResult.data.sectionId;
+
+                            // Create items for this section
+                            if (sectionData.items && sectionData.items.length > 0) {
+                                for (const itemData of sectionData.items) {
+                                    const itemResult = await apiCall(`/sections/${newSectionId}/items`, {
+                                        method: 'POST',
+                                        body: JSON.stringify({
+                                            referenceValue: itemData.referenceValue,
+                                            title: itemData.title,
+                                            coeff: itemData.coeff || 2,
+                                            answer: itemData.answer || 'Yes,Partially,No,NA',
+                                            cr: itemData.cr || ''
+                                        })
+                                    });
+
+                                    if (itemResult.success) {
+                                        itemCount++;
+                                    }
+                                }
+                                showImportProgress(`Restored ${sectionData.items.length} items`, totalDepts, deptCount, totalSections, sectionCount, totalItems, itemCount);
+                            }
+                        }
+                    }
+                }
+
+                hideImportProgress();
+                showToast(`✅ Restored successfully! ${deptCount} departments, ${sectionCount} sections, ${itemCount} items`, 'success');
+                
+                // Refresh the view
+                await loadTemplates();
+
+            } catch (error) {
+                hideImportProgress();
+                console.error('Restore error:', error);
+                showToast('Error restoring template: ' + error.message, 'error');
+            } finally {
+                event.target.value = '';
+                restoreTargetSchemaId = null;
+            }
+        }
+
+        // Import new template from backup file
+        function triggerImportBackup() {
+            document.getElementById('importFileInput').click();
+        }
+
+        async function handleImportFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Show import progress modal
+            showImportProgress('Reading backup file...', 0, 0, 0, 0, 0, 0);
+
+            try {
+                const text = await file.text();
+                const backup = JSON.parse(text);
+
+                // Validate backup structure
+                if (!backup.schema || !backup.schema.departments) {
+                    hideImportProgress();
+                    throw new Error('Invalid backup file format. Missing schema or departments.');
+                }
+
+                const templateName = backup.schema.schemaName || 'Imported Template';
+                const description = backup.schema.description || 'Imported from backup';
+                
+                // Calculate totals
+                const totalDepts = backup.schema.departments.length;
+                const totalSections = backup.schema.departments.reduce((sum, d) => sum + (d.sections?.length || 0), 0);
+                const totalItems = backup.schema.departments.reduce((sum, d) => 
+                    sum + (d.sections?.reduce((s2, sec) => s2 + (sec.items?.length || 0), 0) || 0), 0);
+
+                // Check if template name already exists
+                const existingTemplate = state.templates.find(t => t.schemaName === templateName);
+                let finalName = templateName;
+                if (existingTemplate) {
+                    finalName = `${templateName} (Imported ${new Date().toLocaleDateString()})`;
+                }
+
+                showImportProgress(`Creating template "${finalName}"...`, totalDepts, 0, totalSections, 0, totalItems, 0);
+
+                // Step 1: Create new schema
+                const schemaResult = await apiCall('/schemas', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        schemaName: finalName,
+                        description: description
+                    })
+                });
+
+                if (!schemaResult.success) {
+                    hideImportProgress();
+                    throw new Error(schemaResult.error || 'Failed to create template');
+                }
+
+                const newSchemaId = schemaResult.data.schemaId;
+
+                // Step 2: Create departments, sections and items from backup
+                let deptCount = 0;
+                let sectionCount = 0;
+                let itemCount = 0;
+
+                for (const deptData of backup.schema.departments) {
+                    showImportProgress(`Importing department: ${deptData.departmentName}`, totalDepts, deptCount, totalSections, sectionCount, totalItems, itemCount);
+                    
+                    const deptResult = await apiCall(`/schemas/${newSchemaId}/departments`, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            departmentName: deptData.departmentName,
+                            departmentIcon: deptData.departmentIcon || '🏬',
+                            departmentOrder: deptData.departmentOrder || 1,
+                            passingGrade: deptData.passingGrade || 80
+                        })
+                    });
+
+                    if (!deptResult.success) {
+                        console.error('Failed to create department:', deptData.departmentName, deptResult);
+                        continue;
+                    }
+
+                    deptCount++;
+                    const newDeptId = deptResult.data.departmentId;
+
+                    if (deptData.sections && deptData.sections.length > 0) {
+                        for (const sectionData of deptData.sections) {
+                            showImportProgress(`Importing section: ${sectionData.sectionName}`, totalDepts, deptCount, totalSections, sectionCount, totalItems, itemCount);
+                            
+                            const sectionResult = await apiCall(`/departments/${newDeptId}/sections`, {
+                                method: 'POST',
+                                body: JSON.stringify({
+                                    templateId: newSchemaId,
+                                    sectionNumber: sectionData.sectionNumber,
+                                    sectionName: sectionData.sectionName,
+                                    sectionIcon: sectionData.sectionIcon || '📋'
+                                })
+                            });
+
+                            if (!sectionResult.success) {
+                                console.error('Failed to create section:', sectionData.sectionName, sectionResult);
+                                continue;
+                            }
+
+                            sectionCount++;
+                            const newSectionId = sectionResult.data.sectionId;
+
+                            if (sectionData.items && sectionData.items.length > 0) {
+                                for (const itemData of sectionData.items) {
+                                    const itemResult = await apiCall(`/sections/${newSectionId}/items`, {
+                                        method: 'POST',
+                                        body: JSON.stringify({
+                                            referenceValue: itemData.referenceValue,
+                                            title: itemData.title,
+                                            coeff: itemData.coeff || 2,
+                                            answer: itemData.answer || 'Yes,Partially,No,NA',
+                                            cr: itemData.cr || ''
+                                        })
+                                    });
+
+                                    if (itemResult.success) {
+                                        itemCount++;
+                                    }
+                                }
+                                showImportProgress(`Imported ${sectionData.items.length} items`, totalDepts, deptCount, totalSections, sectionCount, totalItems, itemCount);
+                            }
+                        }
+                    }
+                }
+
+                hideImportProgress();
+                showToast(`✅ Imported "${finalName}": ${deptCount} departments, ${sectionCount} sections, ${itemCount} items`, 'success');
+                
+                // Refresh the list
+                await loadTemplates();
+
+            } catch (error) {
+                hideImportProgress();
+                console.error('Import error:', error);
+                showToast('Error importing template: ' + error.message, 'error');
+            } finally {
+                event.target.value = '';
             }
         }
 
