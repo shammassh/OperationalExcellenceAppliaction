@@ -9,6 +9,10 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const sharp = require('sharp');
+const emailService = require('../../../services/email-service');
+
+// Theft Incident notification email recipient (can be updated later)
+const THEFT_INCIDENT_NOTIFICATION_EMAIL = 'shammas.sh@gmrl.com'; // TODO: Update with actual recipient
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -655,6 +659,106 @@ router.post('/submit', upload.array('photos', 5), async (req, res) => {
                         INSERT INTO TheftIncidentPhotos (IncidentId, FileName, OriginalName, FilePath, FileSize, MimeType, UploadedAt)
                         VALUES (@incidentId, @fileName, @originalName, @filePath, @fileSize, @mimeType, GETDATE())
                     `);
+            }
+        }
+        
+        // Send automatic email notification
+        try {
+            // Get the email template
+            const templateResult = await pool.request()
+                .input('templateKey', sql.NVarChar, 'THEFT_INCIDENT_REPORT')
+                .query('SELECT SubjectTemplate, BodyTemplate FROM EmailTemplates WHERE TemplateKey = @templateKey AND IsActive = 1');
+            
+            if (templateResult.recordset.length > 0) {
+                const template = templateResult.recordset[0];
+                const baseUrl = process.env.APP_URL || 'https://oeapp-uat.gmrlapps.com';
+                
+                // Format values
+                const stolenValue = parseFloat(req.body.stolenValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const valueCollected = parseFloat(req.body.valueCollected || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const amountToHO = parseFloat(req.body.amountToHO || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const incidentDate = req.body.incidentDate ? new Date(req.body.incidentDate).toLocaleDateString('en-GB') : '';
+                const dateOfBirth = req.body.dateOfBirth ? new Date(req.body.dateOfBirth).toLocaleDateString('en-GB') : 'Not Available';
+                
+                // Build template data
+                const templateData = {
+                    incidentId: incidentId.toString(),
+                    storeName: req.body.store || '',
+                    incidentDate: incidentDate,
+                    storeManager: req.body.storeManager || '',
+                    staffName: req.body.staffName || 'N/A',
+                    stolenItems: req.body.stolenItems || '',
+                    stolenValue: stolenValue,
+                    valueCollected: valueCollected,
+                    thiefName: req.body.thiefName || 'Unknown',
+                    thiefSurname: req.body.thiefSurname || '',
+                    idCard: req.body.idCard || 'Not Available',
+                    dateOfBirth: dateOfBirth,
+                    placeOfBirth: req.body.placeOfBirth || 'Not Available',
+                    fatherName: req.body.fatherName || 'Not Available',
+                    motherName: req.body.motherName || 'Not Available',
+                    maritalStatus: req.body.maritalStatus || 'Unknown',
+                    captureMethod: req.body.captureMethod || '',
+                    securityType: req.body.securityType || '',
+                    outsourceCompany: req.body.outsourceCompany || 'N/A',
+                    amountToHO: amountToHO,
+                    currency: req.body.currency || 'USD',
+                    reportUrl: `${baseUrl}/stores/theft-incident/reports/${incidentId}`,
+                    recipientName: 'Team',
+                    submittedAt: new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+                };
+                
+                // Replace variables in template
+                let subject = template.SubjectTemplate;
+                let body = template.BodyTemplate;
+                
+                for (const [key, value] of Object.entries(templateData)) {
+                    const regex = new RegExp(`{{${key}}}`, 'g');
+                    subject = subject.replace(regex, value);
+                    body = body.replace(regex, value);
+                }
+                
+                // Send email
+                await emailService.sendEmail({
+                    to: THEFT_INCIDENT_NOTIFICATION_EMAIL,
+                    subject: subject,
+                    body: body,
+                    accessToken: req.session?.accessToken
+                });
+                
+                // Log the email
+                await pool.request()
+                    .input('incidentId', sql.Int, incidentId)
+                    .input('toEmail', sql.NVarChar, THEFT_INCIDENT_NOTIFICATION_EMAIL)
+                    .input('subject', sql.NVarChar, subject)
+                    .input('status', sql.NVarChar, 'Sent')
+                    .input('sentBy', sql.Int, req.currentUser.userId)
+                    .query(`
+                        INSERT INTO TheftIncidentEmailLog (IncidentId, ToEmail, Subject, Status, SentBy, SentAt)
+                        VALUES (@incidentId, @toEmail, @subject, @status, @sentBy, GETDATE())
+                    `);
+                
+                console.log(`Theft incident email sent for incident #${incidentId} to ${THEFT_INCIDENT_NOTIFICATION_EMAIL}`);
+            }
+        } catch (emailErr) {
+            // Log error but don't fail the submission
+            console.error('Error sending theft incident email:', emailErr);
+            
+            // Log the failed email attempt
+            try {
+                await pool.request()
+                    .input('incidentId', sql.Int, incidentId)
+                    .input('toEmail', sql.NVarChar, THEFT_INCIDENT_NOTIFICATION_EMAIL)
+                    .input('subject', sql.NVarChar, 'Theft Incident Notification')
+                    .input('status', sql.NVarChar, 'Failed')
+                    .input('errorMessage', sql.NVarChar, emailErr.message)
+                    .input('sentBy', sql.Int, req.currentUser.userId)
+                    .query(`
+                        INSERT INTO TheftIncidentEmailLog (IncidentId, ToEmail, Subject, Status, ErrorMessage, SentBy, SentAt)
+                        VALUES (@incidentId, @toEmail, @subject, @status, @errorMessage, @sentBy, GETDATE())
+                    `);
+            } catch (logErr) {
+                console.error('Error logging failed email:', logErr);
             }
         }
         

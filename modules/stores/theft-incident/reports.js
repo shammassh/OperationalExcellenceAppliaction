@@ -458,8 +458,251 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Get single report detail (API)
+// Get single report detail - HTML View Page
 router.get('/:id', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        const result = await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query(`
+                SELECT t.*, u.DisplayName as CreatedByName
+                FROM TheftIncidents t
+                LEFT JOIN Users u ON t.CreatedBy = u.Id
+                WHERE t.Id = @id
+            `);
+        
+        if (result.recordset.length === 0) {
+            await pool.close();
+            return res.status(404).send('<h1>Report not found</h1><a href="/stores/theft-incident/reports">Back to Reports</a>');
+        }
+        
+        const report = result.recordset[0];
+        
+        // Get photos
+        const photosResult = await pool.request()
+            .input('incidentId', sql.Int, req.params.id)
+            .query('SELECT * FROM TheftIncidentPhotos WHERE IncidentId = @incidentId');
+        
+        const photos = photosResult.recordset;
+        
+        await pool.close();
+        
+        // Format values
+        const stolenValue = parseFloat(report.StolenValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const valueCollected = parseFloat(report.ValueCollected || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const amountToHO = parseFloat(report.AmountToHO || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const incidentDate = report.IncidentDate ? new Date(report.IncidentDate).toLocaleDateString('en-GB') : '-';
+        const dateOfBirth = report.DateOfBirth ? new Date(report.DateOfBirth).toLocaleDateString('en-GB') : '-';
+        const createdAt = report.CreatedAt ? new Date(report.CreatedAt).toLocaleString('en-GB') : '-';
+        
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Theft Incident #${report.Id} - ${report.Store}</title>
+                <style>
+                    * { box-sizing: border-box; margin: 0; padding: 0; }
+                    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f5; }
+                    .header { background: linear-gradient(135deg, #dc3545 0%, #a71d2a 100%); color: white; padding: 20px 30px; }
+                    .header h1 { font-size: 24px; margin-bottom: 5px; }
+                    .header .subtitle { opacity: 0.9; font-size: 14px; }
+                    .header-nav { margin-top: 15px; }
+                    .header-nav a { color: white; text-decoration: none; margin-right: 15px; opacity: 0.8; }
+                    .header-nav a:hover { opacity: 1; }
+                    .container { max-width: 1000px; margin: 20px auto; padding: 0 20px; }
+                    .card { background: white; border-radius: 12px; padding: 25px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+                    .card h2 { font-size: 16px; color: #333; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #dc3545; display: flex; align-items: center; gap: 10px; }
+                    .details-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+                    .detail-item { padding: 10px 0; }
+                    .detail-item .label { font-size: 12px; color: #888; margin-bottom: 4px; }
+                    .detail-item .value { font-size: 15px; font-weight: 600; color: #333; }
+                    .value-boxes { display: flex; gap: 20px; margin-bottom: 25px; flex-wrap: wrap; }
+                    .value-box { flex: 1; min-width: 200px; padding: 20px; border-radius: 12px; text-align: center; }
+                    .value-box.stolen { background: linear-gradient(135deg, #dc3545, #a71d2a); color: white; }
+                    .value-box.collected { background: linear-gradient(135deg, #28a745, #20c997); color: white; }
+                    .value-box.ho { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+                    .value-box .amount { font-size: 28px; font-weight: 700; }
+                    .value-box .label { font-size: 12px; opacity: 0.9; margin-top: 5px; }
+                    .stolen-items { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 0 8px 8px 0; margin-bottom: 20px; white-space: pre-wrap; }
+                    .thief-info { background: #f8f9fa; border-radius: 8px; padding: 20px; }
+                    .status-badge { display: inline-block; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+                    .status-badge.open { background: #fff3cd; color: #856404; }
+                    .status-badge.closed { background: #d4edda; color: #155724; }
+                    .status-badge.reviewing { background: #cce5ff; color: #004085; }
+                    .photos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 15px; }
+                    .photo-item { border-radius: 8px; overflow: hidden; cursor: pointer; }
+                    .photo-item img { width: 100%; height: 150px; object-fit: cover; transition: transform 0.2s; }
+                    .photo-item:hover img { transform: scale(1.05); }
+                    .btn { display: inline-block; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; cursor: pointer; border: none; }
+                    .btn-back { background: #6c757d; color: white; }
+                    .btn-back:hover { background: #5a6268; }
+                    .btn-print { background: #28a745; color: white; margin-left: 10px; }
+                    .btn-print:hover { background: #218838; }
+                    .meta { font-size: 12px; color: #888; margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee; }
+                    @media print { .header-nav, .btn { display: none; } .header { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>🚨 Theft Incident Report #${report.Id}</h1>
+                    <div class="subtitle">${report.Store} - ${incidentDate}</div>
+                    <div class="header-nav">
+                        <a href="/stores/theft-incident/reports">← Back to Reports</a>
+                        <a href="/stores/theft-incident">+ New Report</a>
+                        <a href="/admin/job-monitor">Job Monitor</a>
+                    </div>
+                </div>
+                
+                <div class="container">
+                    <!-- Value Summary -->
+                    <div class="value-boxes">
+                        <div class="value-box stolen">
+                            <div class="amount">${report.Currency} ${stolenValue}</div>
+                            <div class="label">STOLEN VALUE</div>
+                        </div>
+                        <div class="value-box collected">
+                            <div class="amount">${report.Currency} ${valueCollected}</div>
+                            <div class="label">VALUE COLLECTED</div>
+                        </div>
+                        <div class="value-box ho">
+                            <div class="amount">${report.Currency} ${amountToHO}</div>
+                            <div class="label">AMOUNT TO HO</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Store Information -->
+                    <div class="card">
+                        <h2>📍 Store Information</h2>
+                        <div class="details-grid">
+                            <div class="detail-item">
+                                <div class="label">Store</div>
+                                <div class="value">${report.Store || '-'}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">Incident Date</div>
+                                <div class="value">${incidentDate}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">Store Manager</div>
+                                <div class="value">${report.StoreManager || '-'}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">Staff Name (Reporter)</div>
+                                <div class="value">${report.StaffName || '-'}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">Status</div>
+                                <div class="value">
+                                    <span class="status-badge ${(report.Status || 'Open').toLowerCase()}">${report.Status || 'Open'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Stolen Items -->
+                    <div class="card">
+                        <h2>📦 Stolen Items</h2>
+                        <div class="stolen-items">${report.StolenItems || 'No description provided'}</div>
+                    </div>
+                    
+                    <!-- Thief Information -->
+                    <div class="card">
+                        <h2>👤 Thief Information</h2>
+                        <div class="thief-info">
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <div class="label">Name</div>
+                                    <div class="value">${report.ThiefName || '-'} ${report.ThiefSurname || ''}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="label">ID Card</div>
+                                    <div class="value">${report.IDCard || '-'}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="label">Date of Birth</div>
+                                    <div class="value">${dateOfBirth}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="label">Place of Birth</div>
+                                    <div class="value">${report.PlaceOfBirth || '-'}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="label">Father's Name</div>
+                                    <div class="value">${report.FatherName || '-'}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="label">Mother's Name</div>
+                                    <div class="value">${report.MotherName || '-'}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="label">Marital Status</div>
+                                    <div class="value">${report.MaritalStatus || '-'}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Capture Details -->
+                    <div class="card">
+                        <h2>🎯 Capture Details</h2>
+                        <div class="details-grid">
+                            <div class="detail-item">
+                                <div class="label">Capture Method</div>
+                                <div class="value">${report.CaptureMethod || '-'}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">Security Type</div>
+                                <div class="value">${report.SecurityType || '-'}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">Outsource Company</div>
+                                <div class="value">${report.OutsourceCompany || 'N/A'}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${photos.length > 0 ? `
+                    <!-- Photos -->
+                    <div class="card">
+                        <h2>📷 Evidence Photos (${photos.length})</h2>
+                        <div class="photos-grid">
+                            ${photos.map(p => `
+                                <div class="photo-item">
+                                    <a href="${p.FilePath}" target="_blank">
+                                        <img src="${p.FilePath}" alt="${p.OriginalName || 'Photo'}">
+                                    </a>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    ` : ''}
+                    
+                    <!-- Actions -->
+                    <div style="margin-top: 20px;">
+                        <a href="/stores/theft-incident/reports" class="btn btn-back">← Back to Reports</a>
+                        <button class="btn btn-print" onclick="window.print()">🖨️ Print Report</button>
+                    </div>
+                    
+                    <div class="meta">
+                        <strong>Report ID:</strong> TI-${report.Id} | 
+                        <strong>Created:</strong> ${createdAt} by ${report.CreatedByName || 'Unknown'}
+                        ${report.ReviewedAt ? ` | <strong>Reviewed:</strong> ${new Date(report.ReviewedAt).toLocaleString('en-GB')}` : ''}
+                    </div>
+                </div>
+            </body>
+            </html>
+        `);
+        
+    } catch (err) {
+        console.error('Error getting report:', err);
+        res.status(500).send('<h1>Error loading report</h1><p>' + err.message + '</p><a href="/stores/theft-incident/reports">Back to Reports</a>');
+    }
+});
+
+// API endpoint for JSON data
+router.get('/:id/json', async (req, res) => {
     try {
         const pool = await sql.connect(dbConfig);
         

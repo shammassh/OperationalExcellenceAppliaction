@@ -460,6 +460,119 @@ router.post('/api/job-monitor/send-test-email', async (req, res) => {
     }
 });
 
+// Resend theft incident email
+router.post('/api/job-monitor/resend-theft-email/:incidentId', async (req, res) => {
+    let pool;
+    try {
+        const incidentId = parseInt(req.params.incidentId);
+        if (!incidentId) {
+            return res.status(400).json({ success: false, error: 'Invalid incident ID' });
+        }
+        
+        pool = await sql.connect(dbConfig);
+        
+        // Get the incident details
+        const incidentResult = await pool.request()
+            .input('incidentId', sql.Int, incidentId)
+            .query(`
+                SELECT * FROM TheftIncidents WHERE Id = @incidentId
+            `);
+        
+        if (incidentResult.recordset.length === 0) {
+            return res.status(404).json({ success: false, error: 'Incident not found' });
+        }
+        
+        const incident = incidentResult.recordset[0];
+        
+        // Get the email template
+        const templateResult = await pool.request()
+            .input('templateKey', sql.NVarChar, 'THEFT_INCIDENT_REPORT')
+            .query('SELECT SubjectTemplate, BodyTemplate FROM EmailTemplates WHERE TemplateKey = @templateKey AND IsActive = 1');
+        
+        if (templateResult.recordset.length === 0) {
+            return res.status(404).json({ success: false, error: 'Email template not found' });
+        }
+        
+        const template = templateResult.recordset[0];
+        const baseUrl = process.env.APP_URL || 'https://oeapp-uat.gmrlapps.com';
+        const THEFT_INCIDENT_NOTIFICATION_EMAIL = 'shammas.sh@gmrl.com'; // TODO: Get from settings
+        
+        // Format values
+        const stolenValue = parseFloat(incident.StolenValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const valueCollected = parseFloat(incident.ValueCollected || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const amountToHO = parseFloat(incident.AmountToHO || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const incidentDate = incident.IncidentDate ? new Date(incident.IncidentDate).toLocaleDateString('en-GB') : '';
+        const dateOfBirth = incident.DateOfBirth ? new Date(incident.DateOfBirth).toLocaleDateString('en-GB') : 'Not Available';
+        
+        // Build template data
+        const templateData = {
+            incidentId: incidentId.toString(),
+            storeName: incident.Store || '',
+            incidentDate: incidentDate,
+            storeManager: incident.StoreManager || '',
+            staffName: incident.StaffName || 'N/A',
+            stolenItems: incident.StolenItems || '',
+            stolenValue: stolenValue,
+            valueCollected: valueCollected,
+            thiefName: incident.ThiefName || 'Unknown',
+            thiefSurname: incident.ThiefSurname || '',
+            idCard: incident.IDCard || 'Not Available',
+            dateOfBirth: dateOfBirth,
+            placeOfBirth: incident.PlaceOfBirth || 'Not Available',
+            fatherName: incident.FatherName || 'Not Available',
+            motherName: incident.MotherName || 'Not Available',
+            maritalStatus: incident.MaritalStatus || 'Unknown',
+            captureMethod: incident.CaptureMethod || '',
+            securityType: incident.SecurityType || '',
+            outsourceCompany: incident.OutsourceCompany || 'N/A',
+            amountToHO: amountToHO,
+            currency: incident.Currency || 'USD',
+            reportUrl: `${baseUrl}/stores/theft-incident/reports/${incidentId}`,
+            recipientName: 'Team',
+            submittedAt: new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+        };
+        
+        // Replace variables in template
+        let subject = template.SubjectTemplate;
+        let body = template.BodyTemplate;
+        
+        for (const [key, value] of Object.entries(templateData)) {
+            const regex = new RegExp(`{{${key}}}`, 'g');
+            subject = subject.replace(regex, value);
+            body = body.replace(regex, value);
+        }
+        
+        // Send email
+        const emailService = require('../../services/email-service');
+        await emailService.sendEmail({
+            to: THEFT_INCIDENT_NOTIFICATION_EMAIL,
+            subject: subject,
+            body: body
+        });
+        
+        // Log the email
+        await pool.request()
+            .input('incidentId', sql.Int, incidentId)
+            .input('toEmail', sql.NVarChar, THEFT_INCIDENT_NOTIFICATION_EMAIL)
+            .input('subject', sql.NVarChar, subject)
+            .input('status', sql.NVarChar, 'Sent')
+            .input('sentBy', sql.Int, req.currentUser?.userId)
+            .query(`
+                INSERT INTO TheftIncidentEmailLog (IncidentId, ToEmail, Subject, Status, SentBy, SentAt)
+                VALUES (@incidentId, @toEmail, @subject, @status, @sentBy, GETDATE())
+            `);
+        
+        console.log(`[Job Monitor] Theft incident email resent for #${incidentId} to ${THEFT_INCIDENT_NOTIFICATION_EMAIL} by ${req.currentUser?.email || 'unknown'}`);
+        
+        res.json({ success: true, message: 'Email sent successfully' });
+    } catch (err) {
+        console.error('Error resending theft email:', err);
+        res.status(500).json({ success: false, error: err.message });
+    } finally {
+        if (pool) await pool.close();
+    }
+});
+
 // Dry run API - check what notifications would be sent
 router.get('/api/job-monitor/dry-run', async (req, res) => {
     let pool;
@@ -4876,6 +4989,7 @@ router.get('/email-templates', async (req, res) => {
         // Group templates by module
         const oeTemplates = templates.filter(t => t.Module === 'OE');
         const ohsTemplates = templates.filter(t => t.Module === 'OHS');
+        const storesTemplates = templates.filter(t => t.Module === 'Stores');
         
         // Helper to get description based on report type
         const getDescription = (reportType) => {
@@ -4886,7 +5000,8 @@ router.get('/email-templates', async (req, res) => {
                 'inspection-reminder': 'Sent X days before action plan deadline.',
                 'inspection-overdue': 'Sent to Store Manager when deadline passed.',
                 'inspection-escalation': 'Escalated to Area Manager for overdue action plans.',
-                'verification-submitted': 'Sent to Store Manager when action item verification is submitted.'
+                'verification-submitted': 'Sent to Store Manager when action item verification is submitted.',
+                'theft-incident': 'Sent when a theft incident report is submitted.'
             };
             return descriptions[reportType] || 'Email notification template.';
         };
@@ -4900,7 +5015,8 @@ router.get('/email-templates', async (req, res) => {
                 'inspection-reminder': '⏰',
                 'inspection-overdue': '⚠️',
                 'inspection-escalation': '🚨',
-                'verification-submitted': '✅'
+                'verification-submitted': '✅',
+                'theft-incident': '🚨'
             };
             return icons[reportType] || '📧';
         };
@@ -4945,6 +5061,7 @@ router.get('/email-templates', async (req, res) => {
                     .module-badge { padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; }
                     .module-badge.oe { background: linear-gradient(135deg, #e8f5e9, #c8e6c9); color: #2e7d32; }
                     .module-badge.ohs { background: linear-gradient(135deg, #ffebee, #ffcdd2); color: #c62828; }
+                    .module-badge.stores { background: linear-gradient(135deg, #fff3e0, #ffe0b2); color: #e65100; }
                     .template-count { font-size: 13px; color: #888; margin-left: auto; }
                     
                     .templates-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
@@ -5024,6 +5141,18 @@ router.get('/email-templates', async (req, res) => {
                             ${ohsTemplates.map(renderCard).join('')}
                         </div>
                     </div>
+                    
+                    <!-- Stores Templates Section -->
+                    <div class="module-section">
+                        <div class="module-header">
+                            <span class="module-badge stores">Stores</span>
+                            <h2>Stores Module Templates</h2>
+                            <span class="template-count">${storesTemplates.length} templates</span>
+                        </div>
+                        <div class="templates-grid">
+                            ${storesTemplates.map(renderCard).join('')}
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="preview-modal" id="previewModal">
@@ -5083,6 +5212,27 @@ router.get('/email-templates', async (req, res) => {
                                 <code onclick="copyVar('submittedAt')">{{submittedAt}}</code>
                                 <code onclick="copyVar('verificationNotes')">{{verificationNotes}}</code>
                                 <code onclick="copyVar('verificationUrl')">{{verificationUrl}}</code>
+                                <br><strong style="font-size:11px; color:#666; margin-top:8px; display:inline-block;">Theft Incident Variables:</strong><br>
+                                <code onclick="copyVar('incidentId')">{{incidentId}}</code>
+                                <code onclick="copyVar('incidentDate')">{{incidentDate}}</code>
+                                <code onclick="copyVar('storeManager')">{{storeManager}}</code>
+                                <code onclick="copyVar('staffName')">{{staffName}}</code>
+                                <code onclick="copyVar('stolenItems')">{{stolenItems}}</code>
+                                <code onclick="copyVar('stolenValue')">{{stolenValue}}</code>
+                                <code onclick="copyVar('valueCollected')">{{valueCollected}}</code>
+                                <code onclick="copyVar('thiefName')">{{thiefName}}</code>
+                                <code onclick="copyVar('thiefSurname')">{{thiefSurname}}</code>
+                                <code onclick="copyVar('idCard')">{{idCard}}</code>
+                                <code onclick="copyVar('dateOfBirth')">{{dateOfBirth}}</code>
+                                <code onclick="copyVar('placeOfBirth')">{{placeOfBirth}}</code>
+                                <code onclick="copyVar('fatherName')">{{fatherName}}</code>
+                                <code onclick="copyVar('motherName')">{{motherName}}</code>
+                                <code onclick="copyVar('maritalStatus')">{{maritalStatus}}</code>
+                                <code onclick="copyVar('captureMethod')">{{captureMethod}}</code>
+                                <code onclick="copyVar('securityType')">{{securityType}}</code>
+                                <code onclick="copyVar('outsourceCompany')">{{outsourceCompany}}</code>
+                                <code onclick="copyVar('amountToHO')">{{amountToHO}}</code>
+                                <code onclick="copyVar('currency')">{{currency}}</code>
                             </div>
                             
                             <div class="form-group">
@@ -5298,7 +5448,28 @@ router.get('/api/email-templates/preview', async (req, res) => {
             submittedBy: 'Mohamed Hassan',
             submittedAt: new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
             verificationNotes: 'All temperature logs have been updated and properly documented. Training conducted for staff on correct recording procedures.',
-            verificationUrl: 'https://oeapp.gmrlapps.com/oe-inspection/action-plan/1?verification=123'
+            verificationUrl: 'https://oeapp.gmrlapps.com/oe-inspection/action-plan/1?verification=123',
+            // Theft incident template variables
+            incidentId: '123',
+            incidentDate: new Date().toLocaleDateString('en-GB'),
+            storeManager: 'Ahmed Hassan',
+            staffName: 'Mohamed Ali',
+            stolenItems: 'Various food items including chocolates, beverages, and snacks. Total of 15 items were taken from different shelves.',
+            stolenValue: '2,500.00',
+            valueCollected: '1,800.00',
+            thiefName: 'Unknown',
+            thiefSurname: 'Unknown',
+            idCard: 'Not Available',
+            dateOfBirth: 'Not Available',
+            placeOfBirth: 'Not Available',
+            fatherName: 'Not Available',
+            motherName: 'Not Available',
+            maritalStatus: 'Unknown',
+            captureMethod: 'CCTV Camera',
+            securityType: 'In-House',
+            outsourceCompany: 'N/A',
+            amountToHO: '700.00',
+            currency: 'USD'
         };
         
         // Replace variables in template
@@ -5356,7 +5527,28 @@ router.post('/api/email-templates/preview-custom', (req, res) => {
             submittedBy: 'Mohamed Hassan',
             submittedAt: new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
             verificationNotes: 'All temperature logs have been updated and properly documented. Training conducted for staff on correct recording procedures.',
-            verificationUrl: 'https://oeapp.gmrlapps.com/oe-inspection/action-plan/1?verification=123'
+            verificationUrl: 'https://oeapp.gmrlapps.com/oe-inspection/action-plan/1?verification=123',
+            // Theft incident template variables
+            incidentId: '123',
+            incidentDate: new Date().toLocaleDateString('en-GB'),
+            storeManager: 'Ahmed Hassan',
+            staffName: 'Mohamed Ali',
+            stolenItems: 'Various food items including chocolates, beverages, and snacks. Total of 15 items were taken from different shelves.',
+            stolenValue: '2,500.00',
+            valueCollected: '1,800.00',
+            thiefName: 'Unknown',
+            thiefSurname: 'Unknown',
+            idCard: 'Not Available',
+            dateOfBirth: 'Not Available',
+            placeOfBirth: 'Not Available',
+            fatherName: 'Not Available',
+            motherName: 'Not Available',
+            maritalStatus: 'Unknown',
+            captureMethod: 'CCTV Camera',
+            securityType: 'In-House',
+            outsourceCompany: 'N/A',
+            amountToHO: '700.00',
+            currency: 'USD'
         };
         
         // Replace variables in template
@@ -5480,6 +5672,66 @@ router.get('/job-monitor', async (req, res) => {
         `);
         const ohsInspections = ohsInspectionsResult.recordset;
         
+        // Get Theft Incidents with email log
+        const theftIncidentsResult = await pool.request().query(`
+            SELECT 
+                ti.Id,
+                ti.Store as StoreName,
+                ti.IncidentDate,
+                ti.StoreManager,
+                ti.StolenItems,
+                ti.StolenValue,
+                ti.ValueCollected,
+                ti.Currency,
+                ti.CaptureMethod,
+                ti.SecurityType,
+                ti.CreatedAt,
+                ISNULL(u.DisplayName, 'Unknown') as CreatedByName,
+                (SELECT COUNT(*) FROM TheftIncidentEmailLog WHERE IncidentId = ti.Id AND Status = 'Sent') as EmailsSent,
+                (SELECT COUNT(*) FROM TheftIncidentEmailLog WHERE IncidentId = ti.Id AND Status = 'Failed') as EmailsFailed,
+                (SELECT TOP 1 SentAt FROM TheftIncidentEmailLog WHERE IncidentId = ti.Id AND Status = 'Sent' ORDER BY SentAt DESC) as LastEmailSent
+            FROM TheftIncidents ti
+            LEFT JOIN Users u ON ti.CreatedBy = u.Id
+            ORDER BY ti.CreatedAt DESC
+        `);
+        const theftIncidents = theftIncidentsResult.recordset;
+        
+        // Get theft incident email log
+        const theftEmailLogResult = await pool.request().query(`
+            SELECT TOP 50
+                el.Id,
+                el.IncidentId,
+                ti.Store as StoreName,
+                ti.StolenValue,
+                ti.Currency,
+                el.ToEmail,
+                el.Subject,
+                el.Status,
+                el.ErrorMessage,
+                el.SentAt,
+                ISNULL(u.DisplayName, 'System') as SentByName
+            FROM TheftIncidentEmailLog el
+            INNER JOIN TheftIncidents ti ON el.IncidentId = ti.Id
+            LEFT JOIN Users u ON el.SentBy = u.Id
+            ORDER BY el.SentAt DESC
+        `);
+        const theftEmailLog = theftEmailLogResult.recordset;
+        
+        // Calculate theft stats
+        const theftTotal = theftIncidents.length;
+        const theftToday = theftIncidents.filter(t => {
+            const today = new Date();
+            const incDate = new Date(t.CreatedAt);
+            return incDate.toDateString() === today.toDateString();
+        }).length;
+        const theftThisWeek = theftIncidents.filter(t => {
+            const now = new Date();
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            return new Date(t.CreatedAt) >= weekAgo;
+        }).length;
+        const theftEmailsSent = theftEmailLog.filter(e => e.Status === 'Sent').length;
+        const theftEmailsFailed = theftEmailLog.filter(e => e.Status === 'Failed').length;
+        
         // Calculate stats
         const oeOverdue = oeInspections.filter(i => i.ActionPlanStatus === 'Overdue').length;
         const oeDueSoon = oeInspections.filter(i => i.ActionPlanStatus === 'Due Soon').length;
@@ -5564,6 +5816,7 @@ router.get('/job-monitor', async (req, res) => {
                     .summary-card .badge { padding: 4px 10px; border-radius: 15px; font-size: 11px; font-weight: 600; }
                     .summary-card .badge.oe { background: #e8f5e9; color: #2e7d32; }
                     .summary-card .badge.ohs { background: #ffebee; color: #c62828; }
+                    .summary-card .badge.theft { background: #fff3e0; color: #e65100; }
                     .summary-stats { display: flex; gap: 20px; }
                     .summary-stat { text-align: center; flex: 1; }
                     .summary-stat .value { font-size: 28px; font-weight: 700; }
@@ -5734,12 +5987,21 @@ router.get('/job-monitor', async (req, res) => {
                                 <div class="summary-stat pending"><div class="value">${ohsNoDeadline}</div><div class="label">⚪ No Deadline</div></div>
                             </div>
                         </div>
+                        <div class="summary-card">
+                            <h3><span class="badge theft">🚨</span> Theft Incidents</h3>
+                            <div class="summary-stats">
+                                <div class="summary-stat" style="color: #e65100;"><div class="value">${theftToday}</div><div class="label">📅 Today</div></div>
+                                <div class="summary-stat" style="color: #ff9800;"><div class="value">${theftThisWeek}</div><div class="label">📊 This Week</div></div>
+                                <div class="summary-stat"><div class="value" style="color: #28a745;">${theftEmailsSent}</div><div class="label">✉️ Emails Sent</div></div>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- Tabs -->
                     <div class="tabs">
                         <div class="tab active" data-tab="oe-tab">📋 OE Inspections (${oeInspections.length})</div>
                         <div class="tab" data-tab="ohs-tab">📋 OHS Inspections (${ohsInspections.length})</div>
+                        <div class="tab" data-tab="theft-tab">🚨 Theft Incidents (${theftIncidents.length})</div>
                         <div class="tab" data-tab="templates-tab">📧 Email Templates</div>
                     </div>
                     
@@ -5766,6 +6028,95 @@ router.get('/job-monitor', async (req, res) => {
                                     <tbody>${ohsInspections.map((i, idx, arr) => renderRow(i, idx, arr, 'OHS')).join('')}</tbody>
                                 </table>
                             ` : `<div class="empty-state"><div class="icon">✅</div><p>No pending action plans</p></div>`}
+                        </div>
+                    </div>
+                    
+                    <!-- Theft Incidents Tab -->
+                    <div class="tab-content" id="theft-tab">
+                        <div class="section">
+                            <div class="section-header">
+                                <h2><span class="badge theft">🚨</span> Theft Incidents</h2>
+                                <div style="font-size: 12px; color: #666;">
+                                    Total: ${theftTotal} | This Week: ${theftThisWeek} | Emails Sent: ${theftEmailsSent} | Failed: ${theftEmailsFailed}
+                                </div>
+                            </div>
+                            
+                            <!-- Recent Incidents Table -->
+                            <h4 style="font-size: 14px; margin: 20px 0 10px; color: #333;">📋 Recent Incidents</h4>
+                            ${theftIncidents.length > 0 ? `
+                                <table class="tracking-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Store</th>
+                                            <th>Incident Date</th>
+                                            <th>Stolen Value</th>
+                                            <th>Capture Method</th>
+                                            <th>Reported By</th>
+                                            <th>Emails</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${theftIncidents.slice(0, 20).map(t => `
+                                            <tr>
+                                                <td><strong>#${t.Id}</strong></td>
+                                                <td>${t.StoreName || '-'}</td>
+                                                <td>${t.IncidentDate ? new Date(t.IncidentDate).toLocaleDateString('en-GB') : '-'}</td>
+                                                <td><strong>${t.Currency} ${parseFloat(t.StolenValue || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</strong></td>
+                                                <td>${t.CaptureMethod || '-'}</td>
+                                                <td>${t.CreatedByName || '-'}</td>
+                                                <td>
+                                                    <span class="status-pill ${t.EmailsSent > 0 ? 'completed' : 'no-deadline'}">
+                                                        ${t.EmailsSent > 0 ? '✅ ' + t.EmailsSent + ' sent' : '⚪ None'}
+                                                    </span>
+                                                    ${t.EmailsFailed > 0 ? '<span class="status-pill overdue" style="margin-left:5px;">❌ ' + t.EmailsFailed + ' failed</span>' : ''}
+                                                </td>
+                                                <td>
+                                                    <a href="/stores/theft-incident/reports/${t.Id}" class="btn btn-outline btn-sm" target="_blank">👁️ View</a>
+                                                    <button class="btn btn-outline btn-sm" onclick="resendTheftEmail(${t.Id})">📧 Resend</button>
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            ` : '<div class="empty-state"><div class="icon">📋</div><p>No theft incidents reported</p></div>'}
+                            
+                            <!-- Email Log -->
+                            <h4 style="font-size: 14px; margin: 30px 0 10px; color: #333;">📧 Email Log (Last 50)</h4>
+                            ${theftEmailLog.length > 0 ? `
+                                <table class="tracking-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Incident</th>
+                                            <th>Store</th>
+                                            <th>To</th>
+                                            <th>Subject</th>
+                                            <th>Status</th>
+                                            <th>Sent At</th>
+                                            <th>Sent By</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${theftEmailLog.map(e => `
+                                            <tr class="${e.Status === 'Failed' ? 'overdue' : ''}">
+                                                <td><strong>#${e.IncidentId}</strong></td>
+                                                <td>${e.StoreName || '-'}</td>
+                                                <td>${e.ToEmail}</td>
+                                                <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${e.Subject || '-'}</td>
+                                                <td>
+                                                    <span class="status-pill ${e.Status === 'Sent' ? 'completed' : e.Status === 'Failed' ? 'overdue' : 'no-deadline'}">
+                                                        ${e.Status === 'Sent' ? '✅' : e.Status === 'Failed' ? '❌' : '⏳'} ${e.Status}
+                                                    </span>
+                                                    ${e.ErrorMessage ? '<div style="font-size:10px;color:#dc3545;margin-top:3px;">' + e.ErrorMessage.substring(0, 50) + '</div>' : ''}
+                                                </td>
+                                                <td>${e.SentAt ? new Date(e.SentAt).toLocaleString('en-GB') : '-'}</td>
+                                                <td>${e.SentByName || '-'}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            ` : '<div class="empty-state"><div class="icon">📧</div><p>No emails sent yet</p></div>'}
                         </div>
                     </div>
                     
@@ -6099,6 +6450,23 @@ router.get('/job-monitor', async (req, res) => {
                     }
                     
                     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+                    
+                    async function resendTheftEmail(incidentId) {
+                        if (!confirm('Resend email notification for theft incident #' + incidentId + '?')) return;
+                        
+                        try {
+                            const res = await fetch('/admin/api/job-monitor/resend-theft-email/' + incidentId, { method: 'POST' });
+                            const data = await res.json();
+                            if (data.success) {
+                                showToast('✅ Email sent successfully!', 'success');
+                                setTimeout(() => location.reload(), 2000);
+                            } else {
+                                showToast(data.error || 'Failed to send email', 'error');
+                            }
+                        } catch (e) {
+                            showToast('Error: ' + e.message, 'error');
+                        }
+                    }
                     
                     function showToast(msg, type) {
                         const t = document.createElement('div'); t.className = 'toast ' + type; t.textContent = msg;
