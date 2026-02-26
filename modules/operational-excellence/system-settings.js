@@ -5499,7 +5499,7 @@ router.post('/api/brands', async (req, res) => {
             .input('brandCode', sql.NVarChar, brandCode)
             .input('primaryColor', sql.NVarChar, primaryColor || '#667eea')
             .input('isActive', sql.Bit, isActive ? 1 : 0)
-            .input('createdBy', sql.Int, req.currentUser?.Id || null)
+            .input('createdBy', sql.Int, req.currentUser?.userId || null)
             .query(`
                 INSERT INTO Brands (BrandName, BrandCode, PrimaryColor, IsActive, CreatedAt, CreatedBy)
                 VALUES (@brandName, @brandCode, @primaryColor, @isActive, GETDATE(), @createdBy)
@@ -5533,7 +5533,7 @@ router.put('/api/brands/:id', async (req, res) => {
             .input('brandCode', sql.NVarChar, brandCode)
             .input('primaryColor', sql.NVarChar, primaryColor || '#667eea')
             .input('isActive', sql.Bit, isActive ? 1 : 0)
-            .input('updatedBy', sql.Int, req.currentUser?.Id || null)
+            .input('updatedBy', sql.Int, req.currentUser?.userId || null)
             .query(`
                 UPDATE Brands 
                 SET BrandName = @brandName, BrandCode = @brandCode, PrimaryColor = @primaryColor, 
@@ -5613,7 +5613,7 @@ router.post('/api/brand-responsibles', async (req, res) => {
             .input('areaManagerId', sql.Int, areaManagerId)
             .input('headOfOpsId', sql.Int, headOfOpsId || null)
             .input('notes', sql.NVarChar, notes || null)
-            .input('createdBy', sql.Int, req.currentUser?.Id || null)
+            .input('createdBy', sql.Int, req.currentUser?.userId || null)
             .query(`
                 INSERT INTO OE_BrandResponsibles (BrandId, AreaManagerId, HeadOfOpsId, Notes, CreatedBy, CreatedAt, IsActive)
                 VALUES (@brandId, @areaManagerId, @headOfOpsId, @notes, @createdBy, GETDATE(), 1)
@@ -5637,7 +5637,7 @@ router.put('/api/brand-responsibles/:id', async (req, res) => {
             .input('areaManagerId', sql.Int, areaManagerId)
             .input('headOfOpsId', sql.Int, headOfOpsId || null)
             .input('notes', sql.NVarChar, notes || null)
-            .input('updatedBy', sql.Int, req.currentUser?.Id || null)
+            .input('updatedBy', sql.Int, req.currentUser?.userId || null)
             .query(`
                 UPDATE OE_BrandResponsibles 
                 SET BrandId = @brandId, AreaManagerId = @areaManagerId, HeadOfOpsId = @headOfOpsId, Notes = @notes, 

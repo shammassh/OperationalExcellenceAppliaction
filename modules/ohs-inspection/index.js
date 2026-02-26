@@ -542,7 +542,7 @@ router.post('/api/templates/schemas', async (req, res) => {
         const result = await pool.request()
             .input('name', sql.NVarChar, schemaName)
             .input('desc', sql.NVarChar, description || '')
-            .input('createdBy', sql.Int, req.currentUser?.id || 1)
+            .input('createdBy', sql.Int, req.currentUser?.userId || 1)
             .query(`
                 INSERT INTO OHS_InspectionTemplates (TemplateName, Description, CreatedBy, CreatedAt, IsActive)
                 OUTPUT INSERTED.Id as schemaId
@@ -1343,7 +1343,7 @@ router.get('/api/next-document-number', async (req, res) => {
 router.post('/api/inspections', async (req, res) => {
     try {
         const { storeId, storeName, documentNumber, inspectionDate, inspectors, accompaniedBy, templateId } = req.body;
-        const userId = req.currentUser?.id || 1;
+        const userId = req.currentUser?.userId || 1;
         
         const pool = await sql.connect(dbConfig);
         

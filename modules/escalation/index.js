@@ -596,7 +596,7 @@ router.post('/api/escalate', async (req, res) => {
             .input('responsible', sql.NVarChar, responsible)
             .input('priority', sql.NVarChar, priority || 'High')
             .input('reason', sql.NVarChar, reason)
-            .input('escalatedBy', sql.Int, req.currentUser?.id)
+            .input('escalatedBy', sql.Int, req.currentUser?.userId)
             .input('escalatedByName', sql.NVarChar, req.currentUser?.displayName)
             .query(`
                 INSERT INTO EscalatedItems (
@@ -675,7 +675,7 @@ router.put('/api/escalated/:id', async (req, res) => {
         }
         if (status === 'Resolved' || status === 'Closed') {
             updateFields.push('ResolvedAt = GETDATE()', 'ResolvedBy = @resolvedBy', 'ResolvedByName = @resolvedByName');
-            request.input('resolvedBy', sql.Int, req.currentUser?.id);
+            request.input('resolvedBy', sql.Int, req.currentUser?.userId);
             request.input('resolvedByName', sql.NVarChar, req.currentUser?.displayName);
             if (resolutionNotes) {
                 updateFields.push('ResolutionNotes = @resolutionNotes');

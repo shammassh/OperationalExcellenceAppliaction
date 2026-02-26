@@ -575,7 +575,7 @@ router.post('/api/templates/schemas', async (req, res) => {
         const result = await pool.request()
             .input('name', sql.NVarChar, schemaName)
             .input('desc', sql.NVarChar, description || '')
-            .input('createdBy', sql.Int, req.currentUser?.id || 1)
+            .input('createdBy', sql.Int, req.currentUser?.userId || 1)
             .query(`
                 INSERT INTO OE_InspectionTemplates (TemplateName, Description, CreatedBy, CreatedAt, IsActive)
                 OUTPUT INSERTED.Id as schemaId
@@ -1107,7 +1107,7 @@ router.post('/api/stores/:storeId/managers', async (req, res) => {
                 .input('storeId', sql.Int, storeId)
                 .input('userId', sql.Int, userIds[i])
                 .input('isPrimary', sql.Bit, i === 0) // First one is primary
-                .input('assignedBy', sql.Int, req.currentUser?.id || null)
+                .input('assignedBy', sql.Int, req.currentUser?.userId || null)
                 .query(`
                     INSERT INTO StoreManagerAssignments (StoreId, UserId, IsPrimary, AssignedAt, AssignedBy)
                     VALUES (@storeId, @userId, @isPrimary, GETDATE(), @assignedBy)
@@ -1228,7 +1228,7 @@ router.get('/api/next-document-number', async (req, res) => {
 router.post('/api/inspections', async (req, res) => {
     try {
         const { storeId, storeName, documentNumber, inspectionDate, inspectors, accompaniedBy, templateId } = req.body;
-        const userId = req.currentUser?.id || 1;
+        const userId = req.currentUser?.userId || 1;
         
         const pool = await sql.connect(dbConfig);
         

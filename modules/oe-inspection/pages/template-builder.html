@@ -924,14 +924,14 @@
                     <div class="form-section" style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border: 2px dashed #10b981;">
                         <h3 style="color: #059669;">📤 Bulk Upload Items</h3>
                         <p style="color: #059669; margin-bottom: 15px; font-size: 14px;">
-                            Download the template, fill it with your items, then upload to add multiple items at once.
+                            Upload a CSV or tab-separated file. Supports: Excel copy-paste, or download the template below.
                         </p>
                         <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center;">
                             <button class="btn btn-outline" onclick="downloadItemTemplate()" style="border-color: #10b981; color: #10b981;">
-                                📥 Download Template (CSV)
+                                📥 Download Template
                             </button>
                             <div style="position: relative;">
-                                <input type="file" id="bulkUploadInput" accept=".csv" onchange="handleBulkUpload(event)" style="display: none;">
+                                <input type="file" id="bulkUploadInput" accept=".csv,.txt,.tsv" onchange="handleBulkUpload(event)" style="display: none;">
                                 <button class="btn btn-primary" onclick="document.getElementById('bulkUploadInput').click()">
                                     📤 Upload CSV File
                                 </button>
@@ -1929,16 +1929,47 @@
         function parseCSV(text) {
             const lines = text.split('\n').map(l => l.trim()).filter(l => l);
             const items = [];
-            for (let i = 1; i < lines.length; i++) {
-                const values = parseCSVLine(lines[i]);
-                if (values.length >= 2 && values[0] && values[1]) {
+            
+            // Check if first line is a header (contains common header words)
+            const firstLine = lines[0]?.toLowerCase() || '';
+            const hasHeader = firstLine.includes('reference') || firstLine.includes('title') || firstLine.includes('question') || firstLine.includes('coeff');
+            const startIndex = hasHeader ? 1 : 0;
+            
+            // Detect delimiter: tab or comma
+            const sampleLine = lines[startIndex] || lines[0] || '';
+            const isTabSeparated = sampleLine.includes('\t');
+            
+            for (let i = startIndex; i < lines.length; i++) {
+                const values = isTabSeparated ? lines[i].split('\t') : parseCSVLine(lines[i]);
+                
+                // Skip empty lines
+                if (!values[0] && !values[1]) continue;
+                
+                // Check if first column looks like a reference value (short, possibly with dots/numbers)
+                const firstCol = values[0]?.trim() || '';
+                const isReferenceValue = firstCol.length <= 10 && /^[\d.]+$/.test(firstCol);
+                
+                if (isReferenceValue && values.length >= 2 && values[1]) {
+                    // Standard format: ReferenceValue, Title, Coeff, Quantity, Answer, CR
                     items.push({
-                        referenceValue: values[0].trim(),
+                        referenceValue: firstCol,
                         title: values[1].trim(),
                         coeff: parseInt(values[2]) || 2,
                         quantity: parseInt(values[3]) || null,
                         answer: values[4]?.trim() || 'Yes,Partially,No,NA',
                         cr: values[5]?.trim() || ''
+                    });
+                } else if (firstCol) {
+                    // Plain text format: just questions, auto-generate reference values
+                    const itemNumber = items.length + 1;
+                    const question = values.join(' ').trim();
+                    items.push({
+                        referenceValue: itemNumber.toString(),
+                        title: question,
+                        coeff: 2,
+                        quantity: null,
+                        answer: 'Yes,Partially,No,NA',
+                        cr: ''
                     });
                 }
             }
@@ -1970,7 +2001,10 @@
                     method: 'POST',
                     body: JSON.stringify({ items, duplicateAction: document.getElementById('duplicateAction').value })
                 });
-                const { created = 0, skipped = 0 } = response.data;
+                if (!response.success) {
+                    throw new Error(response.error || 'Failed to upload items');
+                }
+                const { created = 0, skipped = 0 } = response.data || {};
                 statusDiv.innerHTML = `<div style="color: #059669; padding: 10px; background: #ecfdf5; border-radius: 8px;">✅ ${created} created, ${skipped} skipped</div>`;
                 window.pendingBulkItems = null;
                 loadItems();

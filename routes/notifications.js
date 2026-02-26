@@ -23,7 +23,7 @@ const dbConfig = {
 router.get('/count', async (req, res) => {
     try {
         const pool = await sql.connect(dbConfig);
-        const userId = req.currentUser?.id;
+        const userId = req.currentUser?.userId;
         const userEmail = req.currentUser?.email;
         
         const result = await pool.request()
@@ -45,7 +45,7 @@ router.get('/count', async (req, res) => {
 router.get('/list', async (req, res) => {
     try {
         const pool = await sql.connect(dbConfig);
-        const userId = req.currentUser?.id;
+        const userId = req.currentUser?.userId;
         const userEmail = req.currentUser?.email;
         
         const result = await pool.request()
@@ -87,7 +87,7 @@ router.post('/mark-read/:id', async (req, res) => {
 router.post('/mark-all-read', async (req, res) => {
     try {
         const pool = await sql.connect(dbConfig);
-        const userId = req.currentUser?.id;
+        const userId = req.currentUser?.userId;
         const userEmail = req.currentUser?.email;
         
         await pool.request()
@@ -109,7 +109,7 @@ router.post('/mark-all-read', async (req, res) => {
 router.get('/', async (req, res) => {
     try {
         const pool = await sql.connect(dbConfig);
-        const userId = req.currentUser?.id;
+        const userId = req.currentUser?.userId;
         const userEmail = req.currentUser?.email;
         
         const result = await pool.request()
