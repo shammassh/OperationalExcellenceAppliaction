@@ -2192,6 +2192,8 @@ router.get('/parking-violations', async (req, res) => {
                 <tr onclick="viewViolation(${v.Id})" style="cursor: pointer;">
                     <td>${violationDate}</td>
                     <td><span class="location-badge">${v.Location}</span></td>
+                    <td>${v.ViolatorName || '-'}</td>
+                    <td style="font-family: monospace; font-weight: 600;">${v.CarPlateNumber || '-'}</td>
                     <td>${v.CreatedBy}</td>
                     <td>${hasImage}</td>
                     <td>
@@ -2380,6 +2382,8 @@ router.get('/parking-violations', async (req, res) => {
                                         <tr>
                                             <th>Date</th>
                                             <th>Location</th>
+                                            <th>Violator Name</th>
+                                            <th>Car Plate</th>
                                             <th>Reported By</th>
                                             <th>Photo</th>
                                             <th>Action</th>
@@ -2433,13 +2437,15 @@ router.get('/parking-violations', async (req, res) => {
                                 return '<tr onclick="viewViolation(' + v.Id + ')" style="cursor: pointer;">' +
                                     '<td>' + violationDate + '</td>' +
                                     '<td><span class="location-badge">' + v.Location + '</span></td>' +
+                                    '<td>' + (v.ViolatorName || '-') + '</td>' +
+                                    '<td style="font-family: monospace; font-weight: 600;">' + (v.CarPlateNumber || '-') + '</td>' +
                                     '<td>' + v.CreatedBy + '</td>' +
                                     '<td>' + hasImage + '</td>' +
                                     '<td><button class="btn-view" onclick="event.stopPropagation(); viewViolation(' + v.Id + ')">View</button></td>' +
                                 '</tr>';
                             }).join('');
                             
-                            container.innerHTML = '<table><thead><tr><th>Date</th><th>Location</th><th>Reported By</th><th>Photo</th><th>Action</th></tr></thead><tbody>' + rows + '</tbody></table>';
+                            container.innerHTML = '<table><thead><tr><th>Date</th><th>Location</th><th>Violator Name</th><th>Car Plate</th><th>Reported By</th><th>Photo</th><th>Action</th></tr></thead><tbody>' + rows + '</tbody></table>';
                         } catch (err) {
                             console.error('Error filtering violations:', err);
                         }

@@ -303,6 +303,17 @@ router.get('/', (req, res) => {
                         </div>
                         
                         <div class="form-row">
+                            <div class="form-group">
+                                <label>Name of Violator <span class="required">*</span></label>
+                                <input type="text" id="violatorName" name="violatorName" placeholder="Enter violator's name" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Car Plate Number <span class="required">*</span></label>
+                                <input type="text" id="carPlateNumber" name="carPlateNumber" placeholder="Enter car plate number" required style="text-transform: uppercase;">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
                             <div class="form-group full-width">
                                 <label>Parking Lot Information</label>
                                 <textarea id="parkingLotInfo" name="parkingLotInfo" placeholder="Enter details about the parking violation..."></textarea>
@@ -469,9 +480,9 @@ router.get('/', (req, res) => {
 // Save Parking Violation
 router.post('/save', uploadMultiple, async (req, res) => {
     const user = req.currentUser;
-    const { violationDate, location, parkingLotInfo } = req.body;
+    const { violationDate, location, violatorName, carPlateNumber, parkingLotInfo } = req.body;
     
-    if (!violationDate || !location) {
+    if (!violationDate || !location || !violatorName || !carPlateNumber) {
         return res.json({ success: false, message: 'Missing required fields' });
     }
     
@@ -485,14 +496,16 @@ router.post('/save', uploadMultiple, async (req, res) => {
         const result = await pool.request()
             .input('violationDate', sql.Date, violationDate)
             .input('location', sql.NVarChar, location)
+            .input('violatorName', sql.NVarChar, violatorName)
+            .input('carPlateNumber', sql.NVarChar, carPlateNumber.toUpperCase())
             .input('parkingLotInfo', sql.NVarChar, parkingLotInfo || '')
             .input('imagePath', sql.NVarChar, firstImagePath)
             .input('createdBy', sql.NVarChar, user.displayName)
             .input('createdById', sql.NVarChar, user.id)
             .query(`
-                INSERT INTO Security_ParkingViolations (ViolationDate, Location, ParkingLotInfo, ImagePath, CreatedBy, CreatedById)
+                INSERT INTO Security_ParkingViolations (ViolationDate, Location, ViolatorName, CarPlateNumber, ParkingLotInfo, ImagePath, CreatedBy, CreatedById)
                 OUTPUT INSERTED.Id
-                VALUES (@violationDate, @location, @parkingLotInfo, @imagePath, @createdBy, @createdById)
+                VALUES (@violationDate, @location, @violatorName, @carPlateNumber, @parkingLotInfo, @imagePath, @createdBy, @createdById)
             `);
         
         const violationId = result.recordset[0].Id;
@@ -741,6 +754,14 @@ router.get('/:id', async (req, res) => {
                             <div class="info-item">
                                 <label>Created By</label>
                                 <span>${violation.CreatedBy}</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Violator Name</label>
+                                <span>${violation.ViolatorName || '-'}</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Car Plate Number</label>
+                                <span style="font-family: monospace; font-size: 18px; letter-spacing: 1px;">${violation.CarPlateNumber || '-'}</span>
                             </div>
                         </div>
                         
