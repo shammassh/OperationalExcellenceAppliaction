@@ -200,6 +200,7 @@ app.get('/dashboard', requireAuth, (req, res) => {
         'THIRDPARTY_BLACKLIST': 'thirdparty-blacklist',
         'SECURITY_DAILY_REPORTING': 'security-daily-reporting',
         'SEC_VISIT_CALENDAR': 'sec-visit-calendar',
+        'CAMERA_REQUEST': 'camera-request',
         
         // HR module (HR_DASHBOARD is required for HR access)
         'HR_DASHBOARD': 'hr',
@@ -227,7 +228,7 @@ app.get('/dashboard', requireAuth, (req, res) => {
     
     // System Administrator always has full access (no SQL check needed)
     if (roleNames.includes('System Administrator')) {
-        ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel', 'escalation', 'broadcast', 'maknezi-fnb', 'legal-cases', 'thirdparty-blacklist', 'security-daily-reporting', 'master-table', 'store-visit-calendar', 'sec-visit-calendar'].forEach(m => accessibleMenus.add(m));
+        ['stores', 'security-services', 'ohs', 'ohs-inspection', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel', 'escalation', 'broadcast', 'maknezi-fnb', 'legal-cases', 'thirdparty-blacklist', 'security-daily-reporting', 'master-table', 'store-visit-calendar', 'sec-visit-calendar', 'camera-request'].forEach(m => accessibleMenus.add(m));
     }
     
     // Build menu items based on permissions - organized by department/category
@@ -270,7 +271,8 @@ app.get('/dashboard', requireAuth, (req, res) => {
                 { id: 'legal-cases', icon: '⚖️', title: 'Legal Cases', href: '/security-emp/legal-cases', desc: 'Track and manage security legal cases' },
                 { id: 'thirdparty-blacklist', icon: '🚫', title: 'Third Party Blacklist', href: '/security-emp/blacklist', desc: 'Blacklisted third-party staff' },
                 { id: 'security-daily-reporting', icon: '📋', title: 'Daily Reporting', href: '/security-emp/daily-reporting', desc: 'Security guard daily reports' },
-                { id: 'sec-visit-calendar', icon: '📅', title: 'Visit Schedule', href: '/security-emp/calendar', desc: 'View and update store visit schedules' }
+                { id: 'sec-visit-calendar', icon: '📅', title: 'Visit Schedule', href: '/security-emp/calendar', desc: 'View and update store visit schedules' },
+                { id: 'camera-request', icon: '📹', title: 'Camera Request', href: '/security-emp/camera-request', desc: 'Camera requests and malfunction reports' }
             ]
         },
         {
