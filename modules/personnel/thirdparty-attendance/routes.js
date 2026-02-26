@@ -388,6 +388,53 @@ router.get('/view/:batchId', async (req, res) => {
                 ORDER BY Id
             `);
         
+        // Get total hours per employee
+        const employeeTotals = await pool.request()
+            .input('batchId', sql.UniqueIdentifier, batchId)
+            .query(`
+                SELECT 
+                    FirstName, 
+                    LastName, 
+                    Company,
+                    StoreName,
+                    COUNT(*) as DaysWorked,
+                    SUM(
+                        CASE 
+                            WHEN TotalHours LIKE '%:%' THEN 
+                                CAST(PARSENAME(REPLACE(TotalHours, ':', '.'), 2) AS DECIMAL(10,2)) + 
+                                (CAST(PARSENAME(REPLACE(TotalHours, ':', '.'), 1) AS DECIMAL(10,2)) / 60)
+                            ELSE TRY_CAST(TotalHours AS DECIMAL(10,2))
+                        END
+                    ) as TotalHours
+                FROM ThirdpartyAttendance
+                WHERE UploadBatchId = @batchId
+                GROUP BY FirstName, LastName, Company, StoreName
+                ORDER BY StoreName, FirstName, LastName
+            `);
+        
+        // Get total hours per store
+        const storeTotals = await pool.request()
+            .input('batchId', sql.UniqueIdentifier, batchId)
+            .query(`
+                SELECT 
+                    StoreName,
+                    StoreCode,
+                    COUNT(DISTINCT CONCAT(FirstName, ' ', LastName)) as EmployeeCount,
+                    COUNT(*) as TotalRecords,
+                    SUM(
+                        CASE 
+                            WHEN TotalHours LIKE '%:%' THEN 
+                                CAST(PARSENAME(REPLACE(TotalHours, ':', '.'), 2) AS DECIMAL(10,2)) + 
+                                (CAST(PARSENAME(REPLACE(TotalHours, ':', '.'), 1) AS DECIMAL(10,2)) / 60)
+                            ELSE TRY_CAST(TotalHours AS DECIMAL(10,2))
+                        END
+                    ) as TotalHours
+                FROM ThirdpartyAttendance
+                WHERE UploadBatchId = @batchId
+                GROUP BY StoreName, StoreCode
+                ORDER BY StoreName
+            `);
+        
         await pool.close();
         
         const uploadedAt = new Date(upload.UploadedAt).toLocaleDateString('en-GB') + ' ' +
@@ -411,6 +458,37 @@ router.get('/view/:batchId', async (req, res) => {
                 </tr>
             `;
         }).join('');
+        
+        // Build employee totals table rows
+        const employeeTotalRows = employeeTotals.recordset.map((e, idx) => {
+            return `
+                <tr>
+                    <td>${idx + 1}</td>
+                    <td>${e.FirstName || '-'} ${e.LastName || ''}</td>
+                    <td>${e.Company || '-'}</td>
+                    <td>${e.StoreName || '-'}</td>
+                    <td>${e.DaysWorked}</td>
+                    <td><strong>${e.TotalHours || 0}</strong></td>
+                </tr>
+            `;
+        }).join('');
+        
+        // Build store totals table rows
+        const storeTotalRows = storeTotals.recordset.map((s, idx) => {
+            return `
+                <tr>
+                    <td>${idx + 1}</td>
+                    <td>${s.StoreName || '-'}</td>
+                    <td>${s.StoreCode || '-'}</td>
+                    <td>${s.EmployeeCount}</td>
+                    <td>${s.TotalRecords}</td>
+                    <td><strong>${s.TotalHours || 0}</strong></td>
+                </tr>
+            `;
+        }).join('');
+        
+        // Calculate grand total hours
+        const grandTotalHours = storeTotals.recordset.reduce((sum, s) => sum + (parseFloat(s.TotalHours) || 0), 0);
         
         res.send(`
             <!DOCTYPE html>
@@ -519,6 +597,56 @@ router.get('/view/:batchId', async (req, res) => {
                                     ${tableRows || '<tr><td colspan="11" style="text-align:center;color:#666;">No records</td></tr>'}
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                    
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div class="card">
+                            <div class="card-title">🏪 Total Hours by Store</div>
+                            <div style="overflow-x:auto;">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Store</th>
+                                            <th>Code</th>
+                                            <th>Employees</th>
+                                            <th>Records</th>
+                                            <th>Total Hours</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${storeTotalRows || '<tr><td colspan="6" style="text-align:center;color:#666;">No data</td></tr>'}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr style="background:#f39c12; color:white; font-weight:bold;">
+                                            <td colspan="5" style="text-align:right;">Grand Total:</td>
+                                            <td>${grandTotalHours.toFixed(2)}</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-title">👤 Total Hours by Employee</div>
+                            <div style="overflow-x:auto; max-height: 400px;">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Employee</th>
+                                            <th>Company</th>
+                                            <th>Store</th>
+                                            <th>Days</th>
+                                            <th>Total Hours</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${employeeTotalRows || '<tr><td colspan="6" style="text-align:center;color:#666;">No data</td></tr>'}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
