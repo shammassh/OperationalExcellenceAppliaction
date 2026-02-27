@@ -5,6 +5,7 @@ const ExcelJS = require('exceljs');
 const config = require('../../config/default');
 const SharePointUsersService = require('../../gmrl-auth/admin/services/sharepoint-users-service');
 const escalationService = require('../../services/action-plan-escalation');
+const fiveDaysReminderService = require('../../services/five-days-reminder-service');
 
 const dbConfig = {
     server: config.database.server,
@@ -161,6 +162,142 @@ router.post('/api/job-monitor/stop-scheduler', async (req, res) => {
     } catch (err) {
         console.error('Error stopping scheduler:', err);
         res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ============================================================================
+// 5 DAYS REMINDER API ROUTES
+// ============================================================================
+
+// Get 5 Days reminder status
+router.get('/api/job-monitor/five-days/status', async (req, res) => {
+    try {
+        const status = fiveDaysReminderService.getSchedulerStatus();
+        res.json({ success: true, ...status });
+    } catch (err) {
+        console.error('Error getting 5 Days status:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Run 5 Days reminders now
+router.post('/api/job-monitor/five-days/run-now', async (req, res) => {
+    try {
+        const status = fiveDaysReminderService.getSchedulerStatus();
+        
+        if (status.isRunning) {
+            return res.status(400).json({ 
+                success: false, 
+                error: '5 Days job is already running. Please wait for it to complete.' 
+            });
+        }
+        
+        // Run asynchronously
+        fiveDaysReminderService.runFiveDaysReminders()
+            .then(results => {
+                console.log('[5 Days Job] Manual run completed:', results);
+            })
+            .catch(err => {
+                console.error('[5 Days Job] Manual run failed:', err);
+            });
+        
+        res.json({ 
+            success: true, 
+            message: '5 Days reminder job started. Refresh to see results.' 
+        });
+    } catch (err) {
+        console.error('Error triggering 5 Days run:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Dry run 5 Days - preview what would be sent
+router.get('/api/job-monitor/five-days/dry-run', async (req, res) => {
+    try {
+        const preview = await fiveDaysReminderService.getDryRunPreview();
+        res.json({ success: true, ...preview });
+    } catch (err) {
+        console.error('Error getting 5 Days dry run:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Get 5 Days cycle info
+router.get('/api/job-monitor/five-days/cycle-info', async (req, res) => {
+    try {
+        const cycleInfo = fiveDaysReminderService.getCurrentCycleInfo();
+        const reminderType = fiveDaysReminderService.getReminderType(cycleInfo);
+        res.json({ success: true, cycleInfo, reminderType });
+    } catch (err) {
+        console.error('Error getting cycle info:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Get 5 Days settings
+router.get('/api/job-monitor/five-days/settings', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        const result = await pool.request().query(`
+            SELECT SettingKey, SettingValue, Description 
+            FROM FiveDaysSettings
+            ORDER BY SettingKey
+        `);
+        res.json({ success: true, settings: result.recordset });
+    } catch (err) {
+        // Table might not exist yet
+        res.json({ success: true, settings: [] });
+    } finally {
+        if (pool) await pool.close();
+    }
+});
+
+// Update 5 Days setting
+router.put('/api/job-monitor/five-days/settings/:key', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        const { value } = req.body;
+        
+        await pool.request()
+            .input('key', sql.NVarChar, req.params.key)
+            .input('value', sql.NVarChar, value)
+            .input('updatedBy', sql.Int, req.currentUser?.userId || 1)
+            .query(`
+                UPDATE FiveDaysSettings 
+                SET SettingValue = @value, UpdatedAt = GETDATE(), UpdatedBy = @updatedBy
+                WHERE SettingKey = @key
+            `);
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating 5 Days setting:', err);
+        res.status(500).json({ success: false, error: err.message });
+    } finally {
+        if (pool) await pool.close();
+    }
+});
+
+// Get 5 Days reminder history
+router.get('/api/job-monitor/five-days/history', async (req, res) => {
+    let pool;
+    try {
+        pool = await sql.connect(dbConfig);
+        const result = await pool.request().query(`
+            SELECT TOP 100
+                l.Id, l.CycleKey, l.ReminderType, l.RecipientEmail, l.SentAt,
+                s.StoreName
+            FROM FiveDaysReminderLog l
+            LEFT JOIN Stores s ON l.StoreId = s.Id
+            ORDER BY l.SentAt DESC
+        `);
+        res.json({ success: true, history: result.recordset });
+    } catch (err) {
+        // Table might not exist yet
+        res.json({ success: true, history: [] });
+    } finally {
+        if (pool) await pool.close();
     }
 });
 
@@ -6131,6 +6268,7 @@ router.get('/job-monitor', async (req, res) => {
                         <div class="tab active" data-tab="oe-tab">📋 OE Inspections (${oeInspections.length})</div>
                         <div class="tab" data-tab="ohs-tab">📋 OHS Inspections (${ohsInspections.length})</div>
                         <div class="tab" data-tab="theft-tab">🚨 Theft Incidents (${theftIncidents.length})</div>
+                        <div class="tab" data-tab="fivedays-tab">📅 5 Days Reminders</div>
                         <div class="tab" data-tab="templates-tab">📧 Email Templates</div>
                     </div>
                     
@@ -6246,6 +6384,77 @@ router.get('/job-monitor', async (req, res) => {
                                     </tbody>
                                 </table>
                             ` : '<div class="empty-state"><div class="icon">📧</div><p>No emails sent yet</p></div>'}
+                        </div>
+                    </div>
+                    
+                    <!-- 5 Days Reminders Tab -->
+                    <div class="tab-content" id="fivedays-tab">
+                        <div class="section">
+                            <div class="section-header">
+                                <h2><span class="badge" style="background:#667eea20;color:#667eea;">📅</span> 5 Days Expired Items - Reminder System</h2>
+                                <button class="btn btn-primary btn-sm" onclick="runFiveDaysNow()">▶️ Run Now</button>
+                            </div>
+                            
+                            <div class="info-banner" style="margin-bottom: 20px;">
+                                <strong>📅 5 Days Cycle:</strong> Stores must record expired items during the 1st-5th and 15th-19th of each month.
+                                This system sends automatic reminders throughout the cycle.
+                            </div>
+                            
+                            <!-- Cycle Status -->
+                            <div class="scheduler-row" style="margin-bottom: 20px;">
+                                <div class="scheduler-card" id="fiveDaysCycleCard">
+                                    <div class="icon">📅</div>
+                                    <div class="info">
+                                        <div class="label">Current Cycle</div>
+                                        <div class="value" id="fiveDaysCycleInfo">Loading...</div>
+                                    </div>
+                                </div>
+                                <div class="scheduler-card">
+                                    <div class="icon">📧</div>
+                                    <div class="info">
+                                        <div class="label">Today's Reminder</div>
+                                        <div class="value" id="fiveDaysReminderType">-</div>
+                                    </div>
+                                </div>
+                                <div class="scheduler-card">
+                                    <div class="icon">🕐</div>
+                                    <div class="info">
+                                        <div class="label">Last Run</div>
+                                        <div class="value" id="fiveDaysLastRun">-</div>
+                                    </div>
+                                </div>
+                                <div class="scheduler-card">
+                                    <div class="icon">📤</div>
+                                    <div class="info">
+                                        <div class="label">Emails Sent (Total)</div>
+                                        <div class="value" id="fiveDaysEmailsSent">0</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Reminder Schedule -->
+                            <h4 style="font-size: 14px; margin: 20px 0 10px; color: #333;">📋 Reminder Schedule</h4>
+                            <table class="tracking-table">
+                                <thead>
+                                    <tr><th>Day</th><th>Reminder Type</th><th>Description</th><th>Priority</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>Day 1 (Cycle Start)</td><td><span class="status-pill completed">INITIATE</span></td><td>Inform stores the cycle has started</td><td>🔴 High</td></tr>
+                                    <tr><td>Day 3</td><td><span class="status-pill due-soon">48H REMINDER</span></td><td>48 hours left to complete entries</td><td>🔴 High</td></tr>
+                                    <tr><td>Day 1-5</td><td><span class="status-pill no-deadline">DAY_1 to DAY_5</span></td><td>Daily reminder to submit findings</td><td>🟡 Normal</td></tr>
+                                    <tr class="due-soon"><td>Day 6 (After Cycle)</td><td><span class="status-pill due-soon">FINAL_REMINDER</span></td><td>Final reminder to present all findings</td><td>🔴 High</td></tr>
+                                    <tr class="overdue"><td>Day 7-10</td><td><span class="status-pill overdue">OVERDUE_WARNING</span></td><td>Warning: Missing data affects audit</td><td>🔴 High</td></tr>
+                                </tbody>
+                            </table>
+                            
+                            <!-- Dry Run Preview -->
+                            <h4 style="font-size: 14px; margin: 30px 0 10px; color: #333;">🧪 Dry Run Preview</h4>
+                            <button class="btn btn-outline btn-sm" onclick="fiveDaysDryRun()" style="margin-bottom: 15px;">👁️ Preview What Would Be Sent</button>
+                            <div id="fiveDaysDryRunResults" style="display:none;"></div>
+                            
+                            <!-- Recent History -->
+                            <h4 style="font-size: 14px; margin: 30px 0 10px; color: #333;">📧 Recent Email History</h4>
+                            <div id="fiveDaysHistory">Loading...</div>
                         </div>
                     </div>
                     
@@ -6605,6 +6814,158 @@ router.get('/job-monitor', async (req, res) => {
                     ['previewModal', 'dryrunModal'].forEach(id => {
                         document.getElementById(id).addEventListener('click', function(e) { if (e.target === this) closeModal(id); });
                     });
+                    
+                    // ==========================================
+                    // 5 DAYS REMINDER FUNCTIONS
+                    // ==========================================
+                    
+                    // Load 5 Days status on page load
+                    loadFiveDaysStatus();
+                    
+                    async function loadFiveDaysStatus() {
+                        try {
+                            const res = await fetch('/admin/api/job-monitor/five-days/status');
+                            const data = await res.json();
+                            if (data.success) {
+                                const cycle = data.currentCycle;
+                                
+                                // Update cycle info
+                                if (cycle && cycle.cycleKey) {
+                                    document.getElementById('fiveDaysCycleInfo').textContent = 
+                                        'Cycle ' + cycle.cycleNumber + ' (' + (cycle.isInCycle ? 'Day ' + cycle.daysIntoCycle : 'Ended') + ')';
+                                    document.getElementById('fiveDaysCycleCard').className = 'scheduler-card ' + (cycle.isInCycle ? 'ok' : 'idle');
+                                } else {
+                                    document.getElementById('fiveDaysCycleInfo').textContent = 'Between Cycles';
+                                    document.getElementById('fiveDaysCycleCard').className = 'scheduler-card idle';
+                                }
+                                
+                                // Update last run and stats
+                                document.getElementById('fiveDaysLastRun').textContent = data.lastRunTime ? new Date(data.lastRunTime).toLocaleString() : 'Never';
+                                document.getElementById('fiveDaysEmailsSent').textContent = data.stats?.emailsSent || 0;
+                            }
+                            
+                            // Get reminder type
+                            const cycleRes = await fetch('/admin/api/job-monitor/five-days/cycle-info');
+                            const cycleData = await cycleRes.json();
+                            if (cycleData.success && cycleData.reminderType) {
+                                document.getElementById('fiveDaysReminderType').textContent = cycleData.reminderType.replace(/_/g, ' ');
+                            } else {
+                                document.getElementById('fiveDaysReminderType').textContent = 'None scheduled';
+                            }
+                            
+                            // Load history
+                            loadFiveDaysHistory();
+                        } catch (e) {
+                            console.error('Error loading 5 Days status:', e);
+                        }
+                    }
+                    
+                    async function loadFiveDaysHistory() {
+                        try {
+                            const res = await fetch('/admin/api/job-monitor/five-days/history');
+                            const data = await res.json();
+                            const container = document.getElementById('fiveDaysHistory');
+                            
+                            if (data.success && data.history && data.history.length > 0) {
+                                container.innerHTML = \`
+                                    <table class="tracking-table">
+                                        <thead><tr><th>Date</th><th>Cycle</th><th>Type</th><th>Store</th><th>Recipient</th></tr></thead>
+                                        <tbody>
+                                            \${data.history.slice(0, 50).map(h => \`
+                                                <tr>
+                                                    <td>\${new Date(h.SentAt).toLocaleString()}</td>
+                                                    <td>\${h.CycleKey || '-'}</td>
+                                                    <td><span class="status-pill no-deadline">\${h.ReminderType || '-'}</span></td>
+                                                    <td>\${h.StoreName || '-'}</td>
+                                                    <td>\${h.RecipientEmail || '-'}</td>
+                                                </tr>
+                                            \`).join('')}
+                                        </tbody>
+                                    </table>
+                                \`;
+                            } else {
+                                container.innerHTML = '<div class="empty-state"><div class="icon">📧</div><p>No reminder history yet</p></div>';
+                            }
+                        } catch (e) {
+                            document.getElementById('fiveDaysHistory').innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>Error loading history</p></div>';
+                        }
+                    }
+                    
+                    async function runFiveDaysNow() {
+                        if (!confirm('Run 5 Days reminder job now? This will send emails to stores based on the current cycle.')) return;
+                        
+                        try {
+                            const res = await fetch('/admin/api/job-monitor/five-days/run-now', { method: 'POST' });
+                            const data = await res.json();
+                            if (data.success) {
+                                showToast('5 Days job started!', 'success');
+                                setTimeout(() => location.reload(), 2000);
+                            } else {
+                                showToast(data.error || 'Failed to run job', 'error');
+                            }
+                        } catch (e) {
+                            showToast('Error: ' + e.message, 'error');
+                        }
+                    }
+                    
+                    async function fiveDaysDryRun() {
+                        const container = document.getElementById('fiveDaysDryRunResults');
+                        container.style.display = 'block';
+                        container.innerHTML = '<div class="dryrun-empty"><span class="loading loading-dark"></span> Checking...</div>';
+                        
+                        try {
+                            const res = await fetch('/admin/api/job-monitor/five-days/dry-run');
+                            const data = await res.json();
+                            
+                            if (data.success) {
+                                let html = '<div style="background:#f8f9fa;border-radius:8px;padding:15px;margin-bottom:15px;">';
+                                
+                                // Cycle info
+                                if (data.cycleInfo && data.cycleInfo.cycleKey) {
+                                    html += '<p><strong>📅 Cycle:</strong> ' + data.cycleInfo.cycleKey + '</p>';
+                                    html += '<p><strong>📧 Reminder Type:</strong> ' + (data.reminderType || 'None') + '</p>';
+                                } else {
+                                    html += '<p><strong>📅 Status:</strong> Between cycles - no reminders scheduled</p>';
+                                }
+                                
+                                html += '<p><strong>📊 Stores:</strong> Total: ' + data.totalStores + ' | Target: ' + data.targetStores + ' | Completed: ' + data.completedStores + '</p>';
+                                html += '</div>';
+                                
+                                // Recipients
+                                if (data.recipients && data.recipients.length > 0) {
+                                    html += '<h5 style="margin:15px 0 10px;">📧 Would Send To (' + data.recipients.length + '):</h5>';
+                                    html += data.recipients.slice(0, 20).map(r => \`
+                                        <div class="dryrun-item">
+                                            <h4>\${r.store}</h4>
+                                            <p><strong>To:</strong> \${r.email} (\${r.name})</p>
+                                            <p><strong>Entries:</strong> \${r.entryCount} | <strong>Status:</strong> \${r.hasSubmitted ? '✅ Submitted' : '⏳ Pending'}</p>
+                                        </div>
+                                    \`).join('');
+                                    if (data.recipients.length > 20) {
+                                        html += '<p style="color:#888;font-size:12px;">...and ' + (data.recipients.length - 20) + ' more</p>';
+                                    }
+                                } else {
+                                    html += '<div class="dryrun-empty">✅ No emails would be sent (all stores completed or no cycle active)</div>';
+                                }
+                                
+                                // Content preview
+                                if (data.content) {
+                                    html += '<h5 style="margin:20px 0 10px;">📝 Message Preview:</h5>';
+                                    html += '<div style="background:#fff;border:1px solid #ddd;border-radius:8px;padding:15px;">';
+                                    html += '<p><strong>Title:</strong> ' + data.content.title + '</p>';
+                                    html += '<p><strong>Priority:</strong> ' + data.content.priority + '</p>';
+                                    html += '<p style="white-space:pre-wrap;background:#f8f9fa;padding:10px;border-radius:4px;margin-top:10px;">' + data.content.message + '</p>';
+                                    html += '</div>';
+                                }
+                                
+                                container.innerHTML = html;
+                            } else {
+                                container.innerHTML = '<div class="dryrun-empty">❌ ' + (data.error || 'Error') + '</div>';
+                            }
+                        } catch (e) {
+                            container.innerHTML = '<div class="dryrun-empty">❌ ' + e.message + '</div>';
+                        }
+                    }
                 </script>
             </body>
             </html>
