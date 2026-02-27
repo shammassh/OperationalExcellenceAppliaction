@@ -253,7 +253,8 @@ app.get('/dashboard', requireAuth, (req, res) => {
             items: [
                 { id: 'ohs', icon: '🦺', title: 'OHS Incidents', href: '/ohs', desc: 'OHS incidents & reports' },
                 { id: 'ohs-inspection', icon: '🛡️', title: 'OHS Inspection', href: '/ohs-inspection', desc: 'OHS safety inspections & audits' },
-                { id: 'fire-equipment', icon: '🧯', title: 'Fire Equipment', href: '/ohs/fire-equipment', desc: 'Fire fighting equipment register' }
+                { id: 'fire-equipment', icon: '🧯', title: 'Fire Equipment', href: '/ohs/fire-equipment', desc: 'Fire fighting equipment register' },
+                { id: 'ora', icon: '📋', title: 'Risk Assessment (ORA)', href: '/ohs/ora', desc: 'Overall Risk Assessment' }
             ]
         },
         {

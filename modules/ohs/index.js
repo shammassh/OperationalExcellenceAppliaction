@@ -10,11 +10,15 @@ const router = express.Router();
 const ohsSettings = require('./settings');
 const fireEquipment = require('./fire-equipment');
 const fireEquipmentAdmin = require('./fire-equipment-admin');
+const ora = require('./ora');
+const oraAdmin = require('./ora-admin');
 
 // Mount sub-routes
 router.use('/settings', ohsSettings);
 router.use('/fire-equipment', fireEquipment);
 router.use('/fire-equipment/admin', fireEquipmentAdmin);
+router.use('/ora', ora);
+router.use('/ora/admin', oraAdmin);
 
 // OHS Landing Page
 router.get('/', (req, res) => {
@@ -28,10 +32,12 @@ router.get('/', (req, res) => {
         { id: 'injury-types', icon: '🩹', title: 'Injury Types', href: '/ohs/settings/injury-types', desc: 'Configure injury types for reporting', color: '#e17055' },
         { id: 'body-parts', icon: '🦴', title: 'Body Parts', href: '/ohs/settings/body-parts', desc: 'Manage body part options for injuries', color: '#fdcb6e' },
         { id: 'fire-equipment-setup', icon: '⚙️', title: 'Fire Equipment Setup', href: '/ohs/fire-equipment/admin', desc: 'Configure fire equipment types and store registry', color: '#d63031' },
+        { id: 'ora-setup', icon: '⚙️', title: 'ORA Setup', href: '/ohs/ora/admin', desc: 'Configure hazard categories and risk matrix', color: '#6c5ce7' },
     ];
     
     // Dashboard cards
     const dashboardCards = [
+        { id: 'ora', icon: '📋', title: 'Risk Assessment (ORA)', href: '/ohs/ora', desc: 'Overall Risk Assessment and action planning', color: '#6c5ce7' },
         { id: 'fire-equipment', icon: '🧯', title: 'Fire Equipment Register', href: '/ohs/fire-equipment', desc: 'Manage fire fighting equipment inspections', color: '#d63031' },
         { id: 'all-incidents', icon: '📊', title: 'All Incidents', href: '/stores/ohs-incident/history', desc: 'View and manage all reported incidents', color: '#e17055' },
         { id: 'pending-review', icon: '⏳', title: 'Pending Review', href: '/stores/ohs-incident/history?status=pending', desc: 'Incidents awaiting review', color: '#fdcb6e' },
