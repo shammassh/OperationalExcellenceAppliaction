@@ -626,7 +626,9 @@ router.get('/api/templates/schemas/:schemaId', async (req, res) => {
                     SELECT Id as itemId, ReferenceValue as referenceValue, Question as title, Coefficient as coeff, AnswerOptions as answer, Criteria as cr
                     FROM OE_InspectionTemplateItems
                     WHERE SectionId = @sectionId AND IsActive = 1
-                    ORDER BY ReferenceValue
+                    ORDER BY 
+                        CAST(PARSENAME(REPLACE(ReferenceValue, '-', '.'), 2) AS INT),
+                        CAST(PARSENAME(REPLACE(ReferenceValue, '-', '.'), 1) AS INT)
                 `);
             section.items = itemsResult.recordset;
             template.sections.push(section);
@@ -775,7 +777,9 @@ router.get('/api/templates/sections/:sectionId/items', async (req, res) => {
                        IsQuantitative as isQuantitative, Range1From as range1From, Range1To as range1To, Range2From as range2From, Range2To as range2To, Range3From as range3From
                 FROM OE_InspectionTemplateItems
                 WHERE SectionId = @sectionId AND IsActive = 1
-                ORDER BY ReferenceValue
+                ORDER BY 
+                    CAST(PARSENAME(REPLACE(ReferenceValue, '-', '.'), 2) AS INT),
+                    CAST(PARSENAME(REPLACE(ReferenceValue, '-', '.'), 1) AS INT)
             `);
         await pool.close();
         res.json({ success: true, data: result.recordset });
@@ -1732,7 +1736,9 @@ router.get('/api/audits/:auditId', async (req, res) => {
                         Range3From as range3From
                     FROM OE_InspectionItems
                     WHERE InspectionId = @inspectionId AND SectionName = @sectionName
-                    ORDER BY ItemOrder
+                    ORDER BY 
+                        CAST(PARSENAME(REPLACE(ReferenceValue, '-', '.'), 2) AS INT),
+                        CAST(PARSENAME(REPLACE(ReferenceValue, '-', '.'), 1) AS INT)
                 `);
             section.items = itemsResult.recordset;
             sections.push(section);
@@ -2712,7 +2718,9 @@ router.get('/api/action-plan/by-doc/:documentNumber', async (req, res) => {
                 LEFT JOIN OE_ActionItemVerification v ON v.ActionItemId = a.Id
                 LEFT JOIN Users u ON v.VerifiedBy = u.Id
                 WHERE i.DocumentNumber = @documentNumber
-                ORDER BY a.Priority DESC, a.ReferenceValue
+                ORDER BY a.Priority DESC, 
+                    CAST(PARSENAME(REPLACE(a.ReferenceValue, '-', '.'), 2) AS INT),
+                    CAST(PARSENAME(REPLACE(a.ReferenceValue, '-', '.'), 1) AS INT)
             `);
         
         await pool.close();
