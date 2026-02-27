@@ -6432,20 +6432,82 @@ router.get('/job-monitor', async (req, res) => {
                                 </div>
                             </div>
                             
-                            <!-- Reminder Schedule -->
-                            <h4 style="font-size: 14px; margin: 20px 0 10px; color: #333;">📋 Reminder Schedule</h4>
-                            <table class="tracking-table">
-                                <thead>
-                                    <tr><th>Day</th><th>Reminder Type</th><th>Description</th><th>Priority</th></tr>
-                                </thead>
-                                <tbody>
-                                    <tr><td>Day 1 (Cycle Start)</td><td><span class="status-pill completed">INITIATE</span></td><td>Inform stores the cycle has started</td><td>🔴 High</td></tr>
-                                    <tr><td>Day 3</td><td><span class="status-pill due-soon">48H REMINDER</span></td><td>48 hours left to complete entries</td><td>🔴 High</td></tr>
-                                    <tr><td>Day 1-5</td><td><span class="status-pill no-deadline">DAY_1 to DAY_5</span></td><td>Daily reminder to submit findings</td><td>🟡 Normal</td></tr>
-                                    <tr class="due-soon"><td>Day 6 (After Cycle)</td><td><span class="status-pill due-soon">FINAL_REMINDER</span></td><td>Final reminder to present all findings</td><td>🔴 High</td></tr>
-                                    <tr class="overdue"><td>Day 7-10</td><td><span class="status-pill overdue">OVERDUE_WARNING</span></td><td>Warning: Missing data affects audit</td><td>🔴 High</td></tr>
-                                </tbody>
-                            </table>
+                            <!-- Visual Step Tracker -->
+                            <h4 style="font-size: 14px; margin: 20px 0 10px; color: #333;">📊 Cycle Progress Tracker</h4>
+                            <div id="fiveDaysStepTracker" style="background: #f8f9fa; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                                <div style="display: flex; justify-content: space-between; position: relative; margin-bottom: 30px;">
+                                    <!-- Progress Line -->
+                                    <div style="position: absolute; top: 20px; left: 30px; right: 30px; height: 4px; background: #e0e0e0; z-index: 1;"></div>
+                                    <div id="fiveDaysProgressLine" style="position: absolute; top: 20px; left: 30px; height: 4px; background: linear-gradient(90deg, #667eea, #764ba2); z-index: 2; width: 0%; transition: width 0.5s;"></div>
+                                    
+                                    <!-- Steps -->
+                                    <div class="step-item" data-step="INITIATE" style="text-align: center; z-index: 3; flex: 1;">
+                                        <div class="step-circle" id="step-INITIATE" style="width: 40px; height: 40px; border-radius: 50%; background: #e0e0e0; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; font-size: 16px; transition: all 0.3s;">📢</div>
+                                        <div style="font-size: 11px; color: #666;">Day 1</div>
+                                        <div style="font-size: 10px; font-weight: 600;">INITIATE</div>
+                                    </div>
+                                    <div class="step-item" data-step="DAY_2" style="text-align: center; z-index: 3; flex: 1;">
+                                        <div class="step-circle" id="step-DAY_2" style="width: 40px; height: 40px; border-radius: 50%; background: #e0e0e0; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; font-size: 16px; transition: all 0.3s;">📋</div>
+                                        <div style="font-size: 11px; color: #666;">Day 2</div>
+                                        <div style="font-size: 10px; font-weight: 600;">DAY 2</div>
+                                    </div>
+                                    <div class="step-item" data-step="REMINDER_48H" style="text-align: center; z-index: 3; flex: 1;">
+                                        <div class="step-circle" id="step-REMINDER_48H" style="width: 40px; height: 40px; border-radius: 50%; background: #e0e0e0; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; font-size: 16px; transition: all 0.3s;">⏰</div>
+                                        <div style="font-size: 11px; color: #666;">Day 3</div>
+                                        <div style="font-size: 10px; font-weight: 600;">48H</div>
+                                    </div>
+                                    <div class="step-item" data-step="DAY_4" style="text-align: center; z-index: 3; flex: 1;">
+                                        <div class="step-circle" id="step-DAY_4" style="width: 40px; height: 40px; border-radius: 50%; background: #e0e0e0; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; font-size: 16px; transition: all 0.3s;">📋</div>
+                                        <div style="font-size: 11px; color: #666;">Day 4</div>
+                                        <div style="font-size: 10px; font-weight: 600;">DAY 4</div>
+                                    </div>
+                                    <div class="step-item" data-step="DAY_5" style="text-align: center; z-index: 3; flex: 1;">
+                                        <div class="step-circle" id="step-DAY_5" style="width: 40px; height: 40px; border-radius: 50%; background: #e0e0e0; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; font-size: 16px; transition: all 0.3s;">📋</div>
+                                        <div style="font-size: 11px; color: #666;">Day 5</div>
+                                        <div style="font-size: 10px; font-weight: 600;">FINAL DAY</div>
+                                    </div>
+                                    <div class="step-item" data-step="FINAL_REMINDER" style="text-align: center; z-index: 3; flex: 1;">
+                                        <div class="step-circle" id="step-FINAL_REMINDER" style="width: 40px; height: 40px; border-radius: 50%; background: #e0e0e0; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; font-size: 16px; transition: all 0.3s;">⚠️</div>
+                                        <div style="font-size: 11px; color: #666;">Day 6</div>
+                                        <div style="font-size: 10px; font-weight: 600;">FINAL</div>
+                                    </div>
+                                    <div class="step-item" data-step="OVERDUE_WARNING" style="text-align: center; z-index: 3; flex: 1;">
+                                        <div class="step-circle" id="step-OVERDUE_WARNING" style="width: 40px; height: 40px; border-radius: 50%; background: #e0e0e0; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; font-size: 16px; transition: all 0.3s;">🚨</div>
+                                        <div style="font-size: 11px; color: #666;">Day 7+</div>
+                                        <div style="font-size: 10px; font-weight: 600;">OVERDUE</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Legend -->
+                                <div style="display: flex; gap: 20px; justify-content: center; font-size: 11px; color: #666; border-top: 1px solid #ddd; padding-top: 15px;">
+                                    <span><span style="display: inline-block; width: 12px; height: 12px; background: #28a745; border-radius: 50%; margin-right: 5px;"></span> Completed</span>
+                                    <span><span style="display: inline-block; width: 12px; height: 12px; background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 50%; margin-right: 5px;"></span> Current</span>
+                                    <span><span style="display: inline-block; width: 12px; height: 12px; background: #e0e0e0; border-radius: 50%; margin-right: 5px;"></span> Upcoming</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Sent Reminders for Current Cycle -->
+                            <h4 style="font-size: 14px; margin: 20px 0 10px; color: #333;">✅ Sent Reminders (Current Cycle)</h4>
+                            <div id="fiveDaysSentReminders" style="margin-bottom: 20px;">Loading...</div>
+                            
+                            <!-- Reminder Schedule Reference -->
+                            <details style="margin-bottom: 20px;">
+                                <summary style="cursor: pointer; font-size: 14px; font-weight: 600; color: #333; padding: 10px; background: #f8f9fa; border-radius: 8px;">📋 View Full Reminder Schedule</summary>
+                                <table class="tracking-table" style="margin-top: 10px;">
+                                    <thead>
+                                        <tr><th>Day</th><th>Reminder Type</th><th>Description</th><th>Priority</th><th>Target</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td>Day 1 (Cycle Start)</td><td><span class="status-pill completed">INITIATE</span></td><td>Inform stores the cycle has started</td><td>🔴 High</td><td>All Stores</td></tr>
+                                        <tr><td>Day 2</td><td><span class="status-pill no-deadline">DAY_2</span></td><td>Continue recording findings</td><td>🟡 Normal</td><td>All Stores</td></tr>
+                                        <tr><td>Day 3</td><td><span class="status-pill due-soon">48H REMINDER</span></td><td>48 hours left to complete entries</td><td>🔴 High</td><td>Stores without entries</td></tr>
+                                        <tr><td>Day 4</td><td><span class="status-pill no-deadline">DAY_4</span></td><td>Almost done! Continue your checks</td><td>🟡 Normal</td><td>All Stores</td></tr>
+                                        <tr><td>Day 5</td><td><span class="status-pill no-deadline">DAY_5</span></td><td>Final day of cycle - complete all entries</td><td>🔴 High</td><td>All Stores</td></tr>
+                                        <tr class="due-soon"><td>Day 6 (After Cycle)</td><td><span class="status-pill due-soon">FINAL_REMINDER</span></td><td>Final reminder to present all findings</td><td>🔴 High</td><td>Stores without submissions</td></tr>
+                                        <tr class="overdue"><td>Day 7-10</td><td><span class="status-pill overdue">OVERDUE_WARNING</span></td><td>Warning: Missing data affects audit</td><td>🔴 High</td><td>Stores without submissions</td></tr>
+                                    </tbody>
+                                </table>
+                            </details>
                             
                             <!-- Dry Run Preview -->
                             <h4 style="font-size: 14px; margin: 30px 0 10px; color: #333;">🧪 Dry Run Preview</h4>
@@ -6826,13 +6888,19 @@ router.get('/job-monitor', async (req, res) => {
                         try {
                             const res = await fetch('/admin/api/job-monitor/five-days/status');
                             const data = await res.json();
+                            let currentReminderType = null;
+                            let cycleKey = null;
+                            let daysIntoCycle = 0;
+                            
                             if (data.success) {
                                 const cycle = data.currentCycle;
                                 
                                 // Update cycle info
                                 if (cycle && cycle.cycleKey) {
+                                    cycleKey = cycle.cycleKey;
+                                    daysIntoCycle = cycle.daysIntoCycle || 0;
                                     document.getElementById('fiveDaysCycleInfo').textContent = 
-                                        'Cycle ' + cycle.cycleNumber + ' (' + (cycle.isInCycle ? 'Day ' + cycle.daysIntoCycle : 'Ended') + ')';
+                                        'Cycle ' + cycle.cycleNumber + ' (' + (cycle.isInCycle ? 'Day ' + cycle.daysIntoCycle : 'Day ' + (5 + cycle.daysAfterCycle)) + ')';
                                     document.getElementById('fiveDaysCycleCard').className = 'scheduler-card ' + (cycle.isInCycle ? 'ok' : 'idle');
                                 } else {
                                     document.getElementById('fiveDaysCycleInfo').textContent = 'Between Cycles';
@@ -6848,15 +6916,126 @@ router.get('/job-monitor', async (req, res) => {
                             const cycleRes = await fetch('/admin/api/job-monitor/five-days/cycle-info');
                             const cycleData = await cycleRes.json();
                             if (cycleData.success && cycleData.reminderType) {
+                                currentReminderType = cycleData.reminderType;
                                 document.getElementById('fiveDaysReminderType').textContent = cycleData.reminderType.replace(/_/g, ' ');
                             } else {
                                 document.getElementById('fiveDaysReminderType').textContent = 'None scheduled';
                             }
                             
+                            // Update step tracker
+                            updateStepTracker(cycleData.cycleInfo, currentReminderType, cycleKey);
+                            
+                            // Load sent reminders for current cycle
+                            loadFiveDaysSentReminders(cycleKey);
+                            
                             // Load history
                             loadFiveDaysHistory();
                         } catch (e) {
                             console.error('Error loading 5 Days status:', e);
+                        }
+                    }
+                    
+                    function updateStepTracker(cycleInfo, currentReminderType, cycleKey) {
+                        const steps = ['INITIATE', 'DAY_2', 'REMINDER_48H', 'DAY_4', 'DAY_5', 'FINAL_REMINDER', 'OVERDUE_WARNING'];
+                        const stepOrder = { 'INITIATE': 1, 'DAY_1': 1, 'DAY_2': 2, 'REMINDER_48H': 3, 'DAY_3': 3, 'DAY_4': 4, 'DAY_5': 5, 'FINAL_REMINDER': 6, 'OVERDUE_WARNING': 7 };
+                        
+                        const currentStepNum = stepOrder[currentReminderType] || 0;
+                        const progressPercent = currentStepNum > 0 ? Math.min(100, ((currentStepNum - 1) / (steps.length - 1)) * 100) : 0;
+                        
+                        // Update progress line
+                        const progressLine = document.getElementById('fiveDaysProgressLine');
+                        if (progressLine) {
+                            progressLine.style.width = progressPercent + '%';
+                        }
+                        
+                        // Update each step circle
+                        steps.forEach((step, idx) => {
+                            const stepNum = idx + 1;
+                            const circle = document.getElementById('step-' + step);
+                            if (circle) {
+                                if (stepNum < currentStepNum) {
+                                    // Completed
+                                    circle.style.background = '#28a745';
+                                    circle.style.color = 'white';
+                                    circle.style.boxShadow = '0 2px 8px rgba(40, 167, 69, 0.4)';
+                                } else if (stepNum === currentStepNum) {
+                                    // Current
+                                    circle.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+                                    circle.style.color = 'white';
+                                    circle.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.5)';
+                                    circle.style.transform = 'scale(1.15)';
+                                } else {
+                                    // Upcoming
+                                    circle.style.background = '#e0e0e0';
+                                    circle.style.color = '#666';
+                                    circle.style.boxShadow = 'none';
+                                    circle.style.transform = 'scale(1)';
+                                }
+                            }
+                        });
+                    }
+                    
+                    async function loadFiveDaysSentReminders(cycleKey) {
+                        const container = document.getElementById('fiveDaysSentReminders');
+                        if (!cycleKey) {
+                            container.innerHTML = '<div style="padding: 15px; background: #f8f9fa; border-radius: 8px; color: #666;">No active cycle - no reminders to show</div>';
+                            return;
+                        }
+                        
+                        try {
+                            const res = await fetch('/admin/api/job-monitor/five-days/history');
+                            const data = await res.json();
+                            
+                            if (data.success && data.history) {
+                                // Filter for current cycle
+                                const cycleReminders = data.history.filter(h => h.CycleKey === cycleKey);
+                                
+                                // Group by reminder type
+                                const byType = {};
+                                cycleReminders.forEach(r => {
+                                    if (!byType[r.ReminderType]) {
+                                        byType[r.ReminderType] = { count: 0, stores: [], lastSent: null };
+                                    }
+                                    byType[r.ReminderType].count++;
+                                    if (!byType[r.ReminderType].stores.includes(r.StoreName)) {
+                                        byType[r.ReminderType].stores.push(r.StoreName);
+                                    }
+                                    if (!byType[r.ReminderType].lastSent || new Date(r.SentAt) > new Date(byType[r.ReminderType].lastSent)) {
+                                        byType[r.ReminderType].lastSent = r.SentAt;
+                                    }
+                                });
+                                
+                                if (Object.keys(byType).length > 0) {
+                                    const typeColors = {
+                                        'INITIATE': '#28a745',
+                                        'DAY_1': '#667eea', 'DAY_2': '#667eea', 'DAY_3': '#667eea', 'DAY_4': '#667eea', 'DAY_5': '#667eea',
+                                        'REMINDER_48H': '#ffc107',
+                                        'FINAL_REMINDER': '#fd7e14',
+                                        'OVERDUE_WARNING': '#dc3545'
+                                    };
+                                    
+                                    container.innerHTML = \`
+                                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                                            \${Object.entries(byType).map(([type, info]) => \`
+                                                <div style="background: #fff; border-left: 4px solid \${typeColors[type] || '#667eea'}; padding: 12px 15px; border-radius: 0 8px 8px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                                                    <div style="font-weight: 600; color: #333; margin-bottom: 5px;">\${type.replace(/_/g, ' ')}</div>
+                                                    <div style="font-size: 12px; color: #666;">
+                                                        <div>✅ <strong>\${info.count}</strong> emails sent</div>
+                                                        <div>📍 \${info.stores.length} stores</div>
+                                                        <div>🕐 \${new Date(info.lastSent).toLocaleString()}</div>
+                                                    </div>
+                                                </div>
+                                            \`).join('')}
+                                        </div>
+                                    \`;
+                                } else {
+                                    container.innerHTML = '<div style="padding: 15px; background: #f8f9fa; border-radius: 8px; color: #666;">No reminders sent yet for this cycle</div>';
+                                }
+                            } else {
+                                container.innerHTML = '<div style="padding: 15px; background: #f8f9fa; border-radius: 8px; color: #666;">No reminders sent yet for this cycle</div>';
+                            }
+                        } catch (e) {
+                            container.innerHTML = '<div style="padding: 15px; background: #fff3cd; border-radius: 8px; color: #856404;">Error loading sent reminders</div>';
                         }
                     }
                     
