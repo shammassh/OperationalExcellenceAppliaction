@@ -2,10 +2,12 @@
  * Action Plan Escalation Service
  * Automatically escalates overdue action plans to Area Managers
  * Updated: 2026-02-25 - Added inspection-level notifications and scheduler status
+ * Updated: 2026-02-27 - Integrated 5 Days reminder system
  */
 
 const sql = require('mssql');
 const emailService = require('./email-service');
+const fiveDaysReminderService = require('./five-days-reminder-service');
 
 // Database configuration
 const dbConfig = {
@@ -927,6 +929,19 @@ async function runAllInspectionChecks() {
         const ohsOverdue = await checkInspectionOverdue('OHS');
         results.overdueNotifications += ohsOverdue.overdueNotifications || 0;
         results.emailsSent += ohsOverdue.emailsSent || 0;
+        
+        // 6. Run 5 Days reminder checks (daily cycle reminders)
+        try {
+            console.log('[Escalation Service] Checking 5 Days reminders...');
+            const fiveDaysResult = await fiveDaysReminderService.runFiveDaysReminders();
+            if (fiveDaysResult && !fiveDaysResult.skipped) {
+                results.emailsSent += fiveDaysResult.emailsSent || 0;
+                console.log(`[Escalation Service] 5 Days: ${fiveDaysResult.emailsSent || 0} emails sent, type: ${fiveDaysResult.reminderType || 'none'}`);
+            }
+        } catch (fiveDaysErr) {
+            console.error('[Escalation Service] 5 Days reminder check failed:', fiveDaysErr.message);
+            // Don't fail the entire run for 5 Days errors
+        }
         
         const duration = Date.now() - startTime;
         console.log(`[Escalation Service] ========== Run completed in ${duration}ms ==========`);
