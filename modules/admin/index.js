@@ -17,8 +17,18 @@ const dbConfig = {
 
 // Check if user is System Administrator OR has form-based permission
 const requireSysAdmin = async (req, res, next) => {
+    const currentPath = req.originalUrl.split('?')[0].replace(/\/$/, '');
+    console.log(`[ADMIN] Checking access for ${currentPath}, roleId: ${req.currentUser?.roleId}, roleNames: ${JSON.stringify(req.currentUser?.roleNames)}`);
+    
     // System Administrator (roleId 31) has full access to all admin pages
     if (req.currentUser && req.currentUser.roleId === 31) {
+        console.log(`[ADMIN] Access granted via roleId 31`);
+        return next();
+    }
+    
+    // Also check roleNames array for System Administrator
+    if (req.currentUser && req.currentUser.roleNames && req.currentUser.roleNames.includes('System Administrator')) {
+        console.log(`[ADMIN] Access granted via roleNames includes System Administrator`);
         return next();
     }
     
@@ -35,11 +45,12 @@ const requireSysAdmin = async (req, res, next) => {
         '/admin/notification-history': 'ADMIN_NOTIFICATIONS',
         '/admin/email-templates': 'ADMIN_EMAIL_TEMPLATES',
         '/admin/job-monitor': 'ADMIN_JOB_MONITOR',
-        '/admin/org-tree': 'ADMIN_ORG_TREE'
+        '/admin/org-tree': 'ADMIN_ORG_TREE',
+        '/admin/dashboard-menu': 'ADMIN_DASHBOARD_MENU',
+        '/admin/permission-sync': 'ADMIN_PERMISSION_SYNC'
     };
     
-    // Find matching form code
-    const currentPath = req.originalUrl.split('?')[0].replace(/\/$/, '');
+    // Find matching form code (currentPath already declared above)
     let formCode = null;
     
     // Check for exact match first
@@ -1244,6 +1255,16 @@ router.get('/', (req, res) => {
                         <div class="card-icon">🌳</div>
                         <div class="card-title">Org Tree</div>
                         <div class="card-desc">View organization hierarchy: Brands → Managers → Stores</div>
+                    </a>
+                    <a href="/admin/dashboard-menu" class="admin-card">
+                        <div class="card-icon">🎛️</div>
+                        <div class="card-title">Dashboard Menu</div>
+                        <div class="card-desc">Configure dashboard categories, icons & menu items</div>
+                    </a>
+                    <a href="/admin/permission-sync" class="admin-card">
+                        <div class="card-icon">🔄</div>
+                        <div class="card-title">Permission Sync</div>
+                        <div class="card-desc">Compare & sync permissions from UAT to Live database</div>
                     </a>
                 </div>
             </div>
@@ -7873,5 +7894,458 @@ router.get('/org-tree', async (req, res) => {
         res.status(500).send('Error loading Org Tree: ' + err.message);
     }
 });
+
+// ==========================================
+// Dashboard Menu Management
+// ==========================================
+router.get('/dashboard-menu', requireSysAdmin, async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        // Get all forms with dashboard settings
+        const forms = await pool.request().query(`
+            SELECT Id, FormCode, FormName, ModuleName, FormUrl, 
+                   MenuId, DashboardIcon, DashboardCategory, DashboardCategoryIcon, 
+                   DashboardCategoryColor, DashboardTitle, DashboardDescription,
+                   ShowOnDashboard, CategorySortOrder, DashboardSortOrder, IsActive
+            FROM Forms 
+            ORDER BY CategorySortOrder, DashboardSortOrder, FormName
+        `);
+        
+        // Get distinct categories
+        const categories = await pool.request().query(`
+            SELECT DISTINCT DashboardCategory, DashboardCategoryIcon, DashboardCategoryColor, CategorySortOrder
+            FROM Forms 
+            WHERE DashboardCategory IS NOT NULL AND ShowOnDashboard = 1
+            ORDER BY CategorySortOrder
+        `);
+        
+        await pool.close();
+        
+        const successMsg = req.query.success ? `<div class="alert alert-success">✅ ${req.query.msg || 'Changes saved!'}</div>` : '';
+        
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Dashboard Menu Setup - ${process.env.APP_NAME}</title>
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body { font-family: 'Segoe UI', Arial; background: #f0f2f5; min-height: 100vh; }
+                    .header {
+                        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+                        color: white;
+                        padding: 20px 40px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    }
+                    .header h1 { font-size: 1.5rem; }
+                    .header-nav a { color: white; text-decoration: none; margin-left: 20px; padding: 8px 16px; 
+                                    background: rgba(255,255,255,0.1); border-radius: 6px; }
+                    .header-nav a:hover { background: rgba(255,255,255,0.2); }
+                    .container { max-width: 1400px; margin: 0 auto; padding: 30px; }
+                    .alert { padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; }
+                    .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+                    
+                    .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+                    .tab { padding: 12px 24px; background: white; border: none; border-radius: 8px 8px 0 0; 
+                           cursor: pointer; font-size: 14px; color: #666; }
+                    .tab.active { background: #0078d4; color: white; }
+                    
+                    .card { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+                    .card-header { padding: 20px; border-bottom: 1px solid #eee; font-weight: 600; 
+                                   display: flex; justify-content: space-between; align-items: center; }
+                    .card-body { padding: 20px; }
+                    
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+                    th { background: #f8f9fa; font-weight: 600; color: #333; }
+                    tr:hover { background: #f8f9fa; }
+                    
+                    .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+                    .btn-primary { background: #0078d4; color: white; }
+                    .btn-success { background: #28a745; color: white; }
+                    .btn-sm { padding: 5px 10px; font-size: 12px; }
+                    
+                    .toggle-switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+                    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+                    .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+                                     background: #ccc; border-radius: 26px; transition: 0.3s; }
+                    .toggle-slider:before { position: absolute; content: ""; height: 20px; width: 20px;
+                                            left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+                    input:checked + .toggle-slider { background: #28a745; }
+                    input:checked + .toggle-slider:before { transform: translateX(24px); }
+                    
+                    .emoji-picker { display: inline-block; position: relative; }
+                    .emoji-btn { font-size: 24px; padding: 8px 12px; background: #f8f9fa; border: 1px solid #ddd; 
+                                 border-radius: 6px; cursor: pointer; }
+                    .emoji-dropdown { display: none; position: absolute; top: 100%; left: 0; background: white;
+                                      border: 1px solid #ddd; border-radius: 8px; padding: 10px; z-index: 100;
+                                      box-shadow: 0 4px 12px rgba(0,0,0,0.15); width: 280px; }
+                    .emoji-dropdown.show { display: block; }
+                    .emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; }
+                    .emoji-item { font-size: 20px; padding: 5px; cursor: pointer; text-align: center; border-radius: 4px; }
+                    .emoji-item:hover { background: #e3f2fd; }
+                    
+                    .color-picker { width: 50px; height: 30px; border: none; border-radius: 4px; cursor: pointer; }
+                    
+                    .sort-input { width: 60px; padding: 5px; text-align: center; border: 1px solid #ddd; border-radius: 4px; }
+                    
+                    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; 
+                                      font-size: 12px; color: white; }
+                    
+                    .preview-section { background: #1a1a2e; padding: 30px; border-radius: 12px; margin-bottom: 20px; }
+                    .preview-category { margin-bottom: 15px; }
+                    .preview-header { display: flex; align-items: center; gap: 10px; padding: 10px 15px;
+                                      background: rgba(255,255,255,0.05); border-radius: 8px; border-left: 4px solid; }
+                    .preview-icon { font-size: 20px; }
+                    .preview-title { color: white; font-weight: 600; }
+                    .preview-count { color: rgba(255,255,255,0.6); font-size: 12px; margin-left: auto; }
+                    .preview-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); 
+                                     gap: 10px; padding: 10px 0 0 20px; }
+                    .preview-item { background: rgba(255,255,255,0.08); padding: 12px; border-radius: 8px;
+                                    display: flex; align-items: center; gap: 10px; }
+                    .preview-item-icon { font-size: 24px; }
+                    .preview-item-title { color: white; font-size: 14px; }
+                    .preview-item-desc { color: rgba(255,255,255,0.5); font-size: 11px; }
+                    
+                    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                             background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+                    .modal.active { display: flex; }
+                    .modal-content { background: white; border-radius: 12px; padding: 30px; width: 600px; max-height: 80vh; overflow-y: auto; }
+                    .modal-content h3 { margin-bottom: 20px; }
+                    .form-group { margin-bottom: 15px; }
+                    .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+                    .form-group input, .form-group select, .form-group textarea { 
+                        width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+                    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+                    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>🎛️ Dashboard Menu Setup</h1>
+                    <div class="header-nav">
+                        <a href="/admin">⬅️ Admin Panel</a>
+                        <a href="/dashboard">🏠 Dashboard</a>
+                    </div>
+                </div>
+                
+                <div class="container">
+                    ${successMsg}
+                    
+                    <!-- Preview Section -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span>👁️ Dashboard Preview</span>
+                            <button class="btn btn-primary btn-sm" onclick="refreshPreview()">🔄 Refresh Preview</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="preview-section" id="dashboardPreview">
+                                ${categories.recordset.map(cat => {
+                                    const catForms = forms.recordset.filter(f => 
+                                        f.DashboardCategory === cat.DashboardCategory && f.ShowOnDashboard
+                                    );
+                                    return `
+                                        <div class="preview-category">
+                                            <div class="preview-header" style="border-left-color: ${cat.DashboardCategoryColor || '#666'}">
+                                                <span class="preview-icon">${cat.DashboardCategoryIcon || '📁'}</span>
+                                                <span class="preview-title">${cat.DashboardCategory}</span>
+                                                <span class="preview-count">${catForms.length} apps</span>
+                                            </div>
+                                            <div class="preview-items">
+                                                ${catForms.map(f => `
+                                                    <div class="preview-item">
+                                                        <span class="preview-item-icon">${f.DashboardIcon || '📄'}</span>
+                                                        <div>
+                                                            <div class="preview-item-title">${f.DashboardTitle || f.FormName}</div>
+                                                            <div class="preview-item-desc">${f.DashboardDescription || ''}</div>
+                                                        </div>
+                                                    </div>
+                                                `).join('')}
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Forms Table -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span>📋 Dashboard Menu Items</span>
+                            <div>
+                                <select id="filterCategory" onchange="filterTable()" style="padding: 8px; border-radius: 6px; margin-right: 10px;">
+                                    <option value="">All Categories</option>
+                                    ${categories.recordset.map(c => `<option value="${c.DashboardCategory}">${c.DashboardCategory}</option>`).join('')}
+                                </select>
+                                <button class="btn btn-success" onclick="saveAllChanges()">💾 Save All Changes</button>
+                            </div>
+                        </div>
+                        <div class="card-body" style="overflow-x: auto;">
+                            <table id="menuTable">
+                                <thead>
+                                    <tr>
+                                        <th>Show</th>
+                                        <th>Icon</th>
+                                        <th>Title</th>
+                                        <th>Description</th>
+                                        <th>Category</th>
+                                        <th>Cat Icon</th>
+                                        <th>Cat Color</th>
+                                        <th>Menu ID</th>
+                                        <th>URL</th>
+                                        <th>Cat Order</th>
+                                        <th>Sort Order</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${forms.recordset.map(f => `
+                                        <tr data-id="${f.Id}" data-category="${f.DashboardCategory || ''}">
+                                            <td>
+                                                <label class="toggle-switch">
+                                                    <input type="checkbox" class="show-toggle" ${f.ShowOnDashboard ? 'checked' : ''} 
+                                                           onchange="markChanged(${f.Id})">
+                                                    <span class="toggle-slider"></span>
+                                                </label>
+                                            </td>
+                                            <td>
+                                                <div class="emoji-picker">
+                                                    <button type="button" class="emoji-btn" onclick="toggleEmojiPicker(this, ${f.Id}, 'icon')">${f.DashboardIcon || '📄'}</button>
+                                                    <input type="hidden" class="icon-input" value="${f.DashboardIcon || ''}">
+                                                </div>
+                                            </td>
+                                            <td><input type="text" class="title-input" value="${(f.DashboardTitle || '').replace(/"/g, '&quot;')}" 
+                                                       style="width: 150px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;"
+                                                       onchange="markChanged(${f.Id})"></td>
+                                            <td><input type="text" class="desc-input" value="${(f.DashboardDescription || '').replace(/"/g, '&quot;')}" 
+                                                       style="width: 200px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;"
+                                                       onchange="markChanged(${f.Id})"></td>
+                                            <td><input type="text" class="category-input" value="${(f.DashboardCategory || '').replace(/"/g, '&quot;')}" 
+                                                       style="width: 150px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;"
+                                                       onchange="markChanged(${f.Id})"></td>
+                                            <td>
+                                                <div class="emoji-picker">
+                                                    <button type="button" class="emoji-btn" onclick="toggleEmojiPicker(this, ${f.Id}, 'catIcon')">${f.DashboardCategoryIcon || '📁'}</button>
+                                                    <input type="hidden" class="cat-icon-input" value="${f.DashboardCategoryIcon || ''}">
+                                                </div>
+                                            </td>
+                                            <td><input type="color" class="color-picker cat-color-input" value="${f.DashboardCategoryColor || '#666666'}" 
+                                                       onchange="markChanged(${f.Id})"></td>
+                                            <td><input type="text" class="menuid-input" value="${f.MenuId || ''}" 
+                                                       style="width: 100px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;"
+                                                       onchange="markChanged(${f.Id})"></td>
+                                            <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis;" title="${f.FormUrl || ''}">${f.FormUrl || '-'}</td>
+                                            <td><input type="number" class="sort-input cat-sort-input" value="${f.CategorySortOrder || 100}" 
+                                                       onchange="markChanged(${f.Id})"></td>
+                                            <td><input type="number" class="sort-input item-sort-input" value="${f.DashboardSortOrder || 100}" 
+                                                       onchange="markChanged(${f.Id})"></td>
+                                            <td>
+                                                <span class="change-indicator" style="display: none; color: #f39c12;">●</span>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Emoji Picker Dropdown (shared) -->
+                <div class="emoji-dropdown" id="emojiDropdown">
+                    <div class="emoji-grid">
+                        ${['📊', '📋', '📁', '📂', '📄', '📝', '📌', '📍', '🔍', '🔎', '🔐', '🔒', '🔓', '🔑', 
+                           '⚙️', '🛠️', '🔧', '🔩', '⚡', '💡', '🎯', '🎨', '🏠', '🏢', '🏪', '🏭', '🏗️', '🏛️',
+                           '👤', '👥', '👷', '🧑‍💼', '🤝', '💼', '📈', '📉', '📅', '📆', '🗓️', '⏰', '🕐', '⏱️',
+                           '🦺', '🛡️', '⚠️', '🚨', '🚫', '⛔', '✅', '❌', '❓', '❗', '💯', '🔥', '🧯', '🚒',
+                           '📢', '📣', '🔔', '🔕', '📧', '📨', '📩', '📤', '📥', '💬', '💭', '🗨️', '📱', '💻',
+                           '⚖️', '📜', '📑', '📃', '📰', '🗞️', '📦', '📫', '📪', '📬', '📭', '🗄️', '🗃️', '🗂️',
+                           '🍽️', '🍴', '🥄', '🍳', '🥘', '🍕', '🍔', '🥗', '☕', '🧃', '🥤', '🍺', '🍷', '🥂'
+                          ].map(e => `<span class="emoji-item" onclick="selectEmoji('${e}')">${e}</span>`).join('')}
+                    </div>
+                </div>
+                
+                <script>
+                    let changedRows = new Set();
+                    let currentEmojiTarget = null;
+                    let currentEmojiType = null;
+                    
+                    function markChanged(id) {
+                        changedRows.add(id);
+                        document.querySelector(\`tr[data-id="\${id}"] .change-indicator\`).style.display = 'inline';
+                    }
+                    
+                    function toggleEmojiPicker(btn, id, type) {
+                        const dropdown = document.getElementById('emojiDropdown');
+                        const rect = btn.getBoundingClientRect();
+                        
+                        if (dropdown.classList.contains('show') && currentEmojiTarget === btn) {
+                            dropdown.classList.remove('show');
+                            currentEmojiTarget = null;
+                            return;
+                        }
+                        
+                        currentEmojiTarget = btn;
+                        currentEmojiType = type;
+                        dropdown.style.top = (rect.bottom + window.scrollY + 5) + 'px';
+                        dropdown.style.left = rect.left + 'px';
+                        dropdown.classList.add('show');
+                        
+                        // Store the row id
+                        dropdown.dataset.rowId = id;
+                    }
+                    
+                    function selectEmoji(emoji) {
+                        if (!currentEmojiTarget) return;
+                        
+                        const rowId = document.getElementById('emojiDropdown').dataset.rowId;
+                        const row = document.querySelector(\`tr[data-id="\${rowId}"]\`);
+                        
+                        currentEmojiTarget.textContent = emoji;
+                        
+                        if (currentEmojiType === 'icon') {
+                            row.querySelector('.icon-input').value = emoji;
+                        } else if (currentEmojiType === 'catIcon') {
+                            row.querySelector('.cat-icon-input').value = emoji;
+                        }
+                        
+                        markChanged(parseInt(rowId));
+                        document.getElementById('emojiDropdown').classList.remove('show');
+                        currentEmojiTarget = null;
+                    }
+                    
+                    // Close emoji picker when clicking outside
+                    document.addEventListener('click', function(e) {
+                        if (!e.target.closest('.emoji-picker') && !e.target.closest('.emoji-dropdown')) {
+                            document.getElementById('emojiDropdown').classList.remove('show');
+                        }
+                    });
+                    
+                    function filterTable() {
+                        const category = document.getElementById('filterCategory').value;
+                        document.querySelectorAll('#menuTable tbody tr').forEach(row => {
+                            if (!category || row.dataset.category === category) {
+                                row.style.display = '';
+                            } else {
+                                row.style.display = 'none';
+                            }
+                        });
+                    }
+                    
+                    async function saveAllChanges() {
+                        if (changedRows.size === 0) {
+                            alert('No changes to save');
+                            return;
+                        }
+                        
+                        const updates = [];
+                        changedRows.forEach(id => {
+                            const row = document.querySelector(\`tr[data-id="\${id}"]\`);
+                            updates.push({
+                                id: id,
+                                showOnDashboard: row.querySelector('.show-toggle').checked,
+                                dashboardIcon: row.querySelector('.icon-input').value,
+                                dashboardTitle: row.querySelector('.title-input').value,
+                                dashboardDescription: row.querySelector('.desc-input').value,
+                                dashboardCategory: row.querySelector('.category-input').value,
+                                dashboardCategoryIcon: row.querySelector('.cat-icon-input').value,
+                                dashboardCategoryColor: row.querySelector('.cat-color-input').value,
+                                menuId: row.querySelector('.menuid-input').value,
+                                categorySortOrder: parseInt(row.querySelector('.cat-sort-input').value) || 100,
+                                dashboardSortOrder: parseInt(row.querySelector('.item-sort-input').value) || 100
+                            });
+                        });
+                        
+                        try {
+                            const res = await fetch('/admin/dashboard-menu/save', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ updates })
+                            });
+                            const result = await res.json();
+                            
+                            if (result.success) {
+                                alert('✅ ' + result.updated + ' items saved successfully!');
+                                changedRows.clear();
+                                document.querySelectorAll('.change-indicator').forEach(el => el.style.display = 'none');
+                                location.reload();
+                            } else {
+                                alert('Error: ' + result.error);
+                            }
+                        } catch (err) {
+                            alert('Error saving: ' + err.message);
+                        }
+                    }
+                    
+                    function refreshPreview() {
+                        location.reload();
+                    }
+                </script>
+            </body>
+            </html>
+        `);
+    } catch (err) {
+        console.error('Error loading dashboard menu:', err);
+        res.status(500).send('Error: ' + err.message);
+    }
+});
+
+// Save dashboard menu changes
+router.post('/dashboard-menu/save', requireSysAdmin, async (req, res) => {
+    try {
+        const { updates } = req.body;
+        
+        if (!updates || !Array.isArray(updates)) {
+            return res.json({ success: false, error: 'Invalid data' });
+        }
+        
+        const pool = await sql.connect(dbConfig);
+        
+        for (const item of updates) {
+            await pool.request()
+                .input('id', sql.Int, item.id)
+                .input('showOnDashboard', sql.Bit, item.showOnDashboard ? 1 : 0)
+                .input('dashboardIcon', sql.NVarChar, item.dashboardIcon || null)
+                .input('dashboardTitle', sql.NVarChar, item.dashboardTitle || null)
+                .input('dashboardDescription', sql.NVarChar, item.dashboardDescription || null)
+                .input('dashboardCategory', sql.NVarChar, item.dashboardCategory || null)
+                .input('dashboardCategoryIcon', sql.NVarChar, item.dashboardCategoryIcon || null)
+                .input('dashboardCategoryColor', sql.NVarChar, item.dashboardCategoryColor || null)
+                .input('menuId', sql.NVarChar, item.menuId || null)
+                .input('categorySortOrder', sql.Int, item.categorySortOrder || 100)
+                .input('dashboardSortOrder', sql.Int, item.dashboardSortOrder || 100)
+                .query(`
+                    UPDATE Forms SET
+                        ShowOnDashboard = @showOnDashboard,
+                        DashboardIcon = @dashboardIcon,
+                        DashboardTitle = @dashboardTitle,
+                        DashboardDescription = @dashboardDescription,
+                        DashboardCategory = @dashboardCategory,
+                        DashboardCategoryIcon = @dashboardCategoryIcon,
+                        DashboardCategoryColor = @dashboardCategoryColor,
+                        MenuId = @menuId,
+                        CategorySortOrder = @categorySortOrder,
+                        DashboardSortOrder = @dashboardSortOrder,
+                        UpdatedAt = GETDATE()
+                    WHERE Id = @id
+                `);
+        }
+        
+        await pool.close();
+        
+        res.json({ success: true, updated: updates.length });
+    } catch (err) {
+        console.error('Error saving dashboard menu:', err);
+        res.json({ success: false, error: err.message });
+    }
+});
+
+// Permission Sync Tool - moved to separate module
+const permissionSyncRouter = require('./permission-sync');
+router.use('/permission-sync', permissionSyncRouter);
 
 module.exports = router;

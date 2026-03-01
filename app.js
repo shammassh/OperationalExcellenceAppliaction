@@ -15,6 +15,19 @@ const express = require('express');
 const fs = require('fs');
 const https = require('https');
 const http = require('http');
+const sql = require('mssql');
+
+// Database configuration
+const dbConfig = {
+    server: process.env.SQL_SERVER,
+    database: process.env.SQL_DATABASE,
+    user: process.env.SQL_USER,
+    password: process.env.SQL_PASSWORD,
+    options: {
+        encrypt: process.env.SQL_ENCRYPT === 'true',
+        trustServerCertificate: process.env.SQL_TRUST_CERT === 'true'
+    }
+};
 
 // Import auth module
 const { initializeAuth, requireAuth, requireRole } = require('./auth/auth-server');
@@ -88,6 +101,9 @@ app.use('/security', requireAuth, formAccessMiddleware, securityModule);
 app.use('/security-emp', requireAuth, formAccessMiddleware, securityEmpModule);
 app.use('/escalation', requireAuth, formAccessMiddleware, escalationModule);
 
+// Redirect common mistaken routes
+app.get('/permission-sync', (req, res) => res.redirect('/admin/permission-sync'));
+
 // ==========================================
 // Routes
 // ==========================================
@@ -142,7 +158,7 @@ app.get('/', (req, res) => {
 });
 
 // Protected dashboard
-app.get('/dashboard', requireAuth, (req, res) => {
+app.get('/dashboard', requireAuth, async (req, res) => {
     const permissions = req.currentUser.permissions || {};
     const roleNames = req.currentUser.roleNames || [];
     const primaryRole = req.currentUser.role;
@@ -227,92 +243,70 @@ app.get('/dashboard', requireAuth, (req, res) => {
         });
     }
     
-    // System Administrator always has full access (no SQL check needed)
-    if (roleNames.includes('System Administrator')) {
-        ['stores', 'security-services', 'ohs', 'ohs-inspection', 'fire-equipment', 'oe', 'oe-inspection', 'thirdparty', 'security', 'hr', 'personnel', 'escalation', 'broadcast', 'maknezi-fnb', 'legal-cases', 'thirdparty-blacklist', 'security-daily-reporting', 'master-table', 'store-visit-calendar', 'sec-visit-calendar', 'camera-request'].forEach(m => accessibleMenus.add(m));
-    }
+    // System Administrator always has full access - will be handled below from database
+    const isSystemAdmin = roleNames.includes('System Administrator');
     
-    // Build menu items based on permissions - organized by department/category
-    const menuCategories = [
-        {
-            category: 'Operational Excellence',
-            icon: '📊',
-            color: '#0078d4',
-            items: [
-                { id: 'oe', icon: '📋', title: 'OE Dashboard', href: '/operational-excellence', desc: 'Audits, action plans & reports' },
-                { id: 'oe-inspection', icon: '🔍', title: 'OE Inspection', href: '/oe-inspection', desc: 'OE inspections, reports & action plans' },
-                { id: 'escalation', icon: '🔴', title: 'Escalation', href: '/escalation', desc: 'Escalate & track overdue action items' },
-                { id: 'master-table', icon: '📊', title: 'Master Table', href: '/operational-excellence/master-table', desc: 'Third-party staff master data' },
-                { id: 'store-visit-calendar', icon: '📅', title: 'Store Visit Calendar', href: '/operational-excellence/calendar', desc: 'Schedule & track employee store visits' }
-            ]
-        },
-        {
-            category: 'Occupational Health & Safety',
-            icon: '🦺',
-            color: '#28a745',
-            items: [
-                { id: 'ohs', icon: '🦺', title: 'OHS Incidents', href: '/ohs', desc: 'OHS incidents & reports' },
-                { id: 'ohs-inspection', icon: '🛡️', title: 'OHS Inspection', href: '/ohs-inspection', desc: 'OHS safety inspections & audits' },
-                { id: 'fire-equipment', icon: '🧯', title: 'Fire Equipment', href: '/ohs/fire-equipment', desc: 'Fire fighting equipment register' },
-                { id: 'ora', icon: '📋', title: 'Risk Assessment (ORA)', href: '/ohs/ora', desc: 'Overall Risk Assessment' }
-            ]
-        },
-        {
-            category: 'Facility Management',
-            icon: '🏢',
-            color: '#6f42c1',
-            items: [
-                { id: 'security-services', icon: '🏢', title: 'Facility Services', href: '/security-services', desc: 'Facility services & management' },
-                { id: 'security', icon: '🔧', title: 'Facility Department', href: '/security', desc: 'Facility incidents & inspections' }
-            ]
-        },
-        {
-            category: 'Security Department',
-            icon: '🔒',
-            color: '#343a40',
-            items: [
-                { id: 'legal-cases', icon: '⚖️', title: 'Legal Cases', href: '/security-emp/legal-cases', desc: 'Track and manage security legal cases' },
-                { id: 'thirdparty-blacklist', icon: '🚫', title: 'Third Party Blacklist', href: '/security-emp/blacklist', desc: 'Blacklisted third-party staff' },
-                { id: 'security-daily-reporting', icon: '📋', title: 'Daily Reporting', href: '/security-emp/daily-reporting', desc: 'Security guard daily reports' },
-                { id: 'sec-visit-calendar', icon: '📅', title: 'Visit Schedule', href: '/security-emp/calendar', desc: 'View and update store visit schedules' },
-                { id: 'camera-request', icon: '📹', title: 'Camera Request', href: '/security-emp/camera-request', desc: 'Camera requests and malfunction reports' }
-            ]
-        },
-        {
-            category: 'Store Operations',
-            icon: '🏪',
-            color: '#fd7e14',
-            items: [
-                { id: 'stores', icon: '🏪', title: 'Store Forms', href: '/stores', desc: 'Store operations & management' },
-                { id: 'personnel', icon: '👤', title: 'Personnel', href: '/personnel', desc: 'Personnel forms & requests' },
-                { id: 'thirdparty', icon: '🤝', title: 'Third-Party Services', href: '/third-party', desc: 'Service providers & compliance' }
-            ]
-        },
-        {
-            category: 'Mackenzie F&B and GMRL',
-            icon: '🍽️',
-            color: '#dc3545',
-            items: [
-                { id: 'maknezi-fnb', icon: '👷', title: 'Production Extras Request', href: '/stores/production-extras', desc: 'Request extra production items' }
-            ]
-        },
-        {
-            category: 'HR & Talent',
-            icon: '👥',
-            color: '#e83e8c',
-            items: [
-                { id: 'hr', icon: '👥', title: 'HR Dashboard', href: '/hr', desc: 'Employee relations & cases' }
-            ]
-        },
-        {
-            category: 'Communication',
-            icon: '📢',
-            color: '#17a2b8',
-            items: [
-                { id: 'broadcast', icon: '📢', title: 'Broadcast', href: '/admin/broadcast', desc: 'Send announcements to users' }
-            ]
+    // Build menu items dynamically from Forms table
+    let menuCategories = [];
+    let pool;
+    try {
+        // Fetch dashboard menu items from Forms table
+        pool = await sql.connect(dbConfig);
+        const dashboardForms = await pool.request().query(`
+            SELECT 
+                FormCode,
+                MenuId,
+                FormUrl,
+                DashboardIcon,
+                DashboardCategory,
+                DashboardCategoryIcon,
+                DashboardCategoryColor,
+                DashboardTitle,
+                DashboardDescription,
+                CategorySortOrder,
+                DashboardSortOrder
+            FROM Forms 
+            WHERE ShowOnDashboard = 1 AND IsActive = 1 AND MenuId IS NOT NULL
+            ORDER BY CategorySortOrder, DashboardSortOrder
+        `);
+        
+        // System Admin gets all menu items
+        if (isSystemAdmin) {
+            dashboardForms.recordset.forEach(f => {
+                if (f.MenuId) accessibleMenus.add(f.MenuId);
+            });
         }
-    ];
+        
+        // Group forms by category
+        const categoryMap = new Map();
+        dashboardForms.recordset.forEach(form => {
+            if (!categoryMap.has(form.DashboardCategory)) {
+                categoryMap.set(form.DashboardCategory, {
+                    category: form.DashboardCategory,
+                    icon: form.DashboardCategoryIcon || '📁',
+                    color: form.DashboardCategoryColor || '#666',
+                    sortOrder: form.CategorySortOrder || 100,
+                    items: []
+                });
+            }
+            categoryMap.get(form.DashboardCategory).items.push({
+                id: form.MenuId,
+                icon: form.DashboardIcon || '📄',
+                title: form.DashboardTitle || form.FormCode,
+                href: form.FormUrl,
+                desc: form.DashboardDescription || ''
+            });
+        });
+        
+        // Convert map to sorted array
+        menuCategories = Array.from(categoryMap.values())
+            .sort((a, b) => a.sortOrder - b.sortOrder);
+            
+    } catch (dbErr) {
+        console.error('Error loading dashboard menu from DB:', dbErr);
+        // Fallback to empty - admin needs to set up the forms
+        menuCategories = [];
+    }
     
     // Filter categories - show all categories, filter items based on access
     const visibleCategories = menuCategories
@@ -767,16 +761,7 @@ app.get('/api/user', requireAuth, (req, res) => {
     });
 });
 
-// User search API for email forms
-const sql = require('mssql');
-const config = require('./config/default');
-const userSearchDbConfig = {
-    server: config.database.server,
-    database: config.database.database,
-    user: config.database.user,
-    password: config.database.password,
-    options: config.database.options
-};
+// User search API for email forms - uses dbConfig from top of file
 
 app.get('/api/users/search', requireAuth, async (req, res) => {
     try {
@@ -785,7 +770,7 @@ app.get('/api/users/search', requireAuth, async (req, res) => {
             return res.json({ success: true, users: [] });
         }
         
-        const pool = await sql.connect(userSearchDbConfig);
+        const pool = await sql.connect(dbConfig);
         const result = await pool.request()
             .input('search', sql.NVarChar, `%${q}%`)
             .query(`

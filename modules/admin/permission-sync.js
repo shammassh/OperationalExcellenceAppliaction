@@ -68,6 +68,66 @@ router.get('/', async (req, res) => {
             ORDER BY r.RoleName, rfa.FormCode
         `);
         
+        // Get Active Users from both
+        const uatUsers = await uatPool.request().query(`
+            SELECT u.Id, u.Email, u.DisplayName, u.RoleId, r.RoleName, u.IsActive, u.IsApproved, u.LastLoginAt
+            FROM Users u
+            LEFT JOIN UserRoles r ON u.RoleId = r.Id
+            WHERE u.IsActive = 1
+            ORDER BY u.DisplayName
+        `);
+        const liveUsers = await livePool.request().query(`
+            SELECT u.Id, u.Email, u.DisplayName, u.RoleId, r.RoleName, u.IsActive, u.IsApproved, u.LastLoginAt
+            FROM Users u
+            LEFT JOIN UserRoles r ON u.RoleId = r.Id
+            WHERE u.IsActive = 1
+            ORDER BY u.DisplayName
+        `);
+        
+        // Get Stores from both
+        const uatStores = await uatPool.request().query(`
+            SELECT s.Id, s.StoreCode, s.StoreName, s.Location, s.StoreSize, s.IsActive, s.BrandId, b.BrandName
+            FROM Stores s
+            LEFT JOIN Brands b ON s.BrandId = b.Id
+            ORDER BY s.StoreName
+        `);
+        const liveStores = await livePool.request().query(`
+            SELECT s.Id, s.StoreCode, s.StoreName, s.Location, s.StoreSize, s.IsActive, s.BrandId, b.BrandName
+            FROM Stores s
+            LEFT JOIN Brands b ON s.BrandId = b.Id
+            ORDER BY s.StoreName
+        `);
+        
+        // Get Brands from both
+        const uatBrands = await uatPool.request().query(`
+            SELECT Id, BrandCode, BrandName, LogoUrl, PrimaryColor, IsActive
+            FROM Brands ORDER BY BrandCode
+        `);
+        const liveBrands = await livePool.request().query(`
+            SELECT Id, BrandCode, BrandName, LogoUrl, PrimaryColor, IsActive
+            FROM Brands ORDER BY BrandCode
+        `);
+        
+        // Get Store Responsibles from both
+        const uatStoreResponsibles = await uatPool.request().query(`
+            SELECT sr.Id, sr.StoreId, s.StoreName, sr.AreaManagerId, am.DisplayName as AreaManager, am.Email as AreaManagerEmail,
+                   sr.HeadOfOpsId, ho.DisplayName as HeadOfOps, ho.Email as HeadOfOpsEmail, sr.IsActive, sr.Notes
+            FROM OE_StoreResponsibles sr
+            LEFT JOIN Stores s ON sr.StoreId = s.Id
+            LEFT JOIN Users am ON sr.AreaManagerId = am.Id
+            LEFT JOIN Users ho ON sr.HeadOfOpsId = ho.Id
+            ORDER BY s.StoreName
+        `);
+        const liveStoreResponsibles = await livePool.request().query(`
+            SELECT sr.Id, sr.StoreId, s.StoreName, sr.AreaManagerId, am.DisplayName as AreaManager, am.Email as AreaManagerEmail,
+                   sr.HeadOfOpsId, ho.DisplayName as HeadOfOps, ho.Email as HeadOfOpsEmail, sr.IsActive, sr.Notes
+            FROM OE_StoreResponsibles sr
+            LEFT JOIN Stores s ON sr.StoreId = s.Id
+            LEFT JOIN Users am ON sr.AreaManagerId = am.Id
+            LEFT JOIN Users ho ON sr.HeadOfOpsId = ho.Id
+            ORDER BY s.StoreName
+        `);
+        
         // Build comparison data
         const uatFormsMap = new Map(uatForms.recordset.map(f => [f.FormCode, f]));
         const liveFormsMap = new Map(liveForms.recordset.map(f => [f.FormCode, f]));
@@ -155,6 +215,113 @@ router.get('/', async (req, res) => {
             accessComparison.push({ roleName, formCode, uat, live, status, diff });
         });
         
+        // Users comparison
+        const uatUsersMap = new Map(uatUsers.recordset.map(u => [u.Email.toLowerCase(), u]));
+        const liveUsersMap = new Map(liveUsers.recordset.map(u => [u.Email.toLowerCase(), u]));
+        
+        const usersComparison = [];
+        const allUserEmails = new Set([...uatUsersMap.keys(), ...liveUsersMap.keys()]);
+        allUserEmails.forEach(email => {
+            const uat = uatUsersMap.get(email);
+            const live = liveUsersMap.get(email);
+            let status = 'same';
+            let diff = [];
+            
+            if (!live) {
+                status = 'missing-live';
+            } else if (!uat) {
+                status = 'missing-uat';
+            } else {
+                if (uat.RoleName !== live.RoleName) diff.push('Role');
+                if (uat.DisplayName !== live.DisplayName) diff.push('DisplayName');
+                if (uat.IsApproved !== live.IsApproved) diff.push('IsApproved');
+                if (diff.length > 0) status = 'different';
+            }
+            
+            usersComparison.push({ email, uat, live, status, diff });
+        });
+        
+        // Stores comparison
+        const uatStoresMap = new Map(uatStores.recordset.map(s => [s.StoreName, s]));
+        const liveStoresMap = new Map(liveStores.recordset.map(s => [s.StoreName, s]));
+        
+        const storesComparison = [];
+        const allStoreNames = new Set([...uatStoresMap.keys(), ...liveStoresMap.keys()]);
+        allStoreNames.forEach(name => {
+            const uat = uatStoresMap.get(name);
+            const live = liveStoresMap.get(name);
+            let status = 'same';
+            let diff = [];
+            
+            if (!live) {
+                status = 'missing-live';
+            } else if (!uat) {
+                status = 'missing-uat';
+            } else {
+                if (uat.StoreName !== live.StoreName) diff.push('StoreName');
+                if (uat.Location !== live.Location) diff.push('Location');
+                if (uat.StoreSize !== live.StoreSize) diff.push('StoreSize');
+                if (uat.IsActive !== live.IsActive) diff.push('IsActive');
+                if (uat.BrandName !== live.BrandName) diff.push('Brand');
+                if (diff.length > 0) status = 'different';
+            }
+            
+            storesComparison.push({ name, uat, live, status, diff });
+        });
+        
+        // Brands comparison
+        const uatBrandsMap = new Map(uatBrands.recordset.map(b => [b.BrandCode, b]));
+        const liveBrandsMap = new Map(liveBrands.recordset.map(b => [b.BrandCode, b]));
+        
+        const brandsComparison = [];
+        const allBrandCodes = new Set([...uatBrandsMap.keys(), ...liveBrandsMap.keys()]);
+        allBrandCodes.forEach(code => {
+            const uat = uatBrandsMap.get(code);
+            const live = liveBrandsMap.get(code);
+            let status = 'same';
+            let diff = [];
+            
+            if (!live) {
+                status = 'missing-live';
+            } else if (!uat) {
+                status = 'missing-uat';
+            } else {
+                if (uat.BrandName !== live.BrandName) diff.push('BrandName');
+                if (uat.LogoUrl !== live.LogoUrl) diff.push('LogoUrl');
+                if (uat.PrimaryColor !== live.PrimaryColor) diff.push('PrimaryColor');
+                if (uat.IsActive !== live.IsActive) diff.push('IsActive');
+                if (diff.length > 0) status = 'different';
+            }
+            
+            brandsComparison.push({ code, uat, live, status, diff });
+        });
+        
+        // Store Responsibles comparison (use StoreName as key)
+        const uatStoreRespMap = new Map(uatStoreResponsibles.recordset.map(sr => [sr.StoreName, sr]));
+        const liveStoreRespMap = new Map(liveStoreResponsibles.recordset.map(sr => [sr.StoreName, sr]));
+        
+        const storeResponsiblesComparison = [];
+        const allStoreRespNames = new Set([...uatStoreRespMap.keys(), ...liveStoreRespMap.keys()]);
+        allStoreRespNames.forEach(storeName => {
+            const uat = uatStoreRespMap.get(storeName);
+            const live = liveStoreRespMap.get(storeName);
+            let status = 'same';
+            let diff = [];
+            
+            if (!live) {
+                status = 'missing-live';
+            } else if (!uat) {
+                status = 'missing-uat';
+            } else {
+                if (uat.AreaManagerEmail !== live.AreaManagerEmail) diff.push('AreaManager');
+                if (uat.HeadOfOpsEmail !== live.HeadOfOpsEmail) diff.push('HeadOfOps');
+                if (uat.IsActive !== live.IsActive) diff.push('IsActive');
+                if (diff.length > 0) status = 'different';
+            }
+            
+            storeResponsiblesComparison.push({ storeName, uat, live, status, diff });
+        });
+        
         // Stats
         const stats = {
             forms: {
@@ -174,6 +341,34 @@ router.get('/', async (req, res) => {
                 same: accessComparison.filter(a => a.status === 'same').length,
                 missingLive: accessComparison.filter(a => a.status === 'missing-live').length,
                 different: accessComparison.filter(a => a.status === 'different').length
+            },
+            users: {
+                total: usersComparison.length,
+                same: usersComparison.filter(u => u.status === 'same').length,
+                missingLive: usersComparison.filter(u => u.status === 'missing-live').length,
+                missingUat: usersComparison.filter(u => u.status === 'missing-uat').length,
+                different: usersComparison.filter(u => u.status === 'different').length
+            },
+            stores: {
+                total: storesComparison.length,
+                same: storesComparison.filter(s => s.status === 'same').length,
+                missingLive: storesComparison.filter(s => s.status === 'missing-live').length,
+                missingUat: storesComparison.filter(s => s.status === 'missing-uat').length,
+                different: storesComparison.filter(s => s.status === 'different').length
+            },
+            brands: {
+                total: brandsComparison.length,
+                same: brandsComparison.filter(b => b.status === 'same').length,
+                missingLive: brandsComparison.filter(b => b.status === 'missing-live').length,
+                missingUat: brandsComparison.filter(b => b.status === 'missing-uat').length,
+                different: brandsComparison.filter(b => b.status === 'different').length
+            },
+            storeResponsibles: {
+                total: storeResponsiblesComparison.length,
+                same: storeResponsiblesComparison.filter(sr => sr.status === 'same').length,
+                missingLive: storeResponsiblesComparison.filter(sr => sr.status === 'missing-live').length,
+                missingUat: storeResponsiblesComparison.filter(sr => sr.status === 'missing-uat').length,
+                different: storeResponsiblesComparison.filter(sr => sr.status === 'different').length
             }
         };
         
@@ -202,7 +397,7 @@ router.get('/', async (req, res) => {
                     .header-nav a:hover { background: rgba(255,255,255,0.2); }
                     .container { max-width: 1600px; margin: 0 auto; padding: 30px; }
                     
-                    .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+                    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
                     .stat-card { background: white; border-radius: 12px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
                     .stat-card h3 { color: #333; margin-bottom: 15px; font-size: 16px; }
                     .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
@@ -345,6 +540,69 @@ router.get('/', async (req, res) => {
                                 </div>
                             </div>
                         </div>
+                        <div class="stat-card">
+                            <h3>&#128100; Active Users</h3>
+                            <div class="stat-grid">
+                                <div class="stat-item total">
+                                    <div class="stat-number">${stats.users.total}</div>
+                                    <div class="stat-label">Total</div>
+                                </div>
+                                <div class="stat-item same">
+                                    <div class="stat-number">${stats.users.same}</div>
+                                    <div class="stat-label">In Sync</div>
+                                </div>
+                                <div class="stat-item missing">
+                                    <div class="stat-number">${stats.users.missingLive}</div>
+                                    <div class="stat-label">Missing Live</div>
+                                </div>
+                                <div class="stat-item different">
+                                    <div class="stat-number">${stats.users.different}</div>
+                                    <div class="stat-label">Different</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>&#127978; Stores</h3>
+                            <div class="stat-grid">
+                                <div class="stat-item total">
+                                    <div class="stat-number">${stats.stores.total}</div>
+                                    <div class="stat-label">Total</div>
+                                </div>
+                                <div class="stat-item same">
+                                    <div class="stat-number">${stats.stores.same}</div>
+                                    <div class="stat-label">In Sync</div>
+                                </div>
+                                <div class="stat-item missing">
+                                    <div class="stat-number">${stats.stores.missingLive}</div>
+                                    <div class="stat-label">Missing Live</div>
+                                </div>
+                                <div class="stat-item different">
+                                    <div class="stat-number">${stats.stores.different}</div>
+                                    <div class="stat-label">Different</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>&#127991; Brands</h3>
+                            <div class="stat-grid">
+                                <div class="stat-item total">
+                                    <div class="stat-number">${stats.brands.total}</div>
+                                    <div class="stat-label">Total</div>
+                                </div>
+                                <div class="stat-item same">
+                                    <div class="stat-number">${stats.brands.same}</div>
+                                    <div class="stat-label">In Sync</div>
+                                </div>
+                                <div class="stat-item missing">
+                                    <div class="stat-number">${stats.brands.missingLive}</div>
+                                    <div class="stat-label">Missing Live</div>
+                                </div>
+                                <div class="stat-item different">
+                                    <div class="stat-number">${stats.brands.different}</div>
+                                    <div class="stat-label">Different</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="legend">
@@ -374,6 +632,22 @@ router.get('/', async (req, res) => {
                         <button class="tab" onclick="showTab('access')">
                             &#128273; Access
                             ${stats.access.missingLive + stats.access.different > 0 ? `<span class="badge">${stats.access.missingLive + stats.access.different}</span>` : ''}
+                        </button>
+                        <button class="tab" onclick="showTab('users')">
+                            &#128100; Users
+                            ${stats.users.missingLive + stats.users.different > 0 ? `<span class="badge">${stats.users.missingLive + stats.users.different}</span>` : ''}
+                        </button>
+                        <button class="tab" onclick="showTab('stores')">
+                            &#127978; Stores
+                            ${stats.stores.missingLive + stats.stores.different > 0 ? `<span class="badge">${stats.stores.missingLive + stats.stores.different}</span>` : ''}
+                        </button>
+                        <button class="tab" onclick="showTab('brands')">
+                            &#127991; Brands
+                            ${stats.brands.missingLive + stats.brands.different > 0 ? `<span class="badge">${stats.brands.missingLive + stats.brands.different}</span>` : ''}
+                        </button>
+                        <button class="tab" onclick="showTab('storeResponsibles')">
+                            &#128101; Store Responsibles
+                            ${stats.storeResponsibles.missingLive + stats.storeResponsibles.different > 0 ? `<span class="badge">${stats.storeResponsibles.missingLive + stats.storeResponsibles.different}</span>` : ''}
                         </button>
                     </div>
                     
@@ -542,6 +816,240 @@ router.get('/', async (req, res) => {
                         </div>
                     </div>
                     
+                    <div class="tab-content" id="tab-users">
+                        <div class="card">
+                            <div class="card-header">
+                                <span>&#128100; Active Users Comparison</span>
+                                <select id="filterUsersStatus" onchange="filterUsers()">
+                                    <option value="">All Status</option>
+                                    <option value="missing-live">Missing on Live</option>
+                                    <option value="missing-uat">Only on Live</option>
+                                    <option value="different">Different</option>
+                                    <option value="same">In Sync</option>
+                                </select>
+                            </div>
+                            <div class="card-body">
+                                <table id="usersTable">
+                                    <thead>
+                                        <tr>
+                                            <th class="checkbox-col"><input type="checkbox" id="selectAllUsers" onchange="toggleSelectAll('users')"></th>
+                                            <th>Email</th>
+                                            <th>Display Name</th>
+                                            <th>UAT Role</th>
+                                            <th>Live Role</th>
+                                            <th>Status</th>
+                                            <th>Differences</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${usersComparison.map(u => `
+                                            <tr data-status="${u.status}" data-email="${u.email}">
+                                                <td class="checkbox-col">
+                                                    ${u.status !== 'same' && u.status !== 'missing-uat' ? 
+                                                        `<input type="checkbox" class="user-checkbox" data-email="${u.email}">` : ''}
+                                                </td>
+                                                <td>${u.email}</td>
+                                                <td>${u.uat?.DisplayName || u.live?.DisplayName || '-'}</td>
+                                                <td>${u.uat?.RoleName || '<em style="color:#1565c0">N/A</em>'}</td>
+                                                <td>${u.live?.RoleName || '<em style="color:#ef6c00">Missing</em>'}</td>
+                                                <td><span class="status-badge status-${u.status}">${
+                                                    u.status === 'same' ? '&#10004; In Sync' :
+                                                    u.status === 'missing-live' ? '&#9888; Missing' :
+                                                    u.status === 'missing-uat' ? '&#128204; Only Live' :
+                                                    '&#9889; Different'
+                                                }</span></td>
+                                                <td class="diff-list">${u.diff?.join(', ') || ''}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="action-bar">
+                                <span id="usersSelected">0 selected</span>
+                                <div>
+                                    <button class="btn btn-warning" onclick="selectAllNeedSync('users')">Select All Needing Sync</button>
+                                    <button class="btn btn-success" onclick="syncSelected('users')">&#128260; Sync to Live</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-content" id="tab-stores">
+                        <div class="card">
+                            <div class="card-header">
+                                <span>&#127978; Stores Comparison</span>
+                                <select id="filterStoresStatus" onchange="filterStores()">
+                                    <option value="">All Status</option>
+                                    <option value="missing-live">Missing on Live</option>
+                                    <option value="missing-uat">Only on Live</option>
+                                    <option value="different">Different</option>
+                                    <option value="same">In Sync</option>
+                                </select>
+                            </div>
+                            <div class="card-body">
+                                <table id="storesTable">
+                                    <thead>
+                                        <tr>
+                                            <th class="checkbox-col"><input type="checkbox" id="selectAllStores" onchange="toggleSelectAll('stores')"></th>
+                                            <th>Store Name</th>
+                                            <th>Store Code</th>
+                                            <th>Brand</th>
+                                            <th>Location</th>
+                                            <th>Size</th>
+                                            <th>Status</th>
+                                            <th>Differences</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${storesComparison.map(s => `
+                                            <tr data-status="${s.status}" data-name="${s.name}">
+                                                <td class="checkbox-col">
+                                                    ${s.status !== 'same' && s.status !== 'missing-uat' ? 
+                                                        `<input type="checkbox" class="store-checkbox" data-name="${s.name}">` : ''}
+                                                </td>
+                                                <td>${s.name}</td>
+                                                <td><code>${s.uat?.StoreCode || s.live?.StoreCode || '-'}</code></td>
+                                                <td>${s.uat?.BrandName || s.live?.BrandName || '-'}</td>
+                                                <td>${s.uat?.Location || s.live?.Location || '-'}</td>
+                                                <td>${s.uat?.StoreSize || s.live?.StoreSize || '-'}</td>
+                                                <td><span class="status-badge status-${s.status}">${
+                                                    s.status === 'same' ? '&#10004; In Sync' :
+                                                    s.status === 'missing-live' ? '&#9888; Missing' :
+                                                    s.status === 'missing-uat' ? '&#128204; Only Live' :
+                                                    '&#9889; Different'
+                                                }</span></td>
+                                                <td class="diff-list">${s.diff?.join(', ') || ''}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="action-bar">
+                                <span id="storesSelected">0 selected</span>
+                                <div>
+                                    <button class="btn btn-warning" onclick="selectAllNeedSync('stores')">Select All Needing Sync</button>
+                                    <button class="btn btn-success" onclick="syncSelected('stores')">&#128260; Sync to Live</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-content" id="tab-brands">
+                        <div class="card">
+                            <div class="card-header">
+                                <span>&#127991; Brands Comparison</span>
+                                <select id="filterBrandsStatus" onchange="filterBrands()">
+                                    <option value="">All Status</option>
+                                    <option value="missing-live">Missing on Live</option>
+                                    <option value="missing-uat">Only on Live</option>
+                                    <option value="different">Different</option>
+                                    <option value="same">In Sync</option>
+                                </select>
+                            </div>
+                            <div class="card-body">
+                                <table id="brandsTable">
+                                    <thead>
+                                        <tr>
+                                            <th class="checkbox-col"><input type="checkbox" id="selectAllBrands" onchange="toggleSelectAll('brands')"></th>
+                                            <th>Brand Code</th>
+                                            <th>Brand Name</th>
+                                            <th>Primary Color</th>
+                                            <th>Active</th>
+                                            <th>Status</th>
+                                            <th>Differences</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${brandsComparison.map(b => `
+                                            <tr data-status="${b.status}" data-code="${b.code}">
+                                                <td class="checkbox-col">
+                                                    ${b.status !== 'same' && b.status !== 'missing-uat' ? 
+                                                        `<input type="checkbox" class="brand-checkbox" data-code="${b.code}">` : ''}
+                                                </td>
+                                                <td><code>${b.code}</code></td>
+                                                <td>${b.uat?.BrandName || b.live?.BrandName || '-'}</td>
+                                                <td>${b.uat?.PrimaryColor || b.live?.PrimaryColor || '-'}</td>
+                                                <td>${(b.uat?.IsActive ?? b.live?.IsActive) ? '&#10004;' : '&#10008;'}</td>
+                                                <td><span class="status-badge status-${b.status}">${
+                                                    b.status === 'same' ? '&#10004; In Sync' :
+                                                    b.status === 'missing-live' ? '&#9888; Missing' :
+                                                    b.status === 'missing-uat' ? '&#128204; Only Live' :
+                                                    '&#9889; Different'
+                                                }</span></td>
+                                                <td class="diff-list">${b.diff?.join(', ') || ''}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="action-bar">
+                                <span id="brandsSelected">0 selected</span>
+                                <div>
+                                    <button class="btn btn-warning" onclick="selectAllNeedSync('brands')">Select All Needing Sync</button>
+                                    <button class="btn btn-success" onclick="syncSelected('brands')">&#128260; Sync to Live</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-content" id="tab-storeResponsibles">
+                        <div class="card">
+                            <div class="card-header">
+                                <span>&#128101; Store Responsibles Comparison</span>
+                                <select id="filterStoreResponsiblesStatus" onchange="filterStoreResponsibles()">
+                                    <option value="">All Status</option>
+                                    <option value="missing-live">Missing on Live</option>
+                                    <option value="missing-uat">Only on Live</option>
+                                    <option value="different">Different</option>
+                                    <option value="same">In Sync</option>
+                                </select>
+                            </div>
+                            <div class="card-body">
+                                <table id="storeResponsiblesTable">
+                                    <thead>
+                                        <tr>
+                                            <th class="checkbox-col"><input type="checkbox" id="selectAllStoreResponsibles" onchange="toggleSelectAll('storeResponsibles')"></th>
+                                            <th>Store Name</th>
+                                            <th>Area Manager</th>
+                                            <th>Head of Ops</th>
+                                            <th>Active</th>
+                                            <th>Status</th>
+                                            <th>Differences</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${storeResponsiblesComparison.map(sr => `
+                                            <tr data-status="${sr.status}" data-storename="${sr.storeName}">
+                                                <td class="checkbox-col">
+                                                    ${sr.status !== 'same' && sr.status !== 'missing-uat' ? 
+                                                        `<input type="checkbox" class="storeResponsible-checkbox" data-storename="${sr.storeName}">` : ''}
+                                                </td>
+                                                <td>${sr.storeName || '-'}</td>
+                                                <td>${sr.uat?.AreaManager || sr.live?.AreaManager || '-'}</td>
+                                                <td>${sr.uat?.HeadOfOps || sr.live?.HeadOfOps || '-'}</td>
+                                                <td>${(sr.uat?.IsActive ?? sr.live?.IsActive) ? '&#10004;' : '&#10008;'}</td>
+                                                <td><span class="status-badge status-${sr.status}">${
+                                                    sr.status === 'same' ? '&#10004; In Sync' :
+                                                    sr.status === 'missing-live' ? '&#9888; Missing' :
+                                                    sr.status === 'missing-uat' ? '&#128204; Only Live' :
+                                                    '&#9889; Different'
+                                                }</span></td>
+                                                <td class="diff-list">${sr.diff?.join(', ') || ''}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="action-bar">
+                                <span id="storeResponsiblesSelected">0 selected</span>
+                                <div>
+                                    <button class="btn btn-warning" onclick="selectAllNeedSync('storeResponsibles')">Select All Needing Sync</button>
+                                    <button class="btn btn-success" onclick="syncSelected('storeResponsibles')">&#128260; Sync to Live</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
                         <div class="card-body" style="text-align: center; padding: 30px;">
                             <h3 style="margin-bottom: 10px;">&#128640; Quick Sync All</h3>
@@ -557,6 +1065,10 @@ router.get('/', async (req, res) => {
                     const formsData = ${JSON.stringify(formsComparison)};
                     const rolesData = ${JSON.stringify(rolesComparison)};
                     const accessData = ${JSON.stringify(accessComparison)};
+                    const usersData = ${JSON.stringify(usersComparison)};
+                    const storesData = ${JSON.stringify(storesComparison)};
+                    const brandsData = ${JSON.stringify(brandsComparison)};
+                    const storeResponsiblesData = ${JSON.stringify(storeResponsiblesComparison)};
                     
                     function showTab(tab) {
                         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -587,10 +1099,14 @@ router.get('/', async (req, res) => {
                         document.getElementById(type + 'Selected').textContent = count + ' selected';
                     }
                     
-                    document.querySelectorAll('.form-checkbox, .role-checkbox, .access-checkbox').forEach(cb => {
+                    document.querySelectorAll('.form-checkbox, .role-checkbox, .access-checkbox, .user-checkbox, .store-checkbox, .brand-checkbox, .storeResponsible-checkbox').forEach(cb => {
                         cb.addEventListener('change', function() {
                             const type = this.classList.contains('form-checkbox') ? 'forms' :
-                                         this.classList.contains('role-checkbox') ? 'roles' : 'access';
+                                         this.classList.contains('role-checkbox') ? 'roles' : 
+                                         this.classList.contains('access-checkbox') ? 'access' : 
+                                         this.classList.contains('user-checkbox') ? 'users' :
+                                         this.classList.contains('store-checkbox') ? 'stores' : 
+                                         this.classList.contains('brand-checkbox') ? 'brands' : 'storeResponsibles';
                             updateSelectedCount(type);
                         });
                     });
@@ -612,6 +1128,34 @@ router.get('/', async (req, res) => {
                         });
                     }
                     
+                    function filterUsers() {
+                        const status = document.getElementById('filterUsersStatus').value;
+                        document.querySelectorAll('#usersTable tbody tr').forEach(row => {
+                            row.style.display = (!status || row.dataset.status === status) ? '' : 'none';
+                        });
+                    }
+                    
+                    function filterStores() {
+                        const status = document.getElementById('filterStoresStatus').value;
+                        document.querySelectorAll('#storesTable tbody tr').forEach(row => {
+                            row.style.display = (!status || row.dataset.status === status) ? '' : 'none';
+                        });
+                    }
+                    
+                    function filterBrands() {
+                        const status = document.getElementById('filterBrandsStatus').value;
+                        document.querySelectorAll('#brandsTable tbody tr').forEach(row => {
+                            row.style.display = (!status || row.dataset.status === status) ? '' : 'none';
+                        });
+                    }
+                    
+                    function filterStoreResponsibles() {
+                        const status = document.getElementById('filterStoreResponsiblesStatus').value;
+                        document.querySelectorAll('#storeResponsiblesTable tbody tr').forEach(row => {
+                            row.style.display = (!status || row.dataset.status === status) ? '' : 'none';
+                        });
+                    }
+                    
                     async function syncSelected(type) {
                         let items = [];
                         if (type === 'forms') {
@@ -628,6 +1172,26 @@ router.get('/', async (req, res) => {
                             document.querySelectorAll('.access-checkbox:checked').forEach(cb => {
                                 const access = accessData.find(a => a.roleName === cb.dataset.role && a.formCode === cb.dataset.form);
                                 if (access) items.push(access);
+                            });
+                        } else if (type === 'users') {
+                            document.querySelectorAll('.user-checkbox:checked').forEach(cb => {
+                                const user = usersData.find(u => u.email === cb.dataset.email);
+                                if (user) items.push(user);
+                            });
+                        } else if (type === 'stores') {
+                            document.querySelectorAll('.store-checkbox:checked').forEach(cb => {
+                                const store = storesData.find(s => s.name === cb.dataset.name);
+                                if (store) items.push(store);
+                            });
+                        } else if (type === 'brands') {
+                            document.querySelectorAll('.brand-checkbox:checked').forEach(cb => {
+                                const brand = brandsData.find(b => b.code === cb.dataset.code);
+                                if (brand) items.push(brand);
+                            });
+                        } else if (type === 'storeResponsibles') {
+                            document.querySelectorAll('.storeResponsible-checkbox:checked').forEach(cb => {
+                                const sr = storeResponsiblesData.find(sr => sr.storeName === cb.dataset.storename);
+                                if (sr) items.push(sr);
                             });
                         }
                         
@@ -659,23 +1223,24 @@ router.get('/', async (req, res) => {
                         const formsToSync = formsData.filter(f => f.status === 'missing-live' || f.status === 'different');
                         const rolesToSync = rolesData.filter(r => r.status === 'missing-live' || r.status === 'different');
                         const accessToSync = accessData.filter(a => a.status === 'missing-live' || a.status === 'different');
+                        const usersToSync = usersData.filter(u => u.status === 'missing-live' || u.status === 'different');
                         
-                        const total = formsToSync.length + rolesToSync.length + accessToSync.length;
+                        const total = formsToSync.length + rolesToSync.length + accessToSync.length + usersToSync.length;
                         if (total === 0) { alert('Everything is already in sync!'); return; }
                         
-                        if (!confirm('Sync ALL to Live?\\n\\n' + formsToSync.length + ' Forms\\n' + rolesToSync.length + ' Roles\\n' + accessToSync.length + ' Access\\n\\nTotal: ' + total + ' items')) return;
+                        if (!confirm('Sync ALL to Live?\\n\\n' + formsToSync.length + ' Forms\\n' + rolesToSync.length + ' Roles\\n' + accessToSync.length + ' Access\\n' + usersToSync.length + ' Users\\n\\nTotal: ' + total + ' items')) return;
                         
                         showProgress();
                         try {
                             const res = await fetch('/admin/permission-sync/sync-all', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ forms: formsToSync, roles: rolesToSync, access: accessToSync })
+                                body: JSON.stringify({ forms: formsToSync, roles: rolesToSync, access: accessToSync, users: usersToSync })
                             });
                             const result = await res.json();
                             hideProgress();
                             if (result.success) {
-                                alert('Sync Complete!\\n\\n' + result.forms + ' Forms\\n' + result.roles + ' Roles\\n' + result.access + ' Access');
+                                alert('Sync Complete!\\n\\n' + result.forms + ' Forms\\n' + result.roles + ' Roles\\n' + result.access + ' Access\\n' + result.users + ' Users');
                                 location.reload();
                             } else {
                                 alert('Error: ' + result.error);
@@ -837,6 +1402,167 @@ router.post('/sync', async (req, res) => {
                 }
                 count++;
             }
+        } else if (type === 'users') {
+            for (const user of items) {
+                const uatUser = user.uat;
+                if (!uatUser) continue;
+                
+                // Get the Live RoleId that matches the UAT RoleName
+                let liveRoleId = null;
+                if (uatUser.RoleName) {
+                    const liveRole = await livePool.request()
+                        .input('roleName', sql.NVarChar, uatUser.RoleName)
+                        .query('SELECT Id FROM UserRoles WHERE RoleName = @roleName');
+                    if (liveRole.recordset.length > 0) {
+                        liveRoleId = liveRole.recordset[0].Id;
+                    }
+                }
+                
+                const exists = await livePool.request()
+                    .input('email', sql.NVarChar, user.email)
+                    .query('SELECT Id FROM Users WHERE Email = @email');
+                
+                if (exists.recordset.length > 0) {
+                    await livePool.request()
+                        .input('email', sql.NVarChar, user.email)
+                        .input('displayName', sql.NVarChar, uatUser.DisplayName)
+                        .input('roleId', sql.Int, liveRoleId)
+                        .input('isActive', sql.Bit, uatUser.IsActive)
+                        .input('isApproved', sql.Bit, uatUser.IsApproved)
+                        .query('UPDATE Users SET DisplayName=@displayName, RoleId=@roleId, IsActive=@isActive, IsApproved=@isApproved WHERE Email=@email');
+                } else {
+                    await livePool.request()
+                        .input('email', sql.NVarChar, user.email)
+                        .input('displayName', sql.NVarChar, uatUser.DisplayName)
+                        .input('roleId', sql.Int, liveRoleId)
+                        .input('isActive', sql.Bit, uatUser.IsActive)
+                        .input('isApproved', sql.Bit, uatUser.IsApproved)
+                        .query('INSERT INTO Users (Email, DisplayName, RoleId, IsActive, IsApproved) VALUES (@email, @displayName, @roleId, @isActive, @isApproved)');
+                }
+                count++;
+            }
+        } else if (type === 'stores') {
+            for (const store of items) {
+                const uatStore = store.uat;
+                if (!uatStore) continue;
+                
+                // Get the Live BrandId that matches the UAT BrandName
+                let liveBrandId = null;
+                if (uatStore.BrandName) {
+                    const liveBrand = await livePool.request()
+                        .input('brandName', sql.NVarChar, uatStore.BrandName)
+                        .query('SELECT Id FROM Brands WHERE BrandName = @brandName');
+                    if (liveBrand.recordset.length > 0) {
+                        liveBrandId = liveBrand.recordset[0].Id;
+                    }
+                }
+                
+                const exists = await livePool.request()
+                    .input('storeName', sql.NVarChar, store.name)
+                    .query('SELECT Id FROM Stores WHERE StoreName = @storeName');
+                
+                if (exists.recordset.length > 0) {
+                    await livePool.request()
+                        .input('storeName', sql.NVarChar, store.name)
+                        .input('storeCode', sql.NVarChar, uatStore.StoreCode)
+                        .input('location', sql.NVarChar, uatStore.Location)
+                        .input('storeSize', sql.NVarChar, uatStore.StoreSize)
+                        .input('isActive', sql.Bit, uatStore.IsActive)
+                        .input('brandId', sql.Int, liveBrandId)
+                        .query('UPDATE Stores SET StoreCode=@storeCode, Location=@location, StoreSize=@storeSize, IsActive=@isActive, BrandId=@brandId WHERE StoreName=@storeName');
+                } else {
+                    await livePool.request()
+                        .input('storeName', sql.NVarChar, store.name)
+                        .input('storeCode', sql.NVarChar, uatStore.StoreCode)
+                        .input('location', sql.NVarChar, uatStore.Location)
+                        .input('storeSize', sql.NVarChar, uatStore.StoreSize)
+                        .input('isActive', sql.Bit, uatStore.IsActive)
+                        .input('brandId', sql.Int, liveBrandId)
+                        .query('INSERT INTO Stores (StoreName, StoreCode, Location, StoreSize, IsActive, BrandId, CreatedDate) VALUES (@storeName, @storeCode, @location, @storeSize, @isActive, @brandId, GETDATE())');
+                }
+                count++;
+            }
+        } else if (type === 'brands') {
+            for (const brand of items) {
+                const uatBrand = brand.uat;
+                if (!uatBrand) continue;
+                
+                const exists = await livePool.request()
+                    .input('code', sql.NVarChar, brand.code)
+                    .query('SELECT Id FROM Brands WHERE BrandCode = @code');
+                
+                if (exists.recordset.length > 0) {
+                    await livePool.request()
+                        .input('code', sql.NVarChar, brand.code)
+                        .input('brandName', sql.NVarChar, uatBrand.BrandName)
+                        .input('logoUrl', sql.NVarChar, uatBrand.LogoUrl)
+                        .input('primaryColor', sql.NVarChar, uatBrand.PrimaryColor)
+                        .input('isActive', sql.Bit, uatBrand.IsActive)
+                        .query('UPDATE Brands SET BrandName=@brandName, LogoUrl=@logoUrl, PrimaryColor=@primaryColor, IsActive=@isActive, UpdatedAt=GETDATE() WHERE BrandCode=@code');
+                } else {
+                    await livePool.request()
+                        .input('code', sql.NVarChar, brand.code)
+                        .input('brandName', sql.NVarChar, uatBrand.BrandName)
+                        .input('logoUrl', sql.NVarChar, uatBrand.LogoUrl)
+                        .input('primaryColor', sql.NVarChar, uatBrand.PrimaryColor)
+                        .input('isActive', sql.Bit, uatBrand.IsActive)
+                        .query('INSERT INTO Brands (BrandCode, BrandName, LogoUrl, PrimaryColor, IsActive, CreatedAt) VALUES (@code, @brandName, @logoUrl, @primaryColor, @isActive, GETDATE())');
+                }
+                count++;
+            }
+        } else if (type === 'storeResponsibles') {
+            for (const sr of items) {
+                const uatSR = sr.uat;
+                if (!uatSR) continue;
+                
+                // Get Live StoreId by StoreName
+                const liveStore = await livePool.request()
+                    .input('storeName', sql.NVarChar, sr.storeName)
+                    .query('SELECT Id FROM Stores WHERE StoreName = @storeName');
+                if (liveStore.recordset.length === 0) continue;
+                const liveStoreId = liveStore.recordset[0].Id;
+                
+                // Get Live AreaManagerId by Email
+                let liveAreaManagerId = null;
+                if (uatSR.AreaManagerEmail) {
+                    const liveAM = await livePool.request()
+                        .input('email', sql.NVarChar, uatSR.AreaManagerEmail)
+                        .query('SELECT Id FROM Users WHERE Email = @email');
+                    if (liveAM.recordset.length > 0) liveAreaManagerId = liveAM.recordset[0].Id;
+                }
+                
+                // Get Live HeadOfOpsId by Email
+                let liveHeadOfOpsId = null;
+                if (uatSR.HeadOfOpsEmail) {
+                    const liveHO = await livePool.request()
+                        .input('email', sql.NVarChar, uatSR.HeadOfOpsEmail)
+                        .query('SELECT Id FROM Users WHERE Email = @email');
+                    if (liveHO.recordset.length > 0) liveHeadOfOpsId = liveHO.recordset[0].Id;
+                }
+                
+                const exists = await livePool.request()
+                    .input('storeId', sql.Int, liveStoreId)
+                    .query('SELECT Id FROM OE_StoreResponsibles WHERE StoreId = @storeId');
+                
+                if (exists.recordset.length > 0) {
+                    await livePool.request()
+                        .input('storeId', sql.Int, liveStoreId)
+                        .input('areaManagerId', sql.Int, liveAreaManagerId)
+                        .input('headOfOpsId', sql.Int, liveHeadOfOpsId)
+                        .input('isActive', sql.Bit, uatSR.IsActive)
+                        .input('notes', sql.NVarChar, uatSR.Notes)
+                        .query('UPDATE OE_StoreResponsibles SET AreaManagerId=@areaManagerId, HeadOfOpsId=@headOfOpsId, IsActive=@isActive, Notes=@notes, UpdatedAt=GETDATE() WHERE StoreId=@storeId');
+                } else {
+                    await livePool.request()
+                        .input('storeId', sql.Int, liveStoreId)
+                        .input('areaManagerId', sql.Int, liveAreaManagerId)
+                        .input('headOfOpsId', sql.Int, liveHeadOfOpsId)
+                        .input('isActive', sql.Bit, uatSR.IsActive)
+                        .input('notes', sql.NVarChar, uatSR.Notes)
+                        .query('INSERT INTO OE_StoreResponsibles (StoreId, AreaManagerId, HeadOfOpsId, IsActive, Notes, CreatedBy, CreatedAt) VALUES (@storeId, @areaManagerId, @headOfOpsId, @isActive, @notes, \'System\', GETDATE())');
+                }
+                count++;
+            }
         }
         
         res.json({ success: true, count });
@@ -854,12 +1580,12 @@ router.post('/sync-all', async (req, res) => {
     let uatPool = null;
     let livePool = null;
     try {
-        const { forms, roles, access } = req.body;
+        const { forms, roles, access, users } = req.body;
         
         uatPool = await new sql.ConnectionPool(uatDbConfig).connect();
         livePool = await new sql.ConnectionPool(liveDbConfig).connect();
         
-        let formsCount = 0, rolesCount = 0, accessCount = 0;
+        let formsCount = 0, rolesCount = 0, accessCount = 0, usersCount = 0;
         
         // Sync Roles first
         for (const role of roles || []) {
@@ -987,7 +1713,47 @@ router.post('/sync-all', async (req, res) => {
             accessCount++;
         }
         
-        res.json({ success: true, forms: formsCount, roles: rolesCount, access: accessCount });
+        // Sync Users
+        for (const user of users || []) {
+            const uatUser = user.uat;
+            if (!uatUser) continue;
+            
+            // Get the Live RoleId that matches the UAT RoleName
+            let liveRoleId = null;
+            if (uatUser.RoleName) {
+                const liveRole = await livePool.request()
+                    .input('roleName', sql.NVarChar, uatUser.RoleName)
+                    .query('SELECT Id FROM UserRoles WHERE RoleName = @roleName');
+                if (liveRole.recordset.length > 0) {
+                    liveRoleId = liveRole.recordset[0].Id;
+                }
+            }
+            
+            const exists = await livePool.request()
+                .input('email', sql.NVarChar, user.email)
+                .query('SELECT Id FROM Users WHERE Email = @email');
+            
+            if (exists.recordset.length > 0) {
+                await livePool.request()
+                    .input('email', sql.NVarChar, user.email)
+                    .input('displayName', sql.NVarChar, uatUser.DisplayName)
+                    .input('roleId', sql.Int, liveRoleId)
+                    .input('isActive', sql.Bit, uatUser.IsActive)
+                    .input('isApproved', sql.Bit, uatUser.IsApproved)
+                    .query('UPDATE Users SET DisplayName=@displayName, RoleId=@roleId, IsActive=@isActive, IsApproved=@isApproved WHERE Email=@email');
+            } else {
+                await livePool.request()
+                    .input('email', sql.NVarChar, user.email)
+                    .input('displayName', sql.NVarChar, uatUser.DisplayName)
+                    .input('roleId', sql.Int, liveRoleId)
+                    .input('isActive', sql.Bit, uatUser.IsActive)
+                    .input('isApproved', sql.Bit, uatUser.IsApproved)
+                    .query('INSERT INTO Users (Email, DisplayName, RoleId, IsActive, IsApproved) VALUES (@email, @displayName, @roleId, @isActive, @isApproved)');
+            }
+            usersCount++;
+        }
+        
+        res.json({ success: true, forms: formsCount, roles: rolesCount, access: accessCount, users: usersCount });
     } catch (err) {
         console.error('Error syncing all:', err);
         res.json({ success: false, error: err.message });
