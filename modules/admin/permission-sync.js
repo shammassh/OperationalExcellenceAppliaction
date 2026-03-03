@@ -322,6 +322,21 @@ router.get('/', async (req, res) => {
             storeResponsiblesComparison.push({ storeName, uat, live, status, diff });
         });
         
+        // Sort helper function - items needing sync (missing-live, different) come first
+        const sortByNeedsSync = (a, b) => {
+            const statusPriority = { 'missing-live': 0, 'different': 1, 'missing-uat': 2, 'same': 3 };
+            return (statusPriority[a.status] || 3) - (statusPriority[b.status] || 3);
+        };
+        
+        // Sort all comparison arrays to show items needing sync at the top
+        formsComparison.sort(sortByNeedsSync);
+        rolesComparison.sort(sortByNeedsSync);
+        accessComparison.sort(sortByNeedsSync);
+        usersComparison.sort(sortByNeedsSync);
+        storesComparison.sort(sortByNeedsSync);
+        brandsComparison.sort(sortByNeedsSync);
+        storeResponsiblesComparison.sort(sortByNeedsSync);
+        
         // Stats
         const stats = {
             forms: {
