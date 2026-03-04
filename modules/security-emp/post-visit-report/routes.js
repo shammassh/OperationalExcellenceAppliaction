@@ -219,8 +219,7 @@ router.get('/', async (req, res) => {
                     <h1>📋 Post Visit Report</h1>
                     <div class="header-nav">
                         <a href="/security-emp/post-visit-report/history">📜 View Reports</a>
-                        <a href="/security-emp">← Back to Security</a>
-                        <a href="/dashboard">Dashboard</a>
+                        <a href="/dashboard">← Back to Dashboard</a>
                     </div>
                 </div>
                 
@@ -1056,7 +1055,7 @@ router.get('/history', async (req, res) => {
                     <h1>📜 Post Visit Reports</h1>
                     <div class="header-nav">
                         <a href="/security-emp/post-visit-report">➕ New Report</a>
-                        <a href="/security-emp">← Back to Security</a>
+                        <a href="/dashboard">← Back to Dashboard</a>
                     </div>
                 </div>
                 <div class="container">
