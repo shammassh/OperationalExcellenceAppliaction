@@ -474,6 +474,26 @@
             font-size: 13px;
         }
 
+        /* Severity Tags */
+        .severity-tag {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .severity-tag.severity-low {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .severity-tag.severity-medium {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .severity-tag.severity-high {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
         /* Empty State */
         .empty-state {
             text-align: center;
@@ -878,6 +898,15 @@
                                     <label>CR (Criterion)</label>
                                     <textarea id="itemCR" placeholder="Enter the criterion/requirement..."></textarea>
                                 </div>
+                                <div class="form-group">
+                                    <label>Default Severity</label>
+                                    <select id="itemDefaultSeverity">
+                                        <option value="">-- Select --</option>
+                                        <option value="Low">🟢 Low</option>
+                                        <option value="Medium">🟡 Medium</option>
+                                        <option value="High">🔴 High</option>
+                                    </select>
+                                </div>
                             </div>
                             <!-- Quantitative Section -->
                             <div class="form-row" style="align-items: center; margin-top: 15px; padding: 15px; background: #f0f9ff; border-radius: 10px; border: 1px solid #bae6fd;">
@@ -1254,7 +1283,8 @@
                                 title: item.title,
                                 coeff: item.coeff,
                                 answer: item.answer,
-                                cr: item.cr
+                                cr: item.cr,
+                                defaultSeverity: item.defaultSeverity
                             }))
                         }))
                     }
@@ -1356,7 +1386,8 @@
                                     title: itemData.title,
                                     coeff: itemData.coeff || 1,
                                     answer: itemData.answer || 'Yes/No',
-                                    cr: itemData.cr || false
+                                    cr: itemData.cr || false,
+                                    defaultSeverity: itemData.defaultSeverity || null
                                 })
                             });
 
@@ -1727,7 +1758,7 @@
 
                 container.innerHTML = `
                     <table class="items-table">
-                        <thead><tr><th>Ref</th><th>Title</th><th>Coeff</th><th>Qty</th><th>Ranges</th><th>Answer</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>Ref</th><th>Title</th><th>Coeff</th><th>Qty</th><th>Severity</th><th>Ranges</th><th>Answer</th><th>Actions</th></tr></thead>
                         <tbody>
                             ${sortedItems.map(item => `
                                 <tr>
@@ -1735,6 +1766,7 @@
                                     <td>${item.title}</td>
                                     <td><span class="coeff-badge">${item.coeff}</span></td>
                                     <td>${item.quantity || '-'}</td>
+                                    <td>${item.defaultSeverity ? `<span class="severity-tag severity-${item.defaultSeverity.toLowerCase()}">${item.defaultSeverity}</span>` : '-'}</td>
                                     <td>${item.isQuantitative ? `<span style="font-size: 11px;">✅${item.range1From}-${item.range1To} ⚠️${item.range2From}-${item.range2To} ❌${item.range3From}+</span>` : '-'}</td>
                                     <td>${item.answer}</td>
                                     <td style="display: flex; gap: 5px;">
@@ -1761,6 +1793,7 @@
                 quantity: parseInt(document.getElementById('itemQuantity').value) || null,
                 answer: document.getElementById('itemAnswer').value,
                 cr: document.getElementById('itemCR').value,
+                defaultSeverity: document.getElementById('itemDefaultSeverity').value || null,
                 isQuantitative: isQuantitative,
                 range1From: isQuantitative ? parseInt(document.getElementById('itemRange1From').value) || 0 : null,
                 range1To: isQuantitative ? parseInt(document.getElementById('itemRange1To').value) || 0 : null,
@@ -1827,6 +1860,7 @@
             document.getElementById('editItemQuantity').value = item.quantity || '';
             document.getElementById('editItemAnswer').value = item.answer || 'Yes,Partially,No,NA';
             document.getElementById('editItemCR').value = item.cr || '';
+            document.getElementById('editItemDefaultSeverity').value = item.defaultSeverity || '';
             // Quantitative fields
             document.getElementById('editItemIsQuantitative').checked = item.isQuantitative || false;
             document.getElementById('editQuantitativeFields').style.display = item.isQuantitative ? 'block' : 'none';
@@ -1855,6 +1889,7 @@
                 quantity: parseInt(document.getElementById('editItemQuantity').value) || null,
                 answer: document.getElementById('editItemAnswer').value,
                 cr: document.getElementById('editItemCR').value,
+                defaultSeverity: document.getElementById('editItemDefaultSeverity').value || null,
                 isQuantitative: isQuantitative,
                 range1From: isQuantitative ? parseInt(document.getElementById('editItemRange1From').value) || 0 : null,
                 range1To: isQuantitative ? parseInt(document.getElementById('editItemRange1To').value) || 0 : null,
@@ -1881,10 +1916,10 @@
         // ==========================================
 
         function downloadItemTemplate() {
-            const headers = ['ReferenceValue', 'Title', 'Coeff', 'Quantity', 'Answer', 'CR'];
+            const headers = ['ReferenceValue', 'Title', 'Coeff', 'Quantity', 'Answer', 'CR', 'DefaultSeverity'];
             const examples = [
-                ['1.1', 'Example question 1', '2', '5', 'Yes,Partially,No,NA', 'Criterion 1'],
-                ['1.2', 'Example question 2', '2', '10', 'Yes,Partially,No,NA', 'Criterion 2']
+                ['1.1', 'Example question 1', '2', '5', 'Yes,Partially,No,NA', 'Criterion 1', 'Medium'],
+                ['1.2', 'Example question 2', '2', '10', 'Yes,Partially,No,NA', 'Criterion 2', 'High']
             ];
             const csv = [headers.join(','), ...examples.map(r => r.map(f => `"${f}"`).join(','))].join('\n');
             const blob = new Blob([csv], { type: 'text/csv' });
@@ -1950,14 +1985,15 @@
                 const isReferenceValue = firstCol.length <= 10 && /^[\d.]+$/.test(firstCol);
                 
                 if (isReferenceValue && values.length >= 2 && values[1]) {
-                    // Standard format: ReferenceValue, Title, Coeff, Quantity, Answer, CR
+                    // Standard format: ReferenceValue, Title, Coeff, Quantity, Answer, CR, DefaultSeverity
                     items.push({
                         referenceValue: firstCol,
                         title: values[1].trim(),
                         coeff: parseInt(values[2]) || 2,
                         quantity: parseInt(values[3]) || null,
                         answer: values[4]?.trim() || 'Yes,Partially,No,NA',
-                        cr: values[5]?.trim() || ''
+                        cr: values[5]?.trim() || '',
+                        defaultSeverity: values[6]?.trim() || null
                     });
                 } else if (firstCol) {
                     // Plain text format: just questions, auto-generate reference values
@@ -1969,7 +2005,8 @@
                         coeff: 2,
                         quantity: null,
                         answer: 'Yes,Partially,No,NA',
-                        cr: ''
+                        cr: '',
+                        defaultSeverity: null
                     });
                 }
             }
@@ -2119,9 +2156,20 @@
                     <label>Answer Options</label>
                     <input type="text" id="editItemAnswer" value="Yes,Partially,No,NA">
                 </div>
-                <div class="form-group">
-                    <label>Criterion</label>
-                    <textarea id="editItemCR" rows="3"></textarea>
+                <div class="form-row">
+                    <div class="form-group" style="flex: 2;">
+                        <label>Criterion</label>
+                        <textarea id="editItemCR" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Default Severity</label>
+                        <select id="editItemDefaultSeverity">
+                            <option value="">-- Select --</option>
+                            <option value="Low">🟢 Low</option>
+                            <option value="Medium">🟡 Medium</option>
+                            <option value="High">🔴 High</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
                     <input type="checkbox" id="editItemIsQuantitative" onchange="toggleQuantitativeFields(true)">
