@@ -426,6 +426,7 @@ router.get('/', async (req, res) => {
                         <label>Visit Type</label>
                         <select id="recurVisitType">
                             <option value="Inspection">Inspection</option>
+                            <option value="Observation">Observation</option>
                             <option value="Follow-up">Follow-up</option>
                             <option value="Training">Training</option>
                             <option value="Audit">Audit</option>
@@ -473,6 +474,7 @@ router.get('/', async (req, res) => {
                         <label>Visit Type</label>
                         <select id="visitType">
                             <option value="Inspection">Inspection</option>
+                            <option value="Observation">Observation</option>
                             <option value="Follow-up">Follow-up</option>
                             <option value="Training">Training</option>
                             <option value="Audit">Audit</option>
