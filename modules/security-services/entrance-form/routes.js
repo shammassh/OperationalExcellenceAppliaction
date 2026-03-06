@@ -296,7 +296,7 @@ router.get('/', async (req, res) => {
         </head>
         <body>
             <div class="header">
-                <h1>🚪 Workers Entrance Form - نموذج الدخول</h1>
+                <h1>&#128119; Workers Entrance Form - نموذج الدخول</h1>
                 <div class="header-nav">
                     <a href="/security-services">← Security Services</a>
                     <a href="/dashboard">Dashboard</a>
@@ -321,14 +321,6 @@ router.get('/', async (req, res) => {
                                     <div class="form-group">
                                         <label>Date</label>
                                         <input type="date" id="formDate" name="formDate" value="${today}" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Entrance *</label>
-                                        <select id="entrance" name="entrance" required>
-                                            <option value="">-- Select Entrance --</option>
-                                            <option value="Lower Entrance">Lower Entrance</option>
-                                            <option value="Upper Entrance">Upper Entrance</option>
-                                        </select>
                                     </div>
                                     <div class="form-group">
                                         <label>Location *</label>
@@ -393,14 +385,6 @@ router.get('/', async (req, res) => {
                             <div class="form-group">
                                 <label>To Date</label>
                                 <input type="date" id="filterToDate" onchange="loadHistory()">
-                            </div>
-                            <div class="form-group">
-                                <label>Entrance</label>
-                                <select id="filterEntrance" onchange="loadHistory()">
-                                    <option value="">All Entrances</option>
-                                    <option value="Lower Entrance">Lower Entrance</option>
-                                    <option value="Upper Entrance">Upper Entrance</option>
-                                </select>
                             </div>
                         </div>
                         <div id="historyList" class="log-list">
@@ -525,7 +509,6 @@ router.get('/', async (req, res) => {
                     
                     const data = {
                         formDate: document.getElementById('formDate').value,
-                        entrance: document.getElementById('entrance').value,
                         location: document.getElementById('location').value,
                         entries: entries
                     };
@@ -566,12 +549,10 @@ router.get('/', async (req, res) => {
                 async function loadHistory() {
                     const fromDate = document.getElementById('filterFromDate').value;
                     const toDate = document.getElementById('filterToDate').value;
-                    const entrance = document.getElementById('filterEntrance').value;
                     
                     let url = '/security-services/entrance-form/list?';
                     if (fromDate) url += 'fromDate=' + fromDate + '&';
-                    if (toDate) url += 'toDate=' + toDate + '&';
-                    if (entrance) url += 'entrance=' + encodeURIComponent(entrance);
+                    if (toDate) url += 'toDate=' + toDate;
                     
                     try {
                         const res = await fetch(url);
@@ -604,11 +585,10 @@ router.get('/', async (req, res) => {
                             return '<div class="log-item" onclick="viewForm(' + form.Id + ')">' +
                                 '<div class="log-item-header">' +
                                     '<span class="log-item-date">' + formDate + '</span>' +
-                                    '<span class="log-item-entrance">' + form.Entrance + '</span>' +
+                                    '<span class="log-item-entrance">' + form.Location + '</span>' +
                                 '</div>' +
                                 '<div class="log-item-meta">' +
-                                    '<span>📍 ' + form.Location + '</span>' +
-                                    '<span style="margin-left: 20px;">👷 ' + form.EntryCount + ' worker(s)</span>' +
+                                    '<span>👷 ' + form.EntryCount + ' worker(s)</span>' +
                                 '</div>' +
                                 '<div class="log-item-meta" style="margin-top: 5px;">' +
                                     '<span>👤 Workers: ' + workerNames + '</span>' +
@@ -641,10 +621,10 @@ router.get('/', async (req, res) => {
 // API: Save Entrance Form
 router.post('/save', async (req, res) => {
     try {
-        const { formDate, entrance, location, entries } = req.body;
+        const { formDate, location, entries } = req.body;
         const user = req.currentUser;
         
-        if (!formDate || !entrance || !location) {
+        if (!formDate || !location) {
             return res.json({ success: false, error: 'Missing required fields' });
         }
         
@@ -669,7 +649,7 @@ router.post('/save', async (req, res) => {
         // Insert main form
         const formResult = await pool.request()
             .input('formDate', sql.Date, formDate)
-            .input('entrance', sql.NVarChar, entrance)
+            .input('entrance', sql.NVarChar, '-')
             .input('location', sql.NVarChar, location)
             .input('createdBy', sql.NVarChar, user.displayName)
             .input('createdById', sql.Int, user.id)
@@ -928,7 +908,7 @@ router.get('/:id', async (req, res) => {
             </head>
             <body>
                 <div class="header">
-                    <h1>🚪 Workers Entrance Form Details</h1>
+                    <h1>&#128119; Workers Entrance Form Details</h1>
                     <div class="header-nav">
                         <a href="/security-services/entrance-form">← Back to Workers Entrance Forms</a>
                         <a href="/security-services">Security Services</a>
