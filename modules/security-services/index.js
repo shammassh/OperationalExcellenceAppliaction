@@ -221,6 +221,24 @@ router.get('/', async (req, res) => {
                         <div class="card-desc">Daily cleaning checklist for HO Dbayeh - قائمة التنظيف اليومية</div>
                         <span class="card-badge internal">Internal</span>
                     </a>
+                    <a href="/security-services/attendance-report" class="menu-card internal">
+                        <div class="card-icon">&#128203;</div>
+                        <div class="card-title">Employee Attendance</div>
+                        <div class="card-desc">Track employees who come after working hours</div>
+                        <span class="card-badge internal">Internal</span>
+                    </a>
+                    <a href="/security-services/visitor-cars" class="menu-card internal">
+                        <div class="card-icon">&#128663;</div>
+                        <div class="card-title">Visitors Cars</div>
+                        <div class="card-desc">Track visitor vehicles and plate numbers</div>
+                        <span class="card-badge internal">Internal</span>
+                    </a>
+                    <a href="/security-services/parking-violation" class="menu-card internal">
+                        <div class="card-icon">🅿️</div>
+                        <div class="card-title">Parking Violations</div>
+                        <div class="card-desc">Record and track parking violations with photo evidence</div>
+                        <span class="card-badge internal">Internal</span>
+                    </a>
                 </div>
             </div>
         </body>
