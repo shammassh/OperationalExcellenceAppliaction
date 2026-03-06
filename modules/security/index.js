@@ -1529,7 +1529,11 @@ router.get('/attendance-reports', async (req, res) => {
         const attendanceResult = await pool.request()
             .query(`
                 SELECT ar.*, 
-                       (SELECT COUNT(*) FROM Security_AttendanceEntries WHERE AttendanceReportId = ar.Id) as EntryCount
+                       (SELECT COUNT(*) FROM Security_AttendanceEntries WHERE AttendanceReportId = ar.Id) as EntryCount,
+                       (SELECT STRING_AGG(EmployeeName, ', ') FROM Security_AttendanceEntries WHERE AttendanceReportId = ar.Id) as EmployeeNames,
+                       (SELECT MIN(TimeIn) FROM Security_AttendanceEntries WHERE AttendanceReportId = ar.Id AND TimeIn IS NOT NULL AND TimeIn != '') as FirstTimeIn,
+                       (SELECT MAX(TimeOut) FROM Security_AttendanceEntries WHERE AttendanceReportId = ar.Id AND TimeOut IS NOT NULL AND TimeOut != '') as LastTimeOut,
+                       (SELECT COUNT(*) FROM Security_AttendanceEntries WHERE AttendanceReportId = ar.Id AND Informed = 1) as InformedCount
                 FROM Security_AttendanceReports ar
                 WHERE ar.Status = 'Active'
                 ORDER BY ar.ReportDate DESC, ar.CreatedAt DESC
@@ -1543,12 +1547,19 @@ router.get('/attendance-reports', async (req, res) => {
             const reportDate = new Date(report.ReportDate).toLocaleDateString('en-GB', { 
                 weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
             });
+            const employeeNames = report.EmployeeNames || '-';
+            const timeIn = report.FirstTimeIn || '-';
+            const timeOut = report.LastTimeOut || '-';
+            const informedCount = report.InformedCount || 0;
             return `
                 <tr onclick="viewReport(${report.Id})" style="cursor: pointer;">
                     <td>${reportDate}</td>
                     <td><span class="location-badge">${report.Location}</span></td>
                     <td>${report.CreatedBy}</td>
                     <td><span class="entry-count">${report.EntryCount} employees</span></td>
+                    <td style="font-size: 12px; color: #666; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${employeeNames}">👤 ${employeeNames}</td>
+                    <td style="font-size: 12px; color: #666;">⏰ ${timeIn} - ${timeOut}</td>
+                    <td style="font-size: 12px; color: #666;">✅ ${informedCount}/${report.EntryCount} informed</td>
                     <td>
                         <button class="btn-view" onclick="event.stopPropagation(); viewReport(${report.Id})">View</button>
                     </td>
@@ -1730,6 +1741,9 @@ router.get('/attendance-reports', async (req, res) => {
                                             <th>Location</th>
                                             <th>Created By</th>
                                             <th>Employees</th>
+                                            <th>Names</th>
+                                            <th>Time</th>
+                                            <th>Informed</th>
                                             <th>Action</th>
                                         </tr>
                                     </thead>
@@ -1777,16 +1791,23 @@ router.get('/attendance-reports', async (req, res) => {
                                 const reportDate = new Date(report.ReportDate).toLocaleDateString('en-GB', { 
                                     weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
                                 });
+                                const employeeNames = report.EmployeeNames || '-';
+                                const timeIn = report.FirstTimeIn || '-';
+                                const timeOut = report.LastTimeOut || '-';
+                                const informedCount = report.InformedCount || 0;
                                 return '<tr onclick="viewReport(' + report.Id + ')" style="cursor: pointer;">' +
                                     '<td>' + reportDate + '</td>' +
                                     '<td><span class="location-badge">' + report.Location + '</span></td>' +
                                     '<td>' + report.CreatedBy + '</td>' +
                                     '<td><span class="entry-count">' + report.EntryCount + ' employees</span></td>' +
+                                    '<td style="font-size: 12px; color: #666; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="' + employeeNames + '">👤 ' + employeeNames + '</td>' +
+                                    '<td style="font-size: 12px; color: #666;">⏰ ' + timeIn + ' - ' + timeOut + '</td>' +
+                                    '<td style="font-size: 12px; color: #666;">✅ ' + informedCount + '/' + report.EntryCount + ' informed</td>' +
                                     '<td><button class="btn-view" onclick="event.stopPropagation(); viewReport(' + report.Id + ')">View</button></td>' +
                                 '</tr>';
                             }).join('');
                             
-                            container.innerHTML = '<table><thead><tr><th>Date</th><th>Location</th><th>Created By</th><th>Employees</th><th>Action</th></tr></thead><tbody>' + rows + '</tbody></table>';
+                            container.innerHTML = '<table><thead><tr><th>Date</th><th>Location</th><th>Created By</th><th>Employees</th><th>Names</th><th>Time</th><th>Informed</th><th>Action</th></tr></thead><tbody>' + rows + '</tbody></table>';
                         } catch (err) {
                             console.error('Error filtering reports:', err);
                         }
@@ -1810,7 +1831,11 @@ router.get('/api/attendance-reports', async (req, res) => {
         
         let query = `
             SELECT ar.*, 
-                   (SELECT COUNT(*) FROM Security_AttendanceEntries WHERE AttendanceReportId = ar.Id) as EntryCount
+                   (SELECT COUNT(*) FROM Security_AttendanceEntries WHERE AttendanceReportId = ar.Id) as EntryCount,
+                   (SELECT STRING_AGG(EmployeeName, ', ') FROM Security_AttendanceEntries WHERE AttendanceReportId = ar.Id) as EmployeeNames,
+                   (SELECT MIN(TimeIn) FROM Security_AttendanceEntries WHERE AttendanceReportId = ar.Id AND TimeIn IS NOT NULL AND TimeIn != '') as FirstTimeIn,
+                   (SELECT MAX(TimeOut) FROM Security_AttendanceEntries WHERE AttendanceReportId = ar.Id AND TimeOut IS NOT NULL AND TimeOut != '') as LastTimeOut,
+                   (SELECT COUNT(*) FROM Security_AttendanceEntries WHERE AttendanceReportId = ar.Id AND Informed = 1) as InformedCount
             FROM Security_AttendanceReports ar
             WHERE ar.Status = 'Active'
         `;
