@@ -72,7 +72,7 @@ router.get('/', async (req, res) => {
             <html>
             <head>
                 <meta charset="UTF-8">
-                <title>Cleaning Checklist - ${process.env.APP_NAME}</title>
+                <title>Canteens and Toilets Check List - ${process.env.APP_NAME}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
                     body { 
@@ -212,7 +212,7 @@ router.get('/', async (req, res) => {
             </head>
             <body>
                 <div class="header">
-                    <h1>🧹 Cleaning Checklist</h1>
+                    <h1>🚽 Canteens and Toilets Check List</h1>
                     <div class="header-nav">
                         <a href="/security-services">← Facility Management</a>
                         <a href="/dashboard">Dashboard</a>
@@ -499,7 +499,7 @@ router.get('/:id', async (req, res) => {
             <html>
             <head>
                 <meta charset="UTF-8">
-                <title>Cleaning Checklist - ${checklist.LocationName} - ${process.env.APP_NAME}</title>
+                <title>Canteens and Toilets Check List - ${checklist.LocationName} - ${process.env.APP_NAME}</title>
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
                     body { 
@@ -681,7 +681,7 @@ router.get('/:id', async (req, res) => {
             </head>
             <body>
                 <div class="header">
-                    <h1>🧹 Cleaning Checklist</h1>
+                    <h1>🚽 Canteens and Toilets Check List</h1>
                     <div class="header-nav">
                         <a href="/security-services/cleaning-checklist">← Back to Checklists</a>
                         <a href="/security-services">Facility Management</a>
