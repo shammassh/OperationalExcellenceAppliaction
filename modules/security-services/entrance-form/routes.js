@@ -590,6 +590,17 @@ router.get('/', async (req, res) => {
                         
                         container.innerHTML = data.forms.map(form => {
                             const formDate = new Date(form.FormDate).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                            const workerNames = form.WorkerNames || '-';
+                            const contractorNames = form.ContractorNames || '-';
+                            const guardNames = form.GuardNames || '-';
+                            const formatTime = (t) => {
+                                if (!t) return '-';
+                                const str = t.toString();
+                                const match = str.match(/(\d{2}):(\d{2})/);
+                                return match ? match[0] : str.substring(0, 5);
+                            };
+                            const timeIn = formatTime(form.FirstTimeIn);
+                            const timeOut = formatTime(form.LastTimeOut);
                             return '<div class="log-item" onclick="viewForm(' + form.Id + ')">' +
                                 '<div class="log-item-header">' +
                                     '<span class="log-item-date">' + formDate + '</span>' +
@@ -598,6 +609,18 @@ router.get('/', async (req, res) => {
                                 '<div class="log-item-meta">' +
                                     '<span>📍 ' + form.Location + '</span>' +
                                     '<span style="margin-left: 20px;">👷 ' + form.EntryCount + ' worker(s)</span>' +
+                                '</div>' +
+                                '<div class="log-item-meta" style="margin-top: 5px;">' +
+                                    '<span>👤 Workers: ' + workerNames + '</span>' +
+                                '</div>' +
+                                '<div class="log-item-meta" style="margin-top: 5px;">' +
+                                    '<span>🏢 Contractors: ' + contractorNames + '</span>' +
+                                '</div>' +
+                                '<div class="log-item-meta" style="margin-top: 5px;">' +
+                                    '<span>👮 Guards: ' + guardNames + '</span>' +
+                                '</div>' +
+                                '<div class="log-item-meta" style="margin-top: 5px;">' +
+                                    '<span>⏰ Time: ' + timeIn + ' - ' + timeOut + '</span>' +
                                 '</div>' +
                             '</div>';
                         }).join('');
@@ -695,7 +718,12 @@ router.get('/list', async (req, res) => {
         
         let query = `
             SELECT ef.*, 
-                   (SELECT COUNT(*) FROM Security_EntranceEntries WHERE EntranceFormId = ef.Id) as EntryCount
+                   (SELECT COUNT(*) FROM Security_EntranceEntries WHERE EntranceFormId = ef.Id) as EntryCount,
+                   (SELECT STRING_AGG(FullName, ', ') FROM Security_EntranceEntries WHERE EntranceFormId = ef.Id) as WorkerNames,
+                   (SELECT STRING_AGG(Contractor, ', ') FROM (SELECT DISTINCT Contractor FROM Security_EntranceEntries WHERE EntranceFormId = ef.Id AND Contractor IS NOT NULL AND Contractor != '') AS c) as ContractorNames,
+                   (SELECT STRING_AGG(GuardName, ', ') FROM (SELECT DISTINCT GuardName FROM Security_EntranceEntries WHERE EntranceFormId = ef.Id) AS g) as GuardNames,
+                   (SELECT MIN(TimeIn) FROM Security_EntranceEntries WHERE EntranceFormId = ef.Id) as FirstTimeIn,
+                   (SELECT MAX(TimeOut) FROM Security_EntranceEntries WHERE EntranceFormId = ef.Id) as LastTimeOut
             FROM Security_EntranceForms ef
             WHERE ef.Status = 'Active'
         `;
