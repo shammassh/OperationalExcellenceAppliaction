@@ -234,9 +234,9 @@ router.get('/', async (req, res) => {
                         <span class="card-badge internal">Internal</span>
                     </a>
                     <a href="/security-services/weekly-schedule" class="menu-card internal">
-                        <div class="card-icon">📆</div>
-                        <div class="card-title">Weekly Schedule</div>
-                        <div class="card-desc">Monthly cleaning schedule checklist for shifts - الجدول الأسبوعي</div>
+                        <div class="card-icon">🧹</div>
+                        <div class="card-title">HO Dbayeh Daily Cleaning Check List</div>
+                        <div class="card-desc">Daily cleaning checklist for HO Dbayeh - قائمة التنظيف اليومية</div>
                         <span class="card-badge internal">Internal</span>
                     </a>
                 </div>
