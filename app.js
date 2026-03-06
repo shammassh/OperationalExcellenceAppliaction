@@ -167,7 +167,7 @@ app.get('/dashboard', requireAuth, async (req, res) => {
     const formToMenu = {
         // Stores module
         'THEFT_INCIDENT': 'stores', 'COMPLAINT': 'stores', 'EXTRA_CLEANING': 'stores',
-        'WEEKLY_FEEDBACK': 'stores', 'FIVE_DAYS_ENTRY': 'stores',
+        'WEEKLY_FEEDBACK': 'stores', 'FIVE_DAYS_ENTRY': 'stores', 'STORES_LOST_AND_FOUND': 'stores',
         
         // Maknezi F&B module
         'PRODUCTION_EXTRAS': 'maknezi-fnb',
