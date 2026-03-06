@@ -574,6 +574,16 @@ router.get('/', async (req, res) => {
                         
                         container.innerHTML = data.sheets.map(sheet => {
                             const sheetDate = new Date(sheet.PatrolDate).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                            const patrolNames = sheet.PatrolNames || '-';
+                            const guardNames = sheet.GuardNames || '-';
+                            const formatTime = (t) => {
+                                if (!t) return '-';
+                                const str = t.toString();
+                                const match = str.match(/(\d{2}):(\d{2})/);
+                                return match ? match[0] : str.substring(0, 5);
+                            };
+                            const timeIn = formatTime(sheet.FirstTimeIn);
+                            const timeOut = formatTime(sheet.LastTimeOut);
                             return '<div class="log-item" onclick="viewSheet(' + sheet.Id + ')">' +
                                 '<div class="log-item-header">' +
                                     '<span class="log-item-date">' + sheetDate + '</span>' +
@@ -582,6 +592,15 @@ router.get('/', async (req, res) => {
                                 '<div class="log-item-meta">' +
                                     '<span>📝 Created by: ' + sheet.CreatedBy + '</span>' +
                                     '<span style="margin-left: 20px;">🚶 ' + sheet.EntryCount + ' patrol(s)</span>' +
+                                '</div>' +
+                                '<div class="log-item-meta" style="margin-top: 5px;">' +
+                                    '<span>🛡️ Patrollers: ' + patrolNames + '</span>' +
+                                '</div>' +
+                                '<div class="log-item-meta" style="margin-top: 5px;">' +
+                                    '<span>👮 Guards: ' + guardNames + '</span>' +
+                                '</div>' +
+                                '<div class="log-item-meta" style="margin-top: 5px;">' +
+                                    '<span>⏰ Time: ' + timeIn + ' - ' + timeOut + '</span>' +
                                 '</div>' +
                             '</div>';
                         }).join('');
@@ -678,7 +697,11 @@ router.get('/list', async (req, res) => {
         
         let query = `
             SELECT ps.*, 
-                   (SELECT COUNT(*) FROM Security_PatrolEntries WHERE PatrolSheetId = ps.Id) as EntryCount
+                   (SELECT COUNT(*) FROM Security_PatrolEntries WHERE PatrolSheetId = ps.Id) as EntryCount,
+                   (SELECT STRING_AGG(PatrolName, ', ') FROM Security_PatrolEntries WHERE PatrolSheetId = ps.Id) as PatrolNames,
+                   (SELECT STRING_AGG(GuardName, ', ') FROM Security_PatrolEntries WHERE PatrolSheetId = ps.Id) as GuardNames,
+                   (SELECT MIN(TimeIn) FROM Security_PatrolEntries WHERE PatrolSheetId = ps.Id) as FirstTimeIn,
+                   (SELECT MAX(TimeOut) FROM Security_PatrolEntries WHERE PatrolSheetId = ps.Id) as LastTimeOut
             FROM Security_PatrolSheets ps
             WHERE ps.Status = 'Active'
         `;
