@@ -2033,9 +2033,12 @@
 
         // Render CR (Corrective Action) field
         function renderCRField(item) {
-            if (!item.cr && !item.crNote) return '';
+            // Show CR field if there's criteria from template OR user has already entered cr value
+            // The criteria field contains the predefined corrective action text from the template
+            if (!item.cr && !item.crNote && !item.criteria) return '';
             
-            const crValue = item.cr || '';
+            // Use saved cr value, or fall back to template criteria
+            const crValue = item.cr || item.criteria || '';
             const crNote = item.crNote || '';
             
             return `
