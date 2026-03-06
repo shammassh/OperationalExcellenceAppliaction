@@ -582,6 +582,8 @@ router.get('/', async (req, res) => {
                         
                         container.innerHTML = data.logs.map(log => {
                             const logDate = new Date(log.LogDate).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                            const employeeNames = log.EmployeeNames || '-';
+                            const deliveryCompanies = log.DeliveryCompanies || '-';
                             return '<div class="log-item" onclick="viewLog(' + log.Id + ')">' +
                                 '<div class="log-item-header">' +
                                     '<span class="log-item-date">' + logDate + '</span>' +
@@ -590,6 +592,12 @@ router.get('/', async (req, res) => {
                                 '<div class="log-item-meta">' +
                                     '<span>📝 Filled by: ' + log.FilledBy + '</span>' +
                                     '<span style="margin-left: 20px;">📦 ' + log.ItemCount + ' item(s)</span>' +
+                                '</div>' +
+                                '<div class="log-item-meta" style="margin-top: 5px;">' +
+                                    '<span>👤 Employees: ' + employeeNames + '</span>' +
+                                '</div>' +
+                                '<div class="log-item-meta" style="margin-top: 5px;">' +
+                                    '<span>🚚 From: ' + deliveryCompanies + '</span>' +
                                 '</div>' +
                             '</div>';
                         }).join('');
@@ -682,7 +690,9 @@ router.get('/list', async (req, res) => {
         
         let query = `
             SELECT dl.*, 
-                   (SELECT COUNT(*) FROM Security_DeliveryLogItems WHERE DeliveryLogId = dl.Id) as ItemCount
+                   (SELECT COUNT(*) FROM Security_DeliveryLogItems WHERE DeliveryLogId = dl.Id) as ItemCount,
+                   (SELECT STRING_AGG(EmployeeName, ', ') FROM Security_DeliveryLogItems WHERE DeliveryLogId = dl.Id) as EmployeeNames,
+                   (SELECT STRING_AGG(ReceivedFrom, ', ') FROM (SELECT DISTINCT ReceivedFrom FROM Security_DeliveryLogItems WHERE DeliveryLogId = dl.Id AND ReceivedFrom IS NOT NULL AND ReceivedFrom != '') AS rf) as DeliveryCompanies
             FROM Security_DeliveryLogs dl
             WHERE dl.Status = 'Active'
         `;
