@@ -473,23 +473,10 @@ router.get('/', async (req, res) => {
                             <div class="view-btn cleaning">Manage &#8594;</div>
                         </a>
                         
-                        <a href="/security/multizone-team" class="dashboard-card multizone">
-                            <div class="card-icon">🔄</div>
-                            <div class="card-title">Multi-Zone Team</div>
-                            <div class="card-desc">Configure zones, time slots, and agent assignments for multi-zone cleaning team</div>
-                            <div class="card-stats">
-                                <div class="stat-item">
-                                    <div class="stat-number multizone">Setup</div>
-                                    <div class="stat-label">Admin</div>
-                                </div>
-                            </div>
-                            <div class="view-btn multizone">Manage &#8594;</div>
-                        </a>
-                        
                         <a href="/security/fixedarea-team" class="dashboard-card fixedarea">
-                            <div class="card-icon">📍</div>
-                            <div class="card-title">Fixed Area Team</div>
-                            <div class="card-desc">Configure areas, task items, and agent assignments for fixed area cleaning team</div>
+                            <div class="card-icon">🧹</div>
+                            <div class="card-title">Daily Cleaning Checklist – Head Office Zouk</div>
+                            <div class="card-desc">Configure areas, task items, and agent assignments for daily cleaning checklist</div>
                             <div class="card-stats">
                                 <div class="stat-item">
                                     <div class="stat-number fixedarea">Setup</div>

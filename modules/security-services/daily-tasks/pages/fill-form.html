@@ -218,14 +218,8 @@
     <div class="container">
         <!-- Setup Section -->
         <div class="setup-card" id="setupSection">
-            <h2>Select Team Type and Date Range</h2>
+            <h2>Select Date Range</h2>
             <div class="setup-row">
-                <div class="form-group">
-                    <label>Team Type</label>
-                    <select id="teamTypeSelect">
-                        <option value="">-- Select Team --</option>
-                    </select>
-                </div>
                 <div class="form-group">
                     <label>Date From</label>
                     <input type="date" id="dateFrom">
@@ -276,30 +270,18 @@
         
         async function init() {
             setDefaultDates();
-            await loadTeamTypes();
+            // Fixed Area Team (ID=2) is the only team type now
+            selectedTeamType = { Id: 2, TeamTypeName: 'Daily Cleaning Checklist – Head Office Zouk' };
             
             // Check for URL parameters (from history page)
             const params = new URLSearchParams(window.location.search);
-            const teamId = params.get('team');
             const fromDate = params.get('from');
             const toDate = params.get('to');
             
-            if (teamId && fromDate && toDate) {
+            if (fromDate && toDate) {
                 // Auto-load the form
                 document.getElementById('dateFrom').value = fromDate;
                 document.getElementById('dateTo').value = toDate;
-                
-                // Select the team type
-                const select = document.getElementById('teamTypeSelect');
-                for (let i = 0; i < select.options.length; i++) {
-                    if (select.options[i].value) {
-                        const tt = JSON.parse(select.options[i].value);
-                        if (tt.Id == teamId) {
-                            select.selectedIndex = i;
-                            break;
-                        }
-                    }
-                }
                 
                 // Auto-load checklist
                 setTimeout(() => loadChecklist(), 100);
@@ -318,34 +300,10 @@
             document.getElementById('dateTo').value = friday.toISOString().split('T')[0];
         }
         
-        async function loadTeamTypes() {
-            try {
-                const res = await fetch('/security-services/daily-tasks/api/team-types');
-                const teamTypes = await res.json();
-                
-                const select = document.getElementById('teamTypeSelect');
-                select.innerHTML = '<option value="">-- Select Team --</option>';
-                teamTypes.forEach(tt => {
-                    const opt = document.createElement('option');
-                    opt.value = JSON.stringify(tt);
-                    opt.textContent = tt.TeamTypeName;
-                    select.appendChild(opt);
-                });
-            } catch (err) {
-                console.error('Error loading team types:', err);
-                showToast('Error loading team types', true);
-            }
-        }
-        
         async function loadChecklist() {
-            const teamValue = document.getElementById('teamTypeSelect').value;
             const dateFrom = document.getElementById('dateFrom').value;
             const dateTo = document.getElementById('dateTo').value;
             
-            if (!teamValue) {
-                showToast('Please select a team type', true);
-                return;
-            }
             if (!dateFrom || !dateTo) {
                 showToast('Please select date range', true);
                 return;
@@ -355,10 +313,8 @@
                 return;
             }
             
-            selectedTeamType = JSON.parse(teamValue);
-            
             try {
-                // Load form structure
+                // Load form structure (Fixed Area Team = ID 2)
                 const formRes = await fetch(`/security-services/daily-tasks/api/form/team/${selectedTeamType.Id}`);
                 formData = await formRes.json();
                 
@@ -388,13 +344,8 @@
             
             const dates = getDateRange(dateFrom, dateTo);
             
-            if (selectedTeamType.Id === 1) {
-                // Multi-Zone Team
-                renderMultiZoneChecklist(container, dates);
-            } else {
-                // Fixed Area Team
-                renderFixedAreaChecklist(container, dates);
-            }
+            // Fixed Area Team only
+            renderFixedAreaChecklist(container, dates);
             
             // Apply existing data
             applyExistingData();
