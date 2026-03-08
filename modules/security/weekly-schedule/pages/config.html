@@ -848,23 +848,28 @@
             };
             
             try {
-                const url = id ? `${API_BASE}/shifts/${id}` : `${API_BASE}/shifts`;
-                const method = id ? 'PUT' : 'POST';
+                const url = id !== '' ? `${API_BASE}/shifts/${id}` : `${API_BASE}/shifts`;
+                const method = id !== '' ? 'PUT' : 'POST';
                 
-                await fetch(url, {
+                const res = await fetch(url, {
                     method,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
                 
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Failed to save shift');
+                }
+                
                 closeModal('shiftModal');
                 await loadShifts();
-                if (currentShiftId) {
+                if (currentShiftId !== null) {
                     await loadShiftContent(currentShiftId);
                 }
             } catch (err) {
                 console.error('Error saving shift:', err);
-                alert('Error saving shift');
+                alert('Error saving shift: ' + err.message);
             }
         });
         

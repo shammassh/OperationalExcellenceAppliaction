@@ -65,15 +65,15 @@ router.post('/api/shifts', async (req, res) => {
         const result = await pool.request()
             .input('shiftName', sql.NVarChar, shiftName)
             .input('shiftDescription', sql.NVarChar, shiftDescription || '')
-            .input('startTime', sql.Time, startTime)
-            .input('endTime', sql.Time, endTime)
+            .input('startTime', sql.NVarChar, startTime)
+            .input('endTime', sql.NVarChar, endTime)
             .query(`
                 DECLARE @maxSort INT;
                 SELECT @maxSort = ISNULL(MAX(SortOrder), 0) FROM WeeklySchedule_Shifts;
                 
                 INSERT INTO WeeklySchedule_Shifts (ShiftName, ShiftDescription, StartTime, EndTime, SortOrder)
                 OUTPUT INSERTED.*
-                VALUES (@shiftName, @shiftDescription, @startTime, @endTime, @maxSort + 1);
+                VALUES (@shiftName, @shiftDescription, CAST(@startTime AS TIME), CAST(@endTime AS TIME), @maxSort + 1);
             `);
         await pool.close();
         res.json(result.recordset[0]);
@@ -94,14 +94,14 @@ router.put('/api/shifts/:id', async (req, res) => {
             .input('id', sql.Int, id)
             .input('shiftName', sql.NVarChar, shiftName)
             .input('shiftDescription', sql.NVarChar, shiftDescription || '')
-            .input('startTime', sql.Time, startTime)
-            .input('endTime', sql.Time, endTime)
+            .input('startTime', sql.NVarChar, startTime)
+            .input('endTime', sql.NVarChar, endTime)
             .query(`
                 UPDATE WeeklySchedule_Shifts 
                 SET ShiftName = @shiftName, 
                     ShiftDescription = @shiftDescription,
-                    StartTime = @startTime,
-                    EndTime = @endTime,
+                    StartTime = CAST(@startTime AS TIME),
+                    EndTime = CAST(@endTime AS TIME),
                     UpdatedAt = GETDATE()
                 WHERE Id = @id
             `);
