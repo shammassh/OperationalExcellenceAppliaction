@@ -430,7 +430,9 @@
                 `;
                 
                 formData.tasks.forEach(task => {
-                    const isApplicable = zone.taskApplicability[task.TaskItemId] !== 0;
+                    // Check if task is applicable for this zone (default to true if not set)
+                    const applicabilityValue = zone.taskApplicability[task.TaskItemId];
+                    const isApplicable = applicabilityValue === undefined || applicabilityValue === 1 || applicabilityValue === true;
                     
                     tableHtml += `
                         <tr>
