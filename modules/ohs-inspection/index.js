@@ -2170,13 +2170,17 @@ router.post('/api/audits/:auditId/generate-report', async (req, res) => {
         const { auditId } = req.params;
         const pool = await sql.connect(dbConfig);
         
-        // Get audit header
+        // Get audit header with brand and region info
         const auditResult = await pool.request()
             .input('auditId', sql.Int, auditId)
             .query(`
-                SELECT i.*, t.TemplateName, t.Description as TemplateDescription
+                SELECT i.*, t.TemplateName, t.Description as TemplateDescription,
+                       s.BrandId, b.BrandName, b.BrandCode,
+                       s.Location as Region
                 FROM OHS_Inspections i
                 LEFT JOIN OHS_InspectionTemplates t ON i.TemplateId = t.Id
+                LEFT JOIN Stores s ON i.StoreId = s.Id
+                LEFT JOIN Brands b ON s.BrandId = b.Id
                 WHERE i.Id = @auditId
             `);
         
@@ -2185,47 +2189,94 @@ router.post('/api/audits/:auditId/generate-report', async (req, res) => {
         }
         const audit = auditResult.recordset[0];
         
-        // Get all items
+        // Get departments for this inspection
+        const departmentsResult = await pool.request()
+            .input('auditId', sql.Int, auditId)
+            .query(`
+                SELECT Id, DepartmentName, DepartmentIcon, DepartmentOrder, PassingGrade, IsNA, Score
+                FROM OHS_InspectionDepartments
+                WHERE InspectionId = @auditId
+                ORDER BY DepartmentOrder
+            `);
+        const departments = departmentsResult.recordset;
+        
+        // Get all items with department info
         const itemsResult = await pool.request()
             .input('auditId', sql.Int, auditId)
             .query(`
                 SELECT * FROM OHS_InspectionItems
                 WHERE InspectionId = @auditId
-                ORDER BY SectionOrder, ItemOrder
+                ORDER BY DepartmentName, SectionOrder, ItemOrder
             `);
         
-        // Group items by section and calculate scores
-        const sectionMap = new Map();
+        // Group items by department then by section
+        const departmentMap = new Map();
         for (const item of itemsResult.recordset) {
+            const deptName = item.DepartmentName || 'General';
             const sectionName = item.SectionName || 'General';
-            if (!sectionMap.has(sectionName)) {
-                sectionMap.set(sectionName, {
+            
+            if (!departmentMap.has(deptName)) {
+                const deptInfo = departments.find(d => d.DepartmentName === deptName) || {};
+                departmentMap.set(deptName, {
+                    DepartmentName: deptName,
+                    DepartmentIcon: deptInfo.DepartmentIcon || '📁',
+                    DepartmentOrder: deptInfo.DepartmentOrder || 999,
+                    PassingGrade: deptInfo.PassingGrade || 80,
+                    IsNA: deptInfo.IsNA || false,
+                    sections: new Map(),
+                    earnedScore: 0,
+                    maxScore: 0
+                });
+            }
+            
+            const dept = departmentMap.get(deptName);
+            
+            if (!dept.sections.has(sectionName)) {
+                dept.sections.set(sectionName, {
                     SectionName: sectionName,
+                    SectionIcon: item.SectionIcon || '📋',
                     SectionOrder: item.SectionOrder || 0,
                     items: [],
                     earnedScore: 0,
                     maxScore: 0
                 });
             }
-            const section = sectionMap.get(sectionName);
+            
+            const section = dept.sections.get(sectionName);
             section.items.push(item);
             
             if (item.Answer && item.Answer !== 'NA') {
-                section.maxScore += parseFloat(item.Coefficient || 0);
-                section.earnedScore += parseFloat(item.Score || 0);
+                const coeff = parseFloat(item.Coefficient || 0);
+                const score = parseFloat(item.Score || 0);
+                section.maxScore += coeff;
+                section.earnedScore += score;
+                dept.maxScore += coeff;
+                dept.earnedScore += score;
             }
         }
         
-        const sections = Array.from(sectionMap.values()).sort((a, b) => a.SectionOrder - b.SectionOrder);
+        // Convert to array and sort
+        const departmentsData = Array.from(departmentMap.values())
+            .sort((a, b) => a.DepartmentOrder - b.DepartmentOrder)
+            .map(dept => ({
+                ...dept,
+                Percentage: dept.maxScore > 0 ? Math.round((dept.earnedScore / dept.maxScore) * 100) : 0,
+                sections: Array.from(dept.sections.values())
+                    .sort((a, b) => a.SectionOrder - b.SectionOrder)
+                    .map(s => ({
+                        ...s,
+                        Percentage: s.maxScore > 0 ? Math.round((s.earnedScore / s.maxScore) * 100) : 0
+                    }))
+            }));
         
-        // Get findings
-        const findings = itemsResult.recordset.filter(item => 
-            item.Answer === 'No' || item.Answer === 'Partially' || item.Finding
-        );
-        
-        // Calculate overall score
-        const totalEarned = sections.reduce((sum, s) => sum + s.earnedScore, 0);
-        const totalMax = sections.reduce((sum, s) => sum + s.maxScore, 0);
+        // Calculate overall score (excluding NA departments)
+        let totalEarned = 0, totalMax = 0;
+        for (const dept of departmentsData) {
+            if (!dept.IsNA) {
+                totalEarned += dept.earnedScore;
+                totalMax += dept.maxScore;
+            }
+        }
         const overallScore = totalMax > 0 ? Math.round((totalEarned / totalMax) * 100) : 0;
         
         // Get settings for threshold
@@ -2261,11 +2312,7 @@ router.post('/api/audits/:auditId/generate-report', async (req, res) => {
         // Build report data
         const reportData = {
             audit,
-            sections: sections.map(s => ({
-                ...s,
-                Percentage: s.maxScore > 0 ? Math.round((s.earnedScore / s.maxScore) * 100) : 0
-            })),
-            findings,
+            departments: departmentsData,
             pictures: picturesByItem,
             overallScore,
             threshold,
@@ -2302,7 +2349,7 @@ router.post('/api/audits/:auditId/generate-report', async (req, res) => {
 
 // Helper function to generate HTML report
 function generateOHSReportHTML(data) {
-    const { audit, sections, findings, pictures, overallScore, threshold, generatedAt } = data;
+    const { audit, departments, pictures, overallScore, threshold, generatedAt } = data;
     const passedClass = overallScore >= threshold ? 'pass' : 'fail';
     const passedText = overallScore >= threshold ? 'PASS ✅' : 'FAIL ❌';
     
@@ -2330,41 +2377,145 @@ function generateOHSReportHTML(data) {
         .score-label.pass { color: #10b981; }
         .score-label.fail { color: #ef4444; }
         .section-card { background: white; border-radius: 12px; margin-bottom: 20px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .section-header { background: #fff5f5; padding: 20px; border-bottom: 1px solid #fecaca; display: flex; justify-content: space-between; align-items: center; }
-        .section-title { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
-        .section-score { font-size: 24px; font-weight: bold; }
+        .section-header { background: #fff5f5; padding: 15px 20px; border-bottom: 1px solid #fecaca; display: flex; justify-content: space-between; align-items: center; }
+        .section-title { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .section-score { font-size: 20px; font-weight: bold; }
         .section-score.pass { color: #10b981; }
         .section-score.fail { color: #ef4444; }
+        .department-card { background: white; border-radius: 12px; margin-bottom: 25px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .department-header { background: linear-gradient(135deg, #e17055 0%, #d63031 100%); color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+        .department-header:hover { filter: brightness(1.05); }
+        .department-header.na { background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%); opacity: 0.7; }
+        .department-title { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .department-score { text-align: right; display: flex; align-items: center; gap: 15px; }
+        .department-score-value { font-size: 32px; font-weight: bold; }
+        .department-score-label { font-size: 12px; opacity: 0.9; }
+        .collapse-icon { font-size: 24px; transition: transform 0.3s ease; }
+        .collapse-icon.collapsed { transform: rotate(-90deg); }
+        .na-badge { background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 12px; margin-left: 10px; }
+        .department-sections { padding: 15px; transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease; overflow: hidden; }
+        .department-sections.collapsed { max-height: 0 !important; padding: 0 15px; opacity: 0; }
+        .toggle-controls { display: flex; gap: 10px; margin-bottom: 20px; justify-content: flex-end; }
+        .toggle-btn { background: #4a90a4; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: background 0.2s; }
+        .toggle-btn:hover { background: #3a7a94; }
+        .summary-section { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 25px; overflow: hidden; }
+        .summary-title { background: linear-gradient(135deg, #4a90a4 0%, #357a8c 100%); color: white; margin: 0; padding: 15px 20px; font-size: 18px; font-weight: 600; }
+        .summary-table { width: 100%; border-collapse: collapse; }
+        .summary-table th, .summary-table td { padding: 10px 15px; }
+        .summary-table th:first-child, .summary-table td:first-child { width: 1%; white-space: nowrap; }
+        .summary-table th:nth-child(3), .summary-table td:nth-child(3) { width: 1%; white-space: nowrap; text-align: right !important; }
+        .summary-table th { background: #64748b; color: white; text-align: left; font-size: 12px; text-transform: uppercase; font-weight: 600; border-bottom: 2px solid #475569; }
+        .summary-table td { border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+        .summary-table .dept-row td:first-child { background: #f8fafc; border-right: 1px solid #e2e8f0; vertical-align: top; }
+        .summary-table .na-row { background: #f8fafc; color: #94a3b8; }
+        .summary-table .na-row td:nth-child(2) { text-align: right !important; }
+        .score-pass { color: #10b981; }
+        .score-fail { color: #ef4444; }
+        
+        /* Chart Styles - Horizontal Bar Chart */
+        .chart-section { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 25px; overflow: hidden; }
+        .chart-title { background: linear-gradient(135deg, #4a90a4 0%, #357a8c 100%); color: white; margin: 0; padding: 15px 20px; font-size: 18px; font-weight: 600; }
+        .chart-simple { padding: 20px; max-height: 600px; overflow-y: auto; }
+        .chart-row { display: flex; align-items: center; margin-bottom: 6px; gap: 10px; }
+        .chart-row-dept { background: #f8fafc; padding: 8px 10px; border-radius: 6px; margin-top: 12px; margin-bottom: 4px; }
+        .chart-row-dept:first-child { margin-top: 0; }
+        .chart-row-section { padding-left: 15px; }
+        .chart-row-label { width: 250px; font-size: 12px; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .chart-row-label.dept-label { font-weight: 600; font-size: 13px; }
+        .chart-row-label.section-label { font-weight: 400; color: #64748b; font-size: 11px; }
+        .chart-row-bar-container { flex: 1; height: 16px; background: #e2e8f0; border-radius: 3px; position: relative; overflow: visible; }
+        .chart-row-dept .chart-row-bar-container { height: 20px; }
+        .chart-row-bar { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+        .chart-row-bar.bar-pass { background: linear-gradient(90deg, #10b981 0%, #059669 100%); }
+        .chart-row-bar.bar-fail { background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%); }
+        .chart-row-threshold { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #f59e0b; }
+        .chart-row-value { width: 45px; font-size: 12px; font-weight: 600; text-align: right; }
+        .chart-row-dept .chart-row-value { font-size: 14px; font-weight: 700; }
+        .chart-row-value.bar-pass { color: #10b981; }
+        .chart-row-value.bar-fail { color: #ef4444; }
+        .chart-legend { display: flex; gap: 20px; justify-content: center; padding: 15px; border-top: 1px solid #e2e8f0; background: #f8fafc; }
+        .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #475569; }
+        .legend-color { width: 14px; height: 14px; border-radius: 3px; }
+        .legend-color.pass { background: #10b981; }
+        .legend-color.fail { background: #ef4444; }
+        .legend-line { width: 20px; height: 2px; background: #f59e0b; }
+        
+        .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+        .status-badge.pass { background: #d1fae5; color: #065f46; }
+        .status-badge.fail { background: #fee2e2; color: #991b1b; }
+        .status-badge.na { background: #e2e8f0; color: #64748b; }
         table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e2e8f0; }
-        th { background: #f8fafc; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748b; }
+        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+        th { background: #f8fafc; font-weight: 600; font-size: 11px; text-transform: uppercase; color: #64748b; }
         tr:hover { background: #f8fafc; }
         .choice-yes { color: #10b981; font-weight: 600; }
         .choice-no { color: #ef4444; font-weight: 600; }
         .choice-partial { color: #f59e0b; font-weight: 600; }
         .choice-na { color: #94a3b8; }
-        .findings-card { background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
-        .findings-title { color: #dc2626; font-size: 20px; font-weight: 600; margin-bottom: 15px; }
-        .finding-item { background: white; border-radius: 8px; padding: 15px; margin-bottom: 10px; border-left: 4px solid #ef4444; }
-        .finding-ref { font-weight: 600; color: #e17055; }
-        .finding-question { margin: 5px 0; }
-        .finding-detail { color: #64748b; font-size: 14px; }
+        .good-obs-thumb { max-width: 50px; max-height: 40px; border-radius: 4px; cursor: pointer; border: 2px solid #10b981; object-fit: cover; }
+        .lightbox { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; justify-content: center; align-items: center; }
+        .lightbox.active { display: flex; }
+        .lightbox img { max-width: 90%; max-height: 90%; border-radius: 8px; box-shadow: 0 4px 30px rgba(0,0,0,0.5); }
+        .lightbox-close { position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; font-weight: bold; cursor: pointer; transition: color 0.2s; }
+        .lightbox-close:hover { color: #f59e0b; }
+        @media print { .lightbox { display: none !important; } }
+        .finding-item { background: #fef2f2; border-radius: 8px; padding: 12px; margin-bottom: 8px; border-left: 4px solid #ef4444; }
+        .finding-ref { font-weight: 600; color: #e17055; font-size: 12px; }
+        .finding-question { margin: 5px 0; font-size: 14px; }
+        .finding-detail { color: #64748b; font-size: 13px; }
+        .finding-cr { background: #ecfdf5; border-left: 4px solid #10b981; padding: 10px; margin-top: 8px; border-radius: 4px; font-size: 13px; color: #065f46; }
         .finding-pictures { margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0; }
-        .picture-group { margin-bottom: 8px; }
         .pictures-wrapper { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px; }
+        .section-findings { background: #fef2f2; border-top: 2px solid #fecaca; padding: 12px 15px; margin-top: 10px; border-radius: 0 0 8px 8px; }
+        .section-findings-title { color: #dc2626; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
         .footer { text-align: center; padding: 20px; color: #64748b; font-size: 14px; }
+        .gallery-section { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 25px; overflow: hidden; }
+        .gallery-title { margin: 0; padding: 15px 20px; font-size: 18px; font-weight: 600; color: white; }
+        .gallery-title.good { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .gallery-title.findings { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+        .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; padding: 20px; }
+        .gallery-card { background: #f8fafc; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; transition: transform 0.2s, box-shadow 0.2s; }
+        .gallery-card:hover { transform: translateY(-3px); box-shadow: 0 4px 15px rgba(0,0,0,0.15); }
+        .gallery-card.good { border-left: 4px solid #10b981; }
+        .gallery-card.finding { border-left: 4px solid #ef4444; }
+        .gallery-img { width: 100%; height: 180px; object-fit: cover; cursor: pointer; background: #e2e8f0; }
+        .gallery-info { padding: 12px; }
+        .gallery-ref { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+        .gallery-ref.good { color: #059669; }
+        .gallery-ref.finding { color: #dc2626; }
+        .gallery-dept { font-size: 12px; color: #64748b; margin-bottom: 4px; }
+        .gallery-type { font-size: 11px; padding: 2px 8px; border-radius: 10px; display: inline-block; }
+        .gallery-type.good { background: #d1fae5; color: #065f46; }
+        .gallery-type.issue { background: #fee2e2; color: #991b1b; }
+        .gallery-type.corrective { background: #d1fae5; color: #065f46; }
+        .gallery-empty { text-align: center; padding: 40px 20px; color: #94a3b8; font-size: 16px; }
         .action-bar { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 1000; }
         .action-bar button { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); transition: transform 0.2s, box-shadow 0.2s; }
         .action-bar button:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         .btn-email { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; }
         .btn-print { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; }
+        .btn-pdf { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; }
         .btn-back { background: linear-gradient(135deg, #64748b 0%, #475569 100%); color: white; }
-        @media print { body { background: white; } .container { max-width: 100%; padding: 0; } .action-bar { display: none !important; } }
+        .section-block { background: #fafafa; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+        @media print { 
+            @page { size: landscape; margin: 10mm; }
+            body { background: white; font-size: 11px; -webkit-print-color-adjust: exact; print-color-adjust: exact; } 
+            .container { max-width: 100%; padding: 0; } 
+            .action-bar { display: none !important; } 
+            .department-card { break-inside: avoid; page-break-inside: avoid; }
+            .section-block { break-inside: avoid; page-break-inside: avoid; }
+            .gallery-section { break-before: page; }
+            .summary-section, .chart-section { break-inside: avoid; }
+            .chart-simple { max-height: none !important; overflow: visible !important; }
+            .header { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            .lightbox { display: none !important; }
+        }
     </style>
 </head>
 <body>
     <div class="action-bar">
         <button class="btn-back" onclick="goBack()">← Back</button>
+        <button class="btn-pdf" onclick="exportToPDF()">📄 PDF</button>
         <button class="btn-email" onclick="openEmailModal('full')">📧 Send Report</button>
         <button class="btn-print" onclick="window.print()">🖨️ Print</button>
     </div>
@@ -2376,6 +2527,20 @@ function generateOHSReportHTML(data) {
                 window.location.href = '/ohs-inspection/reports';
             }
         }
+        
+        // Export to PDF using browser print with PDF option
+        function exportToPDF() {
+            // Add a message overlay
+            const overlay = document.createElement('div');
+            overlay.id = 'pdf-overlay';
+            overlay.innerHTML = '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:10000;"><div style="background:white;padding:30px 50px;border-radius:12px;text-align:center;"><h3 style="margin:0 0 15px 0;">📄 Export to PDF</h3><p style="margin:0 0 20px 0;color:#666;">In the print dialog, select <strong>"Save as PDF"</strong> as the destination.</p><p style="margin:0;color:#888;font-size:13px;">Tip: Layout is set to Landscape for better fit.</p></div></div>';
+            document.body.appendChild(overlay);
+            
+            setTimeout(() => {
+                overlay.remove();
+                window.print();
+            }, 2000);
+        }
     </script>
     <div class="container">
         <div class="header">
@@ -2383,6 +2548,8 @@ function generateOHSReportHTML(data) {
             <div class="header-info">
                 <div class="header-item"><label>Document Number</label><span>${audit.DocumentNumber}</span></div>
                 <div class="header-item"><label>Store</label><span>${audit.StoreName}</span></div>
+                <div class="header-item"><label>Brand</label><span>${audit.BrandName || 'N/A'}</span></div>
+                <div class="header-item"><label>Region</label><span>${audit.Region || 'N/A'}</span></div>
                 <div class="header-item"><label>Inspection Date</label><span>${new Date(audit.InspectionDate).toLocaleDateString()}</span></div>
                 <div class="header-item"><label>Inspectors</label><span>${audit.Inspectors || 'N/A'}</span></div>
                 <div class="header-item"><label>Accompanied By</label><span>${audit.AccompaniedBy || 'N/A'}</span></div>
@@ -2396,60 +2563,262 @@ function generateOHSReportHTML(data) {
             <div style="color: #64748b; margin-top: 10px;">Threshold: ${threshold}%</div>
         </div>
         
-        ${sections.map(section => `
-        <div class="section-card">
-            <div class="section-header">
-                <div class="section-title">${section.SectionIcon || '📋'} ${section.SectionName}</div>
-                <div class="section-score ${section.Percentage >= threshold ? 'pass' : 'fail'}">${section.Percentage}%</div>
-            </div>
-            <table>
+        <div class="summary-section">
+            <h2 class="summary-title">📊 Audit Summary</h2>
+            <table class="summary-table">
                 <thead>
                     <tr>
-                        <th>#</th>
-                        <th>Question</th>
-                        <th>Answer</th>
+                        <th>Department</th>
+                        <th>Section</th>
                         <th>Score</th>
-                        <th>Finding</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${(section.items || []).map(item => `
-                    <tr>
-                        <td>${item.ReferenceValue || '-'}</td>
-                        <td>${item.Question || '-'}</td>
-                        <td class="${item.Answer === 'Yes' ? 'choice-yes' : item.Answer === 'No' ? 'choice-no' : item.Answer === 'Partially' ? 'choice-partial' : 'choice-na'}">${item.Answer || '-'}</td>
-                        <td>${item.Score ?? '-'} / ${item.Coefficient || 0}</td>
-                        <td>${item.Finding || '-'}</td>
-                    </tr>
-                    `).join('')}
+                    ${departments.map(dept => {
+                        if (dept.IsNA) {
+                            return `<tr class="dept-row na-row">
+                                <td colspan="2"><strong>${dept.DepartmentIcon || '📁'} ${dept.DepartmentName}</strong></td>
+                                <td>N/A</td>
+                            </tr>`;
+                        }
+                        const rows = [];
+                        const deptPassed = dept.Percentage >= dept.PassingGrade;
+                        const deptScoreClass = deptPassed ? 'score-pass' : 'score-fail';
+                        dept.sections.forEach((section, idx) => {
+                            const sectionPassed = section.Percentage >= dept.PassingGrade;
+                            const sectionScoreClass = sectionPassed ? 'score-pass' : 'score-fail';
+                            if (idx === 0) {
+                                rows.push(`<tr class="dept-row">
+                                    <td rowspan="${dept.sections.length}"><strong>${dept.DepartmentIcon || '📁'} ${dept.DepartmentName}</strong><br><small class="${deptScoreClass}">Overall: ${dept.Percentage}%</small></td>
+                                    <td>${section.SectionName}</td>
+                                    <td><strong class="${sectionScoreClass}">${section.Percentage}%</strong></td>
+                                </tr>`);
+                            } else {
+                                rows.push(`<tr>
+                                    <td>${section.SectionName}</td>
+                                    <td><strong class="${sectionScoreClass}">${section.Percentage}%</strong></td>
+                                </tr>`);
+                            }
+                        });
+                        return rows.join('');
+                    }).join('')}
                 </tbody>
             </table>
         </div>
-        `).join('')}
         
-        ${findings.length > 0 ? `
-        <div class="findings-card">
-            <div class="findings-title">⚠️ Findings Summary (${findings.length} items)</div>
-            ${findings.map(f => {
-                const itemPics = pictures[f.Id] || [];
-                
-                return `
-            <div class="finding-item">
-                <div class="finding-ref">[${f.ReferenceValue || 'N/A'}] ${f.SectionName}</div>
-                <div class="finding-question">${f.Question}</div>
-                <div class="finding-detail">Answer: ${f.Answer} | Finding: ${f.Finding || 'N/A'}</div>
-                ${itemPics.length > 0 ? `
-                <div class="finding-pictures">
-                    <strong>Photos (${itemPics.length}):</strong>
-                    <div class="pictures-wrapper">
-                        ${itemPics.map(p => `<img src="${p.dataUrl}" alt="${p.fileName || p.pictureType || 'Photo'}" title="${p.pictureType || 'Photo'}" style="max-width:120px;max-height:90px;margin:4px;border-radius:4px;cursor:pointer;border:2px solid ${p.pictureType === 'Good' || p.pictureType === 'corrective' ? '#10b981' : '#ef4444'};" onclick="window.open(this.src,'_blank')">`).join('')}
+        <div class="chart-section">
+            <h2 class="chart-title">📊 Department Scores Overview</h2>
+            <div class="chart-simple">
+                ${departments.filter(d => !d.IsNA).map(dept => {
+                    const deptBarClass = dept.Percentage >= dept.PassingGrade ? 'bar-pass' : 'bar-fail';
+                    const sectionRows = dept.sections.map(section => {
+                        const secBarClass = section.Percentage >= dept.PassingGrade ? 'bar-pass' : 'bar-fail';
+                        return `
+                        <div class="chart-row chart-row-section">
+                            <div class="chart-row-label section-label">↳ ${section.SectionName}</div>
+                            <div class="chart-row-bar-container">
+                                <div class="chart-row-bar ${secBarClass}" style="width: ${section.Percentage}%;"></div>
+                                <div class="chart-row-threshold" style="left: ${dept.PassingGrade}%;"></div>
+                            </div>
+                            <div class="chart-row-value ${secBarClass}">${section.Percentage}%</div>
+                        </div>
+                        `;
+                    }).join('');
+                    return `
+                    <div class="chart-row chart-row-dept">
+                        <div class="chart-row-label dept-label">${dept.DepartmentIcon || '📁'} ${dept.DepartmentName}</div>
+                        <div class="chart-row-bar-container">
+                            <div class="chart-row-bar ${deptBarClass}" style="width: ${dept.Percentage}%;"></div>
+                            <div class="chart-row-threshold" style="left: ${dept.PassingGrade}%;"></div>
+                        </div>
+                        <div class="chart-row-value ${deptBarClass}">${dept.Percentage}%</div>
                     </div>
+                    ${sectionRows}
+                    `;
+                }).join('')}
+            </div>
+            <div class="chart-legend">
+                <span class="legend-item"><span class="legend-color pass"></span> Pass (≥threshold)</span>
+                <span class="legend-item"><span class="legend-color fail"></span> Fail (&lt;threshold)</span>
+                <span class="legend-item"><span class="legend-line"></span> Threshold</span>
+            </div>
+        </div>
+        
+        <div class="toggle-controls">
+            <button class="toggle-btn" onclick="expandAll()">📂 Expand All</button>
+            <button class="toggle-btn" onclick="collapseAll()">📁 Collapse All</button>
+        </div>
+        
+        ${departments.map((dept, deptIdx) => `
+        <div class="department-card">
+            <div class="department-header ${dept.IsNA ? 'na' : ''}" onclick="toggleDepartment(${deptIdx})">
+                <div class="department-title">
+                    <span class="collapse-icon" id="icon-${deptIdx}">▼</span>
+                    ${dept.DepartmentIcon || '📁'} ${dept.DepartmentName}
+                    ${dept.IsNA ? '<span class="na-badge">N/A - Excluded</span>' : ''}
+                </div>
+                ${!dept.IsNA ? `
+                <div class="department-score">
+                    <div class="department-score-value">${dept.Percentage}%</div>
+                    <div class="department-score-label">Pass: ${dept.PassingGrade}%</div>
                 </div>
                 ` : ''}
             </div>
-            `}).join('')}
+            <div class="department-sections" id="dept-${deptIdx}">
+                ${dept.sections.map(section => {
+                    // Get ALL items with No or Partially answers (not just those with finding text)
+                    const sectionFindings = (section.items || []).filter(item => 
+                        item.Answer === 'No' || item.Answer === 'Partially'
+                    );
+                    
+                    return `
+                <div class="section-block">
+                    <div class="section-header">
+                        <div class="section-title">${section.SectionIcon || '📋'} ${section.SectionName}</div>
+                        <div class="section-score ${section.Percentage >= dept.PassingGrade ? 'pass' : 'fail'}">${section.Percentage}%</div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width:60px">#</th>
+                                <th>Question</th>
+                                <th style="width:80px">Answer</th>
+                                <th style="width:70px">Score</th>
+                                <th style="width:90px">Observation</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${(section.items || []).map(item => {
+                                const itemPics = pictures[item.Id] || [];
+                                const goodPics = itemPics.filter(p => p.pictureType === 'Good');
+                                return `
+                            <tr>
+                                <td>${item.ReferenceValue || '-'}</td>
+                                <td>${item.Question || '-'}</td>
+                                <td class="${item.Answer === 'Yes' ? 'choice-yes' : item.Answer === 'No' ? 'choice-no' : item.Answer === 'Partially' ? 'choice-partial' : 'choice-na'}">${item.Answer || '-'}</td>
+                                <td>${item.Score ?? '-'} / ${item.Coefficient || 0}</td>
+                                <td>${goodPics.length > 0 ? goodPics.map(p => `<img src="${p.dataUrl}" alt="Good" title="Good Observation" class="good-obs-thumb" onclick="openLightbox(this.src)">`).join('') : '-'}</td>
+                            </tr>
+                            `}).join('')}
+                        </tbody>
+                    </table>
+                    ${sectionFindings.length > 0 ? `
+                    <div class="section-findings">
+                        <div class="section-findings-title">⚠️ Findings (${sectionFindings.length})</div>
+                        ${sectionFindings.map(f => {
+                            const itemPics = pictures[f.Id] || [];
+                            return `
+                        <div class="finding-item">
+                            <div class="finding-ref">[${f.ReferenceValue || 'N/A'}]</div>
+                            <div class="finding-question">${f.Question}</div>
+                            <div class="finding-detail">Answer: <strong class="${f.Answer === 'No' ? 'choice-no' : 'choice-partial'}">${f.Answer}</strong> | Finding: ${f.Finding || 'N/A'}</div>
+                            ${f.CorrectiveAction ? `<div class="finding-cr">✅ Corrective Action: ${f.CorrectiveAction}</div>` : ''}
+                            ${itemPics.length > 0 ? `
+                            <div class="finding-pictures">
+                                <strong>Photos:</strong>
+                                <div class="pictures-wrapper">
+                                    ${itemPics.map(p => `<img src="${p.dataUrl}" alt="${p.fileName || 'Photo'}" title="${p.pictureType || 'Photo'}" style="max-width:100px;max-height:75px;border-radius:4px;cursor:pointer;border:2px solid ${p.pictureType === 'Good' || p.pictureType === 'corrective' ? '#10b981' : '#ef4444'};" onclick="openLightbox(this.src)">`).join('')}
+                                </div>
+                            </div>
+                            ` : ''}
+                        </div>
+                        `}).join('')}
+                    </div>
+                    ` : ''}
+                </div>
+                `}).join('')}
+            </div>
         </div>
-        ` : ''}
+        `).join('')}
+        
+        <!-- Good Observations Gallery -->
+        ${(() => {
+            const goodObsItems = [];
+            departments.forEach(dept => {
+                (dept.sections || []).forEach(section => {
+                    (section.items || []).forEach(item => {
+                        const itemPics = pictures[item.Id] || [];
+                        const goodPics = itemPics.filter(p => p.pictureType === 'Good');
+                        goodPics.forEach(pic => {
+                            goodObsItems.push({
+                                ref: item.ReferenceValue || 'N/A',
+                                dept: dept.DepartmentName,
+                                section: section.SectionName,
+                                question: item.Question,
+                                dataUrl: pic.dataUrl,
+                                fileName: pic.fileName
+                            });
+                        });
+                    });
+                });
+            });
+            
+            return `
+        <div class="gallery-section">
+            <h2 class="gallery-title good">✅ Good Observations Gallery (${goodObsItems.length})</h2>
+            ${goodObsItems.length > 0 ? `
+            <div class="gallery-grid">
+                ${goodObsItems.map(item => `
+                <div class="gallery-card good">
+                    <img src="${item.dataUrl}" alt="Good Observation" class="gallery-img" onclick="openLightbox(this.src)">
+                    <div class="gallery-info">
+                        <div class="gallery-ref good">[${item.ref}]</div>
+                        <div class="gallery-dept">📁 ${item.dept} / ${item.section}</div>
+                        <span class="gallery-type good">✅ Good Observation</span>
+                    </div>
+                </div>
+                `).join('')}
+            </div>
+            ` : `<div class="gallery-empty">No good observations captured</div>`}
+        </div>`;
+        })()}
+        
+        <!-- Findings Gallery -->
+        ${(() => {
+            const findingItems = [];
+            departments.forEach(dept => {
+                (dept.sections || []).forEach(section => {
+                    (section.items || []).forEach(item => {
+                        if (item.Answer === 'No' || item.Answer === 'Partially') {
+                            const itemPics = pictures[item.Id] || [];
+                            const issuePics = itemPics.filter(p => p.pictureType !== 'Good');
+                            issuePics.forEach(pic => {
+                                findingItems.push({
+                                    ref: item.ReferenceValue || 'N/A',
+                                    dept: dept.DepartmentName,
+                                    section: section.SectionName,
+                                    question: item.Question,
+                                    answer: item.Answer,
+                                    finding: item.Finding,
+                                    dataUrl: pic.dataUrl,
+                                    fileName: pic.fileName,
+                                    pictureType: pic.pictureType
+                                });
+                            });
+                        }
+                    });
+                });
+            });
+            
+            return `
+        <div class="gallery-section">
+            <h2 class="gallery-title findings">⚠️ Findings Gallery (${findingItems.length})</h2>
+            ${findingItems.length > 0 ? `
+            <div class="gallery-grid">
+                ${findingItems.map(item => `
+                <div class="gallery-card finding">
+                    <img src="${item.dataUrl}" alt="Finding" class="gallery-img" onclick="openLightbox(this.src)">
+                    <div class="gallery-info">
+                        <div class="gallery-ref finding">[${item.ref}]</div>
+                        <div class="gallery-dept">📁 ${item.dept} / ${item.section}</div>
+                        <span class="gallery-type ${item.pictureType === 'corrective' ? 'corrective' : 'issue'}">${item.pictureType === 'corrective' ? '✅ Corrective' : item.pictureType === 'Issue' ? '❌ Issue' : '📷 ' + (item.pictureType || 'Photo')}</span>
+                    </div>
+                </div>
+                `).join('')}
+            </div>
+            ` : `<div class="gallery-empty">No finding photos captured</div>`}
+        </div>`;
+        })()}
         
         <div class="footer">
             Report generated on ${new Date(generatedAt).toLocaleString()} | OHS Inspection System
@@ -2457,6 +2826,31 @@ function generateOHSReportHTML(data) {
     </div>
     <script>
         const inspectionId = ${audit.Id};
+        
+        // Toggle department collapse/expand
+        function toggleDepartment(index) {
+            const sections = document.getElementById('dept-' + index);
+            const icon = document.getElementById('icon-' + index);
+            
+            if (sections.classList.contains('collapsed')) {
+                sections.classList.remove('collapsed');
+                icon.classList.remove('collapsed');
+            } else {
+                sections.classList.add('collapsed');
+                icon.classList.add('collapsed');
+            }
+        }
+        
+        // Expand/Collapse All buttons
+        function expandAll() {
+            document.querySelectorAll('.department-sections').forEach(el => el.classList.remove('collapsed'));
+            document.querySelectorAll('.collapse-icon').forEach(el => el.classList.remove('collapsed'));
+        }
+        
+        function collapseAll() {
+            document.querySelectorAll('.department-sections').forEach(el => el.classList.add('collapsed'));
+            document.querySelectorAll('.collapse-icon').forEach(el => el.classList.add('collapsed'));
+        }
         
         async function openEmailModal(reportType) {
             try {
@@ -2503,6 +2897,26 @@ function generateOHSReportHTML(data) {
         }
     </script>
     <script src="/js/email-modal.js"></script>
+    
+    <!-- Lightbox Modal -->
+    <div id="lightbox" class="lightbox" onclick="closeLightbox()">
+        <span class="lightbox-close" onclick="closeLightbox()">&times;</span>
+        <img id="lightbox-img" src="" alt="Enlarged view">
+    </div>
+    <script>
+        function openLightbox(src) {
+            document.getElementById('lightbox-img').src = src;
+            document.getElementById('lightbox').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeLightbox();
+        });
+    </script>
 </body>
 </html>`;
 }

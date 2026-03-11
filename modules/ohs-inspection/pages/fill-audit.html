@@ -594,6 +594,23 @@
             color: #10b981;
         }
 
+        /* Good Observation Section */
+        .good-observation-section {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px dashed rgba(16, 185, 129, 0.3);
+        }
+
+        .good-obs-btn {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #10b981;
+        }
+
+        .good-obs-btn:hover {
+            background: rgba(16, 185, 129, 0.25);
+        }
+
         /* Image Modal */
         .image-modal {
             position: fixed;
@@ -710,6 +727,12 @@
             border-color: #3b82f6;
         }
 
+        .image-type-btn.type-good { border-color: rgba(16, 185, 129, 0.5); }
+        .image-type-btn.type-good.selected {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border-color: #10b981;
+        }
+
         .image-preview-container { margin-bottom: 1.5rem; }
 
         .image-preview {
@@ -743,6 +766,7 @@
         .existing-image-type { font-size: 0.85rem; font-weight: 500; }
         .existing-image-type.type-finding { color: #ef4444; }
         .existing-image-type.type-corrective { color: #3b82f6; }
+        .existing-image-type.type-good { color: #10b981; }
         .existing-image-name { font-size: 0.75rem; color: #64748b; }
 
         .delete-image-btn {
@@ -866,12 +890,15 @@
             <!-- Image Type Selector -->
             <div class="image-type-selector" id="typeSelector" style="display: none;">
                 <div class="image-type-label">Select image type:</div>
-                <div class="image-type-options">
+                <div class="image-type-options" id="imageTypeOptions">
                     <button class="image-type-btn type-finding" onclick="selectImageType('Finding')">
                         ❌ Finding
                     </button>
                     <button class="image-type-btn type-corrective" onclick="selectImageType('Corrective')">
                         🔧 Corrective Action
+                    </button>
+                    <button class="image-type-btn type-good" onclick="selectImageType('Good')">
+                        ✅ Good Observation
                     </button>
                 </div>
             </div>
@@ -1180,6 +1207,15 @@
                         <button class="answer-btn ${item.selectedChoice === 'NA' ? 'selected-na' : ''}" 
                                 onclick="selectAnswer(${item.responseId}, 'NA', ${item.coeff || 1})">N/A</button>
                     </div>
+
+                    <!-- Good Observation Picture Button (for Yes/NA answers) -->
+                    ${(item.selectedChoice === 'Yes' || item.selectedChoice === 'NA') ? `
+                    <div class="good-observation-section">
+                        <button class="picture-btn good-obs-btn ${hasPicture ? 'has-picture' : ''}" onclick="openImageModal(${item.responseId}, 'good')">
+                            📷 ${hasPicture ? 'View/Add Good Observation' : 'Add Good Observation Picture'}
+                        </button>
+                    </div>
+                    ` : ''}
 
                     <div class="finding-section ${showFinding ? 'visible' : ''}" id="finding-${item.responseId}">
                         <div class="finding-group">
@@ -1516,12 +1552,14 @@
         let currentImageResponseId = null;
         let selectedImageFile = null;
         let selectedImageType = null;
+        let imageModalMode = 'all'; // 'all', 'good', 'finding'
 
         // Open image modal
-        function openImageModal(responseId) {
+        function openImageModal(responseId, mode = 'all') {
             currentImageResponseId = responseId;
             selectedImageFile = null;
             selectedImageType = null;
+            imageModalMode = mode;
             
             // Reset modal state
             document.getElementById('previewContainer').style.display = 'none';
@@ -1529,6 +1567,31 @@
             document.getElementById('uploadBtn').disabled = true;
             document.querySelectorAll('.image-type-btn').forEach(btn => btn.classList.remove('selected'));
             document.getElementById('fileInput').value = '';
+            
+            // Show/hide image type buttons based on mode
+            const typeOptions = document.getElementById('imageTypeOptions');
+            if (mode === 'good') {
+                // Only show Good Observation option
+                typeOptions.innerHTML = `
+                    <button class="image-type-btn type-good selected" onclick="selectImageType('Good')">
+                        ✅ Good Observation
+                    </button>
+                `;
+                selectedImageType = 'Good'; // Pre-select Good
+            } else {
+                // Show all options
+                typeOptions.innerHTML = `
+                    <button class="image-type-btn type-finding" onclick="selectImageType('Finding')">
+                        ❌ Finding
+                    </button>
+                    <button class="image-type-btn type-corrective" onclick="selectImageType('Corrective')">
+                        🔧 Corrective Action
+                    </button>
+                    <button class="image-type-btn type-good" onclick="selectImageType('Good')">
+                        ✅ Good Observation
+                    </button>
+                `;
+            }
             
             // Load existing images
             loadExistingImages(responseId);
@@ -1663,6 +1726,7 @@
             switch (type) {
                 case 'Finding': return '❌ Finding';
                 case 'Corrective': return '🔧 Corrective Action';
+                case 'Good': return '✅ Good Observation';
                 default: return type;
             }
         }
