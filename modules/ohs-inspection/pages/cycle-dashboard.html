@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cycle Dashboard - OHS Inspection</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        
+        /* Header */
+        .header {
+            background: white;
+            border-radius: 16px;
+            padding: 20px 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .header-left h1 { font-size: 1.75rem; color: #1e293b; }
+        .header-left .icon { font-size: 2rem; }
+        .back-btn {
+            background: #64748b;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+        .back-btn:hover { background: #475569; }
+        
+        .refresh-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+        .refresh-btn:hover { background: #059669; }
+        .refresh-btn.spinning i { animation: spin 1s linear infinite; }
+        
+        .header-right { display: flex; gap: 10px; align-items: center; }
+        .last-updated { font-size: 0.8rem; color: #64748b; }
+        
+        /* Info Banner */
+        .info-banner {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .info-banner i { font-size: 1.5rem; }
+        .info-banner p { font-size: 0.95rem; line-height: 1.5; }
+        
+        /* Year Badge */
+        .year-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        
+        /* Overall Progress Card */
+        .overall-card {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 25px;
+            color: white;
+            box-shadow: 0 4px 20px rgba(5, 150, 105, 0.4);
+        }
+        .overall-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .overall-title { font-size: 1.5rem; font-weight: 600; }
+        .overall-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .overall-stat {
+            text-align: center;
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+        }
+        .overall-stat-value { font-size: 2.5rem; font-weight: 700; }
+        .overall-stat-label { font-size: 0.85rem; opacity: 0.9; margin-top: 5px; }
+        .overall-progress-bar {
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+        }
+        .overall-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%);
+            border-radius: 10px;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            min-width: 40px;
+        }
+        
+        /* Brand Cards Grid */
+        .brands-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        .brand-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            position: relative;
+        }
+        .brand-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+        .brand-card.selected {
+            outline: 3px solid #059669;
+        }
+        .brand-card.complete { border-left: 4px solid #10b981; }
+        .brand-card.in-progress { border-left: 4px solid #f59e0b; }
+        .brand-card.not-started { border-left: 4px solid #ef4444; }
+        .brand-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .brand-name { font-size: 1.25rem; font-weight: 700; color: #1e293b; }
+        .cycle-badge {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .completed-cycles {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 3px;
+            text-align: right;
+        }
+        .brand-stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+        .brand-stat { text-align: center; flex: 1; }
+        .brand-stat-value { font-size: 1.75rem; font-weight: 700; color: #1e293b; }
+        .brand-stat-label { font-size: 0.75rem; color: #64748b; }
+        .brand-progress-bar {
+            background: #e2e8f0;
+            border-radius: 8px;
+            height: 12px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        .brand-progress-fill {
+            height: 100%;
+            border-radius: 8px;
+            transition: width 0.5s ease;
+        }
+        .brand-progress-fill.complete { background: linear-gradient(90deg, #10b981 0%, #34d399 100%); }
+        .brand-progress-fill.in-progress { background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%); }
+        .brand-progress-fill.not-started { background: #ef4444; }
+        .brand-percentage {
+            text-align: right;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        .brand-percentage.complete { color: #10b981; }
+        .brand-percentage.in-progress { color: #f59e0b; }
+        .brand-percentage.not-started { color: #ef4444; }
+        
+        /* Stores Section */
+        .stores-section {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        .stores-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .stores-title { font-size: 1.25rem; font-weight: 700; color: #1e293b; }
+        
+        /* Stores Table */
+        .stores-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .stores-table th, .stores-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .stores-table th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #475569;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+        .stores-table tr:hover { background: #f8fafc; }
+        .stores-table .store-name { font-weight: 600; color: #1e293b; }
+        .stores-table .brand-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .stores-table .score {
+            font-weight: 700;
+            padding: 4px 12px;
+            border-radius: 6px;
+        }
+        .stores-table .score.pass { background: #d1fae5; color: #065f46; }
+        .stores-table .score.fail { background: #fee2e2; color: #991b1b; }
+        .stores-table .action-btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .stores-table .action-btn.start {
+            background: #059669;
+            color: white;
+        }
+        .stores-table .action-btn.start:hover { background: #047857; }
+        .stores-table .action-btn.view {
+            background: #e2e8f0;
+            color: #475569;
+        }
+        .stores-table .action-btn.view:hover { background: #cbd5e1; }
+        
+        /* Progress indicator for pending stores */
+        .audit-progress {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+        .audit-dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+        .audit-dot.done {
+            background: #10b981;
+            color: white;
+        }
+        .audit-dot.pending {
+            background: #e2e8f0;
+            color: #64748b;
+            border: 2px dashed #94a3b8;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #64748b;
+        }
+        .empty-state i { font-size: 3rem; margin-bottom: 15px; opacity: 0.5; }
+        .empty-state p { font-size: 1rem; }
+        
+        .select-brand-prompt {
+            text-align: center;
+            padding: 60px 20px;
+            color: #64748b;
+        }
+        .select-brand-prompt i { font-size: 4rem; margin-bottom: 20px; opacity: 0.3; }
+        .select-brand-prompt p { font-size: 1.1rem; }
+        
+        /* Subsections for Audited/Pending */
+        .stores-subsection {
+            margin-bottom: 25px;
+        }
+        .stores-subsection:last-child {
+            margin-bottom: 0;
+        }
+        .subsection-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .subsection-title.audited-title {
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            color: #065f46;
+        }
+        .subsection-title.pending-title {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            color: #92400e;
+        }
+        .empty-state.small {
+            padding: 25px 20px;
+        }
+        .empty-state.small i {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        .empty-state.success {
+            background: #f0fdf4;
+            border-radius: 8px;
+        }
+        
+        /* Loading */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 60px;
+            color: #64748b;
+        }
+        .loading i { font-size: 2rem; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header { flex-direction: column; align-items: flex-start; }
+            .brands-grid { grid-template-columns: 1fr; }
+            .overall-stats { grid-template-columns: repeat(2, 1fr); }
+            .stores-table { font-size: 0.85rem; }
+            .stores-table th, .stores-table td { padding: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <span class="icon">🛡️</span>
+                <h1>OHS Cycle Dashboard</h1>
+            </div>
+            <div class="header-right">
+                <span class="last-updated" id="lastUpdated"></span>
+                <button class="refresh-btn" id="refreshBtn" onclick="refreshDashboard()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+                <a href="/ohs-inspection" class="back-btn">
+                    <i class="fas fa-arrow-left"></i> Back
+                </a>
+            </div>
+        </div>
+        
+        <!-- Info Banner -->
+        <div class="info-banner">
+            <i class="fas fa-info-circle"></i>
+            <p>
+                <strong>OHS Cycle System:</strong> Each store requires <strong>2 audits per year</strong> to complete a cycle. 
+                A cycle completes when ALL stores of a brand have been audited twice. The next cycle then begins.
+            </p>
+            <span class="year-badge" id="yearBadge">2026</span>
+        </div>
+        
+        <!-- Overall Progress -->
+        <div class="overall-card">
+            <div class="overall-header">
+                <div class="overall-title">📊 Overall Current Cycle Progress</div>
+            </div>
+            <div class="overall-stats">
+                <div class="overall-stat">
+                    <div class="overall-stat-value" id="totalStores">0</div>
+                    <div class="overall-stat-label">Total Stores</div>
+                </div>
+                <div class="overall-stat">
+                    <div class="overall-stat-value" id="auditedStores">0</div>
+                    <div class="overall-stat-label">Completed (2/2 Audits)</div>
+                </div>
+                <div class="overall-stat">
+                    <div class="overall-stat-value" id="pendingStores">0</div>
+                    <div class="overall-stat-label">Pending</div>
+                </div>
+                <div class="overall-stat">
+                    <div class="overall-stat-value" id="overallPercentage">0%</div>
+                    <div class="overall-stat-label">Complete</div>
+                </div>
+            </div>
+            <div class="overall-progress-bar">
+                <div class="overall-progress-fill" id="overallProgressBar" style="width: 0%;">0%</div>
+            </div>
+        </div>
+        
+        <!-- Brand Cards -->
+        <div class="brands-grid" id="brandsGrid">
+            <div class="loading"><i class="fas fa-spinner"></i></div>
+        </div>
+        
+        <!-- Stores Section -->
+        <div class="stores-section">
+            <div class="stores-header">
+                <div class="stores-title" id="storesTitle">📋 Select a Brand to View Stores</div>
+            </div>
+            <div id="storesContent">
+                <div class="select-brand-prompt">
+                    <i class="fas fa-hand-pointer"></i>
+                    <p>Click on a brand card above to view its pending and completed stores</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentData = null;
+        let selectedBrandId = null;
+        let selectedBrandName = null;
+        let selectedBrandCycle = null;
+        let autoRefreshInterval = null;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDashboard();
+            // Auto-refresh every 30 seconds
+            autoRefreshInterval = setInterval(loadDashboard, 30000);
+        });
+        
+        function updateLastUpdated() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString();
+            document.getElementById('lastUpdated').textContent = `Last updated: ${timeStr}`;
+        }
+        
+        async function refreshDashboard() {
+            const btn = document.getElementById('refreshBtn');
+            btn.classList.add('spinning');
+            await loadDashboard();
+            if (selectedBrandId !== null) {
+                await loadAllStores();
+            }
+            btn.classList.remove('spinning');
+        }
+        
+        async function loadDashboard() {
+            try {
+                const response = await fetch('/ohs-inspection/api/cycle/progress');
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentData = result.data;
+                    document.getElementById('yearBadge').textContent = result.data.year;
+                    renderOverallProgress(result.data.overall);
+                    renderBrandCards(result.data.brands);
+                    updateLastUpdated();
+                }
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+        
+        function renderOverallProgress(overall) {
+            document.getElementById('totalStores').textContent = overall.totalStores;
+            document.getElementById('auditedStores').textContent = overall.auditedStores;
+            document.getElementById('pendingStores').textContent = overall.pendingStores;
+            document.getElementById('overallPercentage').textContent = overall.percentage + '%';
+            
+            const progressBar = document.getElementById('overallProgressBar');
+            progressBar.style.width = Math.max(overall.percentage, 5) + '%';
+            progressBar.textContent = overall.percentage + '%';
+        }
+        
+        function renderBrandCards(brands) {
+            const grid = document.getElementById('brandsGrid');
+            
+            if (brands.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-store-slash"></i>
+                        <p>No brands found</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            grid.innerHTML = brands.map(brand => {
+                const status = brand.percentage >= 100 ? 'complete' : brand.percentage > 0 ? 'in-progress' : 'not-started';
+                const escapedName = brand.brandName.replace(/'/g, "\\'");
+                
+                return `
+                    <div class="brand-card ${status}" data-brand-id="${brand.brandId}" onclick="selectBrand(${brand.brandId}, '${escapedName}', ${brand.currentCycle})">
+                        <div class="brand-header">
+                            <div class="brand-name">${brand.brandName}</div>
+                            <div>
+                                <div class="cycle-badge">Cycle ${brand.currentCycle}</div>
+                                ${brand.completedCycles > 0 ? `<div class="completed-cycles">${brand.completedCycles} cycle${brand.completedCycles > 1 ? 's' : ''} completed</div>` : ''}
+                            </div>
+                        </div>
+                        <div class="brand-stats">
+                            <div class="brand-stat">
+                                <div class="brand-stat-value">${brand.totalStores}</div>
+                                <div class="brand-stat-label">Total Stores</div>
+                            </div>
+                            <div class="brand-stat">
+                                <div class="brand-stat-value" style="color: #10b981;">${brand.auditedStores}</div>
+                                <div class="brand-stat-label">Completed (2/2)</div>
+                            </div>
+                            <div class="brand-stat">
+                                <div class="brand-stat-value" style="color: #ef4444;">${brand.pendingStores}</div>
+                                <div class="brand-stat-label">Pending</div>
+                            </div>
+                        </div>
+                        <div class="brand-progress-bar">
+                            <div class="brand-progress-fill ${status}" style="width: ${brand.percentage}%;"></div>
+                        </div>
+                        <div class="brand-percentage ${status}">${brand.percentage}% Complete</div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function selectBrand(brandId, brandName, cycle) {
+            selectedBrandId = brandId;
+            selectedBrandName = brandName;
+            selectedBrandCycle = cycle;
+            
+            document.getElementById('storesTitle').textContent = `📋 ${brandName} - Cycle ${cycle} Stores`;
+            
+            // Highlight selected card
+            document.querySelectorAll('.brand-card').forEach(card => card.classList.remove('selected'));
+            document.querySelector(`.brand-card[data-brand-id="${brandId}"]`).classList.add('selected');
+            
+            loadAllStores();
+        }
+        
+        async function loadAllStores() {
+            if (!selectedBrandId) return;
+            
+            const content = document.getElementById('storesContent');
+            content.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i></div>';
+            
+            try {
+                // Fetch both pending and audited stores in parallel
+                const [pendingRes, auditedRes] = await Promise.all([
+                    fetch(`/ohs-inspection/api/cycle/pending-stores?brandId=${selectedBrandId}`),
+                    fetch(`/ohs-inspection/api/cycle/audited-stores?brandId=${selectedBrandId}`)
+                ]);
+                
+                const pendingResult = await pendingRes.json();
+                const auditedResult = await auditedRes.json();
+                
+                if (pendingResult.success && auditedResult.success) {
+                    renderAllStores(
+                        auditedResult.data.auditedStores,
+                        pendingResult.data.pendingStores,
+                        pendingResult.data.currentCycle
+                    );
+                }
+            } catch (error) {
+                console.error('Error loading stores:', error);
+                content.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Error loading stores</p></div>';
+            }
+        }
+        
+        function renderAllStores(auditedStores, pendingStores, cycle) {
+            const content = document.getElementById('storesContent');
+            
+            let html = '';
+            
+            // Audited Stores Section (shown first/on top)
+            html += `
+                <div class="stores-subsection">
+                    <h3 class="subsection-title audited-title">
+                        <i class="fas fa-check-circle"></i> Completed - 2/2 Audits Done (${auditedStores.length})
+                    </h3>
+            `;
+            
+            if (auditedStores.length === 0) {
+                html += `
+                    <div class="empty-state small">
+                        <i class="fas fa-clipboard-list"></i>
+                        <p>No stores have completed both audits yet in Cycle ${cycle}</p>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <table class="stores-table">
+                        <thead>
+                            <tr>
+                                <th>Store</th>
+                                <th>Last Audit Date</th>
+                                <th>Score</th>
+                                <th>Inspectors</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${auditedStores.map(store => {
+                                const scoreClass = parseFloat(store.Score) >= 80 ? 'pass' : 'fail';
+                                const dateStr = store.InspectionDate ? new Date(store.InspectionDate).toLocaleDateString() : '-';
+                                return `
+                                <tr>
+                                    <td class="store-name">${store.StoreName}</td>
+                                    <td>${dateStr}</td>
+                                    <td><span class="score ${scoreClass}">${store.Score || 0}%</span></td>
+                                    <td>${store.Inspectors || '-'}</td>
+                                    <td>
+                                        <button class="action-btn view" onclick="viewAudit(${store.InspectionId})">
+                                            <i class="fas fa-eye"></i> View
+                                        </button>
+                                    </td>
+                                </tr>
+                            `}).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+            html += '</div>';
+            
+            // Pending Stores Section (shown below)
+            html += `
+                <div class="stores-subsection">
+                    <h3 class="subsection-title pending-title">
+                        <i class="fas fa-clock"></i> Pending Audits (${pendingStores.length})
+                    </h3>
+            `;
+            
+            if (pendingStores.length === 0) {
+                html += `
+                    <div class="empty-state small success">
+                        <i class="fas fa-check-circle" style="color: #10b981;"></i>
+                        <p>🎉 Cycle ${cycle} Complete! All stores have completed both audits.</p>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <table class="stores-table">
+                        <thead>
+                            <tr>
+                                <th>Store</th>
+                                <th>Code</th>
+                                <th>Location</th>
+                                <th>Audit Progress</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${pendingStores.map(store => {
+                                const auditsThisCycle = store.AuditsThisCycle || 0;
+                                const progressHtml = renderAuditProgress(auditsThisCycle);
+                                return `
+                                <tr>
+                                    <td class="store-name">${store.StoreName}</td>
+                                    <td>${store.StoreCode || '-'}</td>
+                                    <td>${store.Location || '-'}</td>
+                                    <td>${progressHtml}</td>
+                                    <td>
+                                        <button class="action-btn start" onclick="startAudit(${store.StoreId})">
+                                            <i class="fas fa-play"></i> Start Audit ${auditsThisCycle + 1}
+                                        </button>
+                                    </td>
+                                </tr>
+                            `}).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+            html += '</div>';
+            
+            content.innerHTML = html;
+        }
+        
+        function renderAuditProgress(auditsCompleted) {
+            let html = '<div class="audit-progress">';
+            for (let i = 1; i <= 2; i++) {
+                if (i <= auditsCompleted) {
+                    html += `<div class="audit-dot done"><i class="fas fa-check"></i></div>`;
+                } else {
+                    html += `<div class="audit-dot pending">${i}</div>`;
+                }
+            }
+            html += `<span style="margin-left: 8px; font-size: 0.85rem; color: #64748b;">${auditsCompleted}/2 done</span>`;
+            html += '</div>';
+            return html;
+        }
+        
+        function startAudit(storeId) {
+            window.location.href = `/ohs-inspection/start?storeId=${storeId}`;
+        }
+        
+        function viewAudit(inspectionId) {
+            window.location.href = `/ohs-inspection/fill/${inspectionId}`;
+        }
+    </script>
+</body>
+</html>

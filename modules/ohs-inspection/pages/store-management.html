@@ -780,6 +780,7 @@
                             <tr>
                                 <th>Code</th>
                                 <th>Store Name</th>
+                                <th>Brand</th>
                                 <th>Location</th>
                                 <th>Template</th>
                                 <th>Head of Ops</th>
@@ -797,6 +798,9 @@
                                 <tr>
                                     <td><strong>${store.storeCode || '-'}</strong></td>
                                     <td>${store.storeName}</td>
+                                    <td>${store.brandName 
+                                        ? `<span class="template-badge" style="background: linear-gradient(135deg, #059669 0%, #047857 100%);">${store.brandName}</span>`
+                                        : '<span style="color: #f59e0b; font-size: 12px;">⚠️ Not Set</span>'}</td>
                                     <td>${store.location || '-'}</td>
                                     <td><span class="template-badge">${store.templateName || 'Not set'}</span></td>
                                     <td>

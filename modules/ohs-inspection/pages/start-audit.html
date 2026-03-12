@@ -151,6 +151,41 @@
             font-size: 12px;
         }
 
+        .cycle-badge {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+        }
+
+        .audit-progress {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+        .audit-dot {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            font-weight: 600;
+        }
+        .audit-dot.done {
+            background: #10b981;
+            color: white;
+        }
+        .audit-dot.pending {
+            background: #e2e8f0;
+            color: #64748b;
+            border: 2px dashed #94a3b8;
+        }
+            font-size: 12px;
+        }
+
         .btn {
             padding: 16px 32px;
             border: none;
@@ -265,8 +300,20 @@
                                 <span class="value" id="storeCode">-</span>
                             </div>
                             <div class="store-info-item">
+                                <span class="label">Brand:</span>
+                                <span class="value" id="storeBrand">-</span>
+                            </div>
+                            <div class="store-info-item">
                                 <span class="label">Template:</span>
                                 <span class="value"><span class="schema-badge" id="templateName">Default</span></span>
+                            </div>
+                            <div class="store-info-item">
+                                <span class="label">Current Cycle:</span>
+                                <span class="value"><span class="cycle-badge" id="currentCycle">-</span></span>
+                            </div>
+                            <div class="store-info-item">
+                                <span class="label">Audits This Cycle:</span>
+                                <span class="value" id="auditProgress">-</span>
                             </div>
                         </div>
                     </div>
@@ -361,7 +408,7 @@
         }
 
         // Store selection change
-        document.getElementById('storeSelect').addEventListener('change', function() {
+        document.getElementById('storeSelect').addEventListener('change', async function() {
             const selected = this.options[this.selectedIndex];
             const storeInfo = document.getElementById('storeInfo');
             
@@ -373,6 +420,36 @@
                 // Set template if store has one
                 if (selected.dataset.templateId) {
                     document.getElementById('templateSelect').value = selected.dataset.templateId;
+                }
+                
+                // Fetch cycle info for this store
+                try {
+                    const cycleResponse = await fetch(`/ohs-inspection/api/cycle/store/${this.value}`);
+                    const cycleData = await cycleResponse.json();
+                    
+                    if (cycleData.success) {
+                        document.getElementById('storeBrand').textContent = cycleData.data.brandName || 'Not Set';
+                        document.getElementById('currentCycle').textContent = `Cycle ${cycleData.data.currentCycle} (${cycleData.data.year})`;
+                        
+                        // Show audit progress dots
+                        const auditsThisCycle = cycleData.data.auditsThisCycle || 0;
+                        let progressHtml = '<div class="audit-progress">';
+                        for (let i = 1; i <= 2; i++) {
+                            if (i <= auditsThisCycle) {
+                                progressHtml += '<div class="audit-dot done">✓</div>';
+                            } else {
+                                progressHtml += `<div class="audit-dot pending">${i}</div>`;
+                            }
+                        }
+                        progressHtml += `<span style="margin-left: 8px; font-size: 13px;">${auditsThisCycle}/2 done</span>`;
+                        progressHtml += '</div>';
+                        document.getElementById('auditProgress').innerHTML = progressHtml;
+                    }
+                } catch (error) {
+                    console.error('Error fetching cycle info:', error);
+                    document.getElementById('storeBrand').textContent = '-';
+                    document.getElementById('currentCycle').textContent = '-';
+                    document.getElementById('auditProgress').textContent = '-';
                 }
             } else {
                 storeInfo.classList.remove('show');

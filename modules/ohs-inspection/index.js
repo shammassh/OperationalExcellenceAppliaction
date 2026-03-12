@@ -262,6 +262,12 @@ router.get('/', async (req, res) => {
                             <div class="card-desc">View all OHS inspections, filter by status, store, or date range.</div>
                         </a>
                         
+                        <a href="/ohs-inspection/cycle-dashboard" class="card" style="border-left-color: #059669;">
+                            <div class="card-icon">🔄</div>
+                            <div class="card-title">Cycle Dashboard</div>
+                            <div class="card-desc">Track cycle progress by brand. Each store needs 2 audits per year to complete a cycle.</div>
+                        </a>
+                        
                         <a href="/ohs-inspection/settings" class="card">
                             <div class="card-icon">⚙️</div>
                             <div class="card-title">Settings</div>
@@ -1043,10 +1049,13 @@ router.get('/api/stores', async (req, res) => {
                 s.Location as location,
                 s.TemplateId as templateId,
                 t.TemplateName as templateName,
+                s.BrandId as brandId,
+                b.BrandName as brandName,
                 s.IsActive as isActive,
                 s.CreatedDate as createdDate
             FROM Stores s
             LEFT JOIN OHS_InspectionTemplates t ON s.TemplateId = t.Id
+            LEFT JOIN Brands b ON s.BrandId = b.Id
             ORDER BY s.StoreName
         `);
         res.json({ success: true, data: result.recordset });
@@ -4558,6 +4567,486 @@ router.post('/api/escalation-settings', async (req, res) => {
         res.json({ success: true, message: 'OHS escalation settings saved' });
     } catch (error) {
         console.error('Error saving OHS escalation settings:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ==========================================
+// CYCLE DASHBOARD APIs
+// OHS Logic: Each store needs 2 audits per year to complete a cycle
+// Cycle completes when ALL stores of a brand have 2 audits in that year
+// ==========================================
+
+const AUDITS_PER_CYCLE = 2; // Each store needs 2 audits per cycle
+
+// Serve cycle dashboard page
+router.get('/cycle-dashboard', (req, res) => {
+    res.sendFile(path.join(__dirname, 'pages', 'cycle-dashboard.html'));
+});
+
+// Get overall cycle progress for all brands
+router.get('/api/cycle/progress', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const currentYear = new Date().getFullYear();
+        
+        // Get all brands with their store counts
+        const brandsResult = await pool.request().query(`
+            SELECT b.Id as BrandId, b.BrandName, b.BrandCode,
+                   COUNT(DISTINCT s.Id) as TotalStores
+            FROM Brands b
+            LEFT JOIN Stores s ON b.Id = s.BrandId AND s.IsActive = 1
+            WHERE b.IsActive = 1
+            GROUP BY b.Id, b.BrandName, b.BrandCode
+            ORDER BY b.BrandName
+        `);
+        
+        // Get count of stores without a brand
+        const unassignedResult = await pool.request().query(`
+            SELECT COUNT(*) as TotalStores
+            FROM Stores s
+            WHERE s.BrandId IS NULL AND s.IsActive = 1
+        `);
+        const unassignedCount = unassignedResult.recordset[0].TotalStores;
+        
+        // For each brand, calculate current cycle
+        // OHS: Each store needs 2 audits per cycle
+        // Cycle = floor(min audits / 2) + 1 (current working cycle)
+        // Store is "done" for current cycle if audits > (currentCycle - 1) * 2 + 1 (has both audits)
+        const progress = [];
+        
+        for (const brand of brandsResult.recordset) {
+            if (brand.TotalStores === 0) {
+                progress.push({
+                    brandId: brand.BrandId,
+                    brandName: brand.BrandName,
+                    brandCode: brand.BrandCode,
+                    totalStores: 0,
+                    auditedStores: 0,
+                    pendingStores: 0,
+                    currentCycle: 1,
+                    completedCycles: 0,
+                    percentage: 0,
+                    year: currentYear
+                });
+                continue;
+            }
+            
+            // Count completed audits per store for this brand in current year
+            const storeAuditsResult = await pool.request()
+                .input('brandId', sql.Int, brand.BrandId)
+                .input('year', sql.Int, currentYear)
+                .query(`
+                    SELECT s.Id as StoreId, s.StoreName,
+                           COUNT(i.Id) as AuditCount
+                    FROM Stores s
+                    LEFT JOIN OHS_Inspections i ON s.Id = i.StoreId AND i.Status = 'Completed' AND YEAR(i.InspectionDate) = @year
+                    WHERE s.BrandId = @brandId AND s.IsActive = 1
+                    GROUP BY s.Id, s.StoreName
+                `);
+            
+            const storeAudits = storeAuditsResult.recordset;
+            
+            // Find minimum audit count across all stores
+            const minAudits = Math.min(...storeAudits.map(s => s.AuditCount));
+            
+            // Calculate current cycle: each cycle requires 2 audits per store
+            const completedCycles = Math.floor(minAudits / AUDITS_PER_CYCLE);
+            const currentCycle = completedCycles + 1;
+            const auditsNeededForCurrentCycle = currentCycle * AUDITS_PER_CYCLE;
+            
+            // Count stores that have completed their 2 audits for current cycle
+            const auditedInCurrentCycle = storeAudits.filter(s => s.AuditCount >= auditsNeededForCurrentCycle).length;
+            const pendingInCurrentCycle = brand.TotalStores - auditedInCurrentCycle;
+            
+            const percentage = brand.TotalStores > 0 
+                ? Math.round(auditedInCurrentCycle / brand.TotalStores * 100) 
+                : 0;
+            
+            progress.push({
+                brandId: brand.BrandId,
+                brandName: brand.BrandName,
+                brandCode: brand.BrandCode,
+                totalStores: brand.TotalStores,
+                auditedStores: auditedInCurrentCycle,
+                pendingStores: pendingInCurrentCycle,
+                currentCycle: currentCycle,
+                completedCycles: completedCycles,
+                percentage: percentage,
+                year: currentYear
+            });
+        }
+        
+        // Add "Unassigned" category
+        if (unassignedCount > 0) {
+            const unassignedAuditsResult = await pool.request()
+                .input('year', sql.Int, currentYear)
+                .query(`
+                    SELECT s.Id as StoreId, s.StoreName,
+                           COUNT(i.Id) as AuditCount
+                    FROM Stores s
+                    LEFT JOIN OHS_Inspections i ON s.Id = i.StoreId AND i.Status = 'Completed' AND YEAR(i.InspectionDate) = @year
+                    WHERE s.BrandId IS NULL AND s.IsActive = 1
+                    GROUP BY s.Id, s.StoreName
+                `);
+            
+            const unassignedAudits = unassignedAuditsResult.recordset;
+            const minUnassignedAudits = unassignedAudits.length > 0 
+                ? Math.min(...unassignedAudits.map(s => s.AuditCount)) 
+                : 0;
+            
+            const unassignedCompletedCycles = Math.floor(minUnassignedAudits / AUDITS_PER_CYCLE);
+            const unassignedCurrentCycle = unassignedCompletedCycles + 1;
+            const unassignedAuditsNeeded = unassignedCurrentCycle * AUDITS_PER_CYCLE;
+            const unassignedAuditedInCycle = unassignedAudits.filter(s => s.AuditCount >= unassignedAuditsNeeded).length;
+            const unassignedPending = unassignedCount - unassignedAuditedInCycle;
+            
+            progress.push({
+                brandId: 0,
+                brandName: '⚠️ Unassigned Stores',
+                brandCode: 'UNASSIGNED',
+                totalStores: unassignedCount,
+                auditedStores: unassignedAuditedInCycle,
+                pendingStores: unassignedPending,
+                currentCycle: unassignedCurrentCycle,
+                completedCycles: unassignedCompletedCycles,
+                percentage: unassignedCount > 0 ? Math.round(unassignedAuditedInCycle / unassignedCount * 100) : 0,
+                year: currentYear
+            });
+        }
+        
+        // Calculate overall stats
+        const totalStores = progress.reduce((sum, b) => sum + b.totalStores, 0);
+        const totalAudited = progress.reduce((sum, b) => sum + b.auditedStores, 0);
+        const totalPending = progress.reduce((sum, b) => sum + b.pendingStores, 0);
+        const overallPercentage = totalStores > 0 ? Math.round(totalAudited / totalStores * 100) : 0;
+        
+        res.json({
+            success: true,
+            data: {
+                brands: progress,
+                overall: {
+                    totalStores,
+                    auditedStores: totalAudited,
+                    pendingStores: totalPending,
+                    percentage: overallPercentage
+                },
+                year: currentYear,
+                auditsPerCycle: AUDITS_PER_CYCLE
+            }
+        });
+    } catch (error) {
+        console.error('Error getting OHS cycle progress:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get pending stores for a brand's current cycle
+router.get('/api/cycle/pending-stores', async (req, res) => {
+    try {
+        const { brandId } = req.query;
+        const pool = await sql.connect(dbConfig);
+        const currentYear = new Date().getFullYear();
+        
+        if (brandId === undefined || brandId === '') {
+            return res.status(400).json({ success: false, error: 'brandId is required' });
+        }
+        
+        const brandIdInt = parseInt(brandId);
+        const isUnassigned = brandIdInt === 0;
+        
+        // Get all stores for this brand with their audit counts for current year
+        let storeAuditsResult;
+        if (isUnassigned) {
+            storeAuditsResult = await pool.request()
+                .input('year', sql.Int, currentYear)
+                .query(`
+                    SELECT s.Id as StoreId, s.StoreName, s.StoreCode, s.Location,
+                           'Unassigned' as BrandName, 'N/A' as BrandCode, 0 as BrandId,
+                           COUNT(i.Id) as AuditCount
+                    FROM Stores s
+                    LEFT JOIN OHS_Inspections i ON s.Id = i.StoreId AND i.Status = 'Completed' AND YEAR(i.InspectionDate) = @year
+                    WHERE s.BrandId IS NULL AND s.IsActive = 1
+                    GROUP BY s.Id, s.StoreName, s.StoreCode, s.Location
+                `);
+        } else {
+            storeAuditsResult = await pool.request()
+                .input('brandId', sql.Int, brandIdInt)
+                .input('year', sql.Int, currentYear)
+                .query(`
+                    SELECT s.Id as StoreId, s.StoreName, s.StoreCode, s.Location,
+                           b.BrandName, b.BrandCode, b.Id as BrandId,
+                           COUNT(i.Id) as AuditCount
+                    FROM Stores s
+                    INNER JOIN Brands b ON s.BrandId = b.Id
+                    LEFT JOIN OHS_Inspections i ON s.Id = i.StoreId AND i.Status = 'Completed' AND YEAR(i.InspectionDate) = @year
+                    WHERE s.BrandId = @brandId AND s.IsActive = 1 AND b.IsActive = 1
+                    GROUP BY s.Id, s.StoreName, s.StoreCode, s.Location, b.BrandName, b.BrandCode, b.Id
+                `);
+        }
+        
+        const storeAudits = storeAuditsResult.recordset;
+        
+        if (storeAudits.length === 0) {
+            return res.json({
+                success: true,
+                data: {
+                    currentCycle: 1,
+                    pendingStores: [],
+                    year: currentYear
+                }
+            });
+        }
+        
+        // Calculate current cycle
+        const minAudits = Math.min(...storeAudits.map(s => s.AuditCount));
+        const completedCycles = Math.floor(minAudits / AUDITS_PER_CYCLE);
+        const currentCycle = completedCycles + 1;
+        const auditsNeededForCurrentCycle = currentCycle * AUDITS_PER_CYCLE;
+        
+        // Pending stores: those with AuditCount < auditsNeededForCurrentCycle
+        const pendingStores = storeAudits
+            .filter(s => s.AuditCount < auditsNeededForCurrentCycle)
+            .map(s => ({
+                StoreId: s.StoreId,
+                StoreName: s.StoreName,
+                StoreCode: s.StoreCode,
+                Location: s.Location,
+                BrandName: s.BrandName,
+                BrandCode: s.BrandCode,
+                BrandId: s.BrandId,
+                TotalAudits: s.AuditCount,
+                AuditsThisCycle: s.AuditCount - (completedCycles * AUDITS_PER_CYCLE),
+                AuditsNeeded: AUDITS_PER_CYCLE - (s.AuditCount - (completedCycles * AUDITS_PER_CYCLE))
+            }));
+        
+        res.json({
+            success: true,
+            data: {
+                currentCycle: currentCycle,
+                pendingStores: pendingStores,
+                year: currentYear
+            }
+        });
+    } catch (error) {
+        console.error('Error getting OHS pending stores:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get audited (completed) stores for a brand's current cycle
+router.get('/api/cycle/audited-stores', async (req, res) => {
+    try {
+        const { brandId } = req.query;
+        const pool = await sql.connect(dbConfig);
+        const currentYear = new Date().getFullYear();
+        
+        if (brandId === undefined || brandId === '') {
+            return res.status(400).json({ success: false, error: 'brandId is required' });
+        }
+        
+        const brandIdInt = parseInt(brandId);
+        const isUnassigned = brandIdInt === 0;
+        
+        // First, find the current cycle for this brand
+        let storeAuditsResult;
+        if (isUnassigned) {
+            storeAuditsResult = await pool.request()
+                .input('year', sql.Int, currentYear)
+                .query(`
+                    SELECT s.Id as StoreId, COUNT(i.Id) as AuditCount
+                    FROM Stores s
+                    LEFT JOIN OHS_Inspections i ON s.Id = i.StoreId AND i.Status = 'Completed' AND YEAR(i.InspectionDate) = @year
+                    WHERE s.BrandId IS NULL AND s.IsActive = 1
+                    GROUP BY s.Id
+                `);
+        } else {
+            storeAuditsResult = await pool.request()
+                .input('brandId', sql.Int, brandIdInt)
+                .input('year', sql.Int, currentYear)
+                .query(`
+                    SELECT s.Id as StoreId, COUNT(i.Id) as AuditCount
+                    FROM Stores s
+                    LEFT JOIN OHS_Inspections i ON s.Id = i.StoreId AND i.Status = 'Completed' AND YEAR(i.InspectionDate) = @year
+                    WHERE s.BrandId = @brandId AND s.IsActive = 1
+                    GROUP BY s.Id
+                `);
+        }
+        
+        const storeAudits = storeAuditsResult.recordset;
+        
+        if (storeAudits.length === 0) {
+            return res.json({
+                success: true,
+                data: {
+                    currentCycle: 1,
+                    auditedStores: [],
+                    year: currentYear
+                }
+            });
+        }
+        
+        // Calculate current cycle
+        const minAudits = Math.min(...storeAudits.map(s => s.AuditCount));
+        const completedCycles = Math.floor(minAudits / AUDITS_PER_CYCLE);
+        const currentCycle = completedCycles + 1;
+        const auditsNeededForCurrentCycle = currentCycle * AUDITS_PER_CYCLE;
+        
+        // Get stores that have completed both audits for current cycle
+        // These are stores with AuditCount >= auditsNeededForCurrentCycle
+        // Get the 2 most recent audits for each completed store
+        let auditedResult;
+        if (isUnassigned) {
+            auditedResult = await pool.request()
+                .input('year', sql.Int, currentYear)
+                .input('auditsNeeded', sql.Int, auditsNeededForCurrentCycle)
+                .query(`
+                    WITH StoreAuditCounts AS (
+                        SELECT s.Id as StoreId
+                        FROM Stores s
+                        LEFT JOIN OHS_Inspections i ON s.Id = i.StoreId AND i.Status = 'Completed' AND YEAR(i.InspectionDate) = @year
+                        WHERE s.BrandId IS NULL AND s.IsActive = 1
+                        GROUP BY s.Id
+                        HAVING COUNT(i.Id) >= @auditsNeeded
+                    ),
+                    LatestAudits AS (
+                        SELECT i.*, ROW_NUMBER() OVER (PARTITION BY i.StoreId ORDER BY i.CompletedAt DESC, i.Id DESC) as rn
+                        FROM OHS_Inspections i
+                        INNER JOIN StoreAuditCounts sac ON i.StoreId = sac.StoreId
+                        WHERE i.Status = 'Completed' AND YEAR(i.InspectionDate) = @year
+                    )
+                    SELECT la.Id as InspectionId, la.DocumentNumber, la.StoreId, la.StoreName,
+                           la.InspectionDate, la.Score, la.Inspectors, la.CompletedAt,
+                           s.StoreCode, s.Location,
+                           'Unassigned' as BrandName, 'N/A' as BrandCode, 0 as BrandId
+                    FROM LatestAudits la
+                    INNER JOIN Stores s ON la.StoreId = s.Id
+                    WHERE la.rn = 1
+                    ORDER BY la.CompletedAt DESC, la.InspectionDate DESC
+                `);
+        } else {
+            auditedResult = await pool.request()
+                .input('brandId', sql.Int, brandIdInt)
+                .input('year', sql.Int, currentYear)
+                .input('auditsNeeded', sql.Int, auditsNeededForCurrentCycle)
+                .query(`
+                    WITH StoreAuditCounts AS (
+                        SELECT s.Id as StoreId
+                        FROM Stores s
+                        LEFT JOIN OHS_Inspections i ON s.Id = i.StoreId AND i.Status = 'Completed' AND YEAR(i.InspectionDate) = @year
+                        WHERE s.BrandId = @brandId AND s.IsActive = 1
+                        GROUP BY s.Id
+                        HAVING COUNT(i.Id) >= @auditsNeeded
+                    ),
+                    LatestAudits AS (
+                        SELECT i.*, ROW_NUMBER() OVER (PARTITION BY i.StoreId ORDER BY i.CompletedAt DESC, i.Id DESC) as rn
+                        FROM OHS_Inspections i
+                        INNER JOIN StoreAuditCounts sac ON i.StoreId = sac.StoreId
+                        WHERE i.Status = 'Completed' AND YEAR(i.InspectionDate) = @year
+                    )
+                    SELECT la.Id as InspectionId, la.DocumentNumber, la.StoreId, la.StoreName,
+                           la.InspectionDate, la.Score, la.Inspectors, la.CompletedAt,
+                           s.StoreCode, s.Location,
+                           b.BrandName, b.BrandCode, b.Id as BrandId
+                    FROM LatestAudits la
+                    INNER JOIN Stores s ON la.StoreId = s.Id
+                    INNER JOIN Brands b ON s.BrandId = b.Id
+                    WHERE la.rn = 1
+                    ORDER BY la.CompletedAt DESC, la.InspectionDate DESC
+                `);
+        }
+        
+        res.json({
+            success: true,
+            data: {
+                currentCycle: currentCycle,
+                auditedStores: auditedResult.recordset,
+                year: currentYear
+            }
+        });
+    } catch (error) {
+        console.error('Error getting OHS audited stores:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get current cycle info for a specific store
+router.get('/api/cycle/store/:storeId', async (req, res) => {
+    try {
+        const { storeId } = req.params;
+        const pool = await sql.connect(dbConfig);
+        const currentYear = new Date().getFullYear();
+        
+        // Get the store's brand
+        const storeResult = await pool.request()
+            .input('storeId', sql.Int, storeId)
+            .query(`
+                SELECT s.Id as StoreId, s.StoreName, s.BrandId, ISNULL(b.BrandName, 'Unassigned') as BrandName
+                FROM Stores s
+                LEFT JOIN Brands b ON s.BrandId = b.Id
+                WHERE s.Id = @storeId
+            `);
+        
+        if (storeResult.recordset.length === 0) {
+            return res.status(404).json({ success: false, error: 'Store not found' });
+        }
+        
+        const store = storeResult.recordset[0];
+        const brandId = store.BrandId || 0;
+        const isUnassigned = brandId === 0;
+        
+        // Get all stores for this brand with their audit counts
+        let storeAuditsResult;
+        if (isUnassigned) {
+            storeAuditsResult = await pool.request()
+                .input('year', sql.Int, currentYear)
+                .query(`
+                    SELECT s.Id as StoreId, COUNT(i.Id) as AuditCount
+                    FROM Stores s
+                    LEFT JOIN OHS_Inspections i ON s.Id = i.StoreId AND i.Status = 'Completed' AND YEAR(i.InspectionDate) = @year
+                    WHERE s.BrandId IS NULL AND s.IsActive = 1
+                    GROUP BY s.Id
+                `);
+        } else {
+            storeAuditsResult = await pool.request()
+                .input('brandId', sql.Int, brandId)
+                .input('year', sql.Int, currentYear)
+                .query(`
+                    SELECT s.Id as StoreId, COUNT(i.Id) as AuditCount
+                    FROM Stores s
+                    LEFT JOIN OHS_Inspections i ON s.Id = i.StoreId AND i.Status = 'Completed' AND YEAR(i.InspectionDate) = @year
+                    WHERE s.BrandId = @brandId AND s.IsActive = 1
+                    GROUP BY s.Id
+                `);
+        }
+        
+        const storeAudits = storeAuditsResult.recordset;
+        const minAudits = storeAudits.length > 0 ? Math.min(...storeAudits.map(s => s.AuditCount)) : 0;
+        const completedCycles = Math.floor(minAudits / AUDITS_PER_CYCLE);
+        const currentCycle = completedCycles + 1;
+        
+        // Get this store's audit count
+        const thisStoreAudits = storeAudits.find(s => s.StoreId === parseInt(storeId))?.AuditCount || 0;
+        const auditsThisCycle = thisStoreAudits - (completedCycles * AUDITS_PER_CYCLE);
+        const auditsNeeded = AUDITS_PER_CYCLE - auditsThisCycle;
+        
+        res.json({
+            success: true,
+            data: {
+                storeId: store.StoreId,
+                storeName: store.StoreName,
+                brandId: brandId,
+                brandName: store.BrandName,
+                currentCycle: currentCycle,
+                completedCycles: completedCycles,
+                auditsThisCycle: auditsThisCycle,
+                auditsNeeded: Math.max(0, auditsNeeded),
+                totalAuditsThisYear: thisStoreAudits,
+                year: currentYear
+            }
+        });
+    } catch (error) {
+        console.error('Error getting OHS store cycle info:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
