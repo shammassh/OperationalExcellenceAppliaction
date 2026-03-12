@@ -216,6 +216,74 @@ class OHSReportGenerator {
             opacity: 0.9;
         }
         
+        /* Filter Toolbar */
+        .filter-toolbar {
+            background: white;
+            border: 1px solid rgba(225, 112, 85, 0.2);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .filter-toolbar-title {
+            font-weight: 600;
+            color: #64748b;
+            font-size: 0.9rem;
+            margin-right: 0.5rem;
+        }
+        
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .filter-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .filter-btn:hover {
+            border-color: #e17055;
+        }
+        
+        .filter-btn.active {
+            background: #e17055;
+            border-color: #e17055;
+            color: white;
+        }
+        
+        .filter-btn.filter-yes { border-left: 4px solid #10b981; }
+        .filter-btn.filter-partial { border-left: 4px solid #f59e0b; }
+        .filter-btn.filter-no { border-left: 4px solid #ef4444; }
+        .filter-btn.filter-na { border-left: 4px solid #94a3b8; }
+        .filter-btn.filter-na-dept { border-left: 4px solid #6366f1; }
+        
+        .filter-divider {
+            width: 1px;
+            height: 24px;
+            background: #e2e8f0;
+            margin: 0 0.5rem;
+        }
+        
         .info-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -377,11 +445,53 @@ class OHSReportGenerator {
         @media print {
             .report-container { padding: 0; }
             .section-block { break-inside: avoid; }
+            .filter-toolbar { display: none !important; }
+            .hidden-by-filter { display: table-row !important; }
+            .dept-hidden { display: block !important; opacity: 1 !important; }
         }
+        
+        /* Hidden states */
+        .hidden-by-filter { display: none; }
+        .dept-hidden { display: none; }
+        .section-hidden { display: none; }
     </style>
 </head>
 <body>
     <div class="report-container">
+        <!-- Filter Toolbar -->
+        <div class="filter-toolbar">
+            <span class="filter-toolbar-title">🔍 Filter:</span>
+            <div class="filter-group">
+                <button class="filter-btn filter-yes active" onclick="toggleFilter('yes', this)" title="Show/Hide Yes answers">
+                    ✓ Yes
+                </button>
+                <button class="filter-btn filter-partial active" onclick="toggleFilter('partial', this)" title="Show/Hide Partially answers">
+                    ◐ Partially
+                </button>
+                <button class="filter-btn filter-no active" onclick="toggleFilter('no', this)" title="Show/Hide No answers">
+                    ✗ No
+                </button>
+                <button class="filter-btn filter-na active" onclick="toggleFilter('na', this)" title="Show/Hide N/A answers">
+                    — N/A
+                </button>
+            </div>
+            <div class="filter-divider"></div>
+            <div class="filter-group">
+                <button class="filter-btn filter-na-dept active" onclick="toggleNADepartments(this)" title="Show/Hide N/A Departments">
+                    🏬 N/A Departments
+                </button>
+            </div>
+            <div class="filter-divider"></div>
+            <div class="filter-group">
+                <button class="filter-btn" onclick="showOnlyFindings()" title="Show only items with findings">
+                    ⚠️ Findings Only
+                </button>
+                <button class="filter-btn" onclick="resetFilters()" title="Reset all filters">
+                    🔄 Reset
+                </button>
+            </div>
+        </div>
+        
         <div class="report-header">
             <div>
                 <div class="report-title">🦺 OHS Inspection Report</div>
@@ -434,6 +544,87 @@ class OHSReportGenerator {
             <p>OHS Inspection System - Occupational Health & Safety</p>
         </div>
     </div>
+    
+    <script>
+        // Filter state
+        const filters = { yes: true, partial: true, no: true, na: true, naDepts: true };
+        
+        function toggleFilter(type, btn) {
+            filters[type] = !filters[type];
+            btn.classList.toggle('active', filters[type]);
+            applyFilters();
+        }
+        
+        function toggleNADepartments(btn) {
+            filters.naDepts = !filters.naDepts;
+            btn.classList.toggle('active', filters.naDepts);
+            
+            document.querySelectorAll('[data-na-dept="true"]').forEach(dept => {
+                dept.classList.toggle('dept-hidden', !filters.naDepts);
+            });
+        }
+        
+        function applyFilters() {
+            document.querySelectorAll('tr[data-answer]').forEach(row => {
+                const answer = row.dataset.answer;
+                let show = false;
+                
+                if (answer === 'Yes' && filters.yes) show = true;
+                if (answer === 'Partially' && filters.partial) show = true;
+                if (answer === 'No' && filters.no) show = true;
+                if (answer === 'NA' && filters.na) show = true;
+                
+                row.classList.toggle('hidden-by-filter', !show);
+            });
+            
+            // Hide sections that have no visible rows
+            document.querySelectorAll('.section-block').forEach(section => {
+                const visibleRows = section.querySelectorAll('tr[data-answer]:not(.hidden-by-filter)');
+                section.classList.toggle('section-hidden', visibleRows.length === 0);
+            });
+        }
+        
+        function showOnlyFindings() {
+            // Uncheck Yes and NA
+            filters.yes = false;
+            filters.na = false;
+            filters.partial = true;
+            filters.no = true;
+            
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                if (btn.classList.contains('filter-yes')) btn.classList.remove('active');
+                if (btn.classList.contains('filter-na')) btn.classList.remove('active');
+                if (btn.classList.contains('filter-partial')) btn.classList.add('active');
+                if (btn.classList.contains('filter-no')) btn.classList.add('active');
+            });
+            
+            applyFilters();
+        }
+        
+        function resetFilters() {
+            filters.yes = true;
+            filters.partial = true;
+            filters.no = true;
+            filters.na = true;
+            filters.naDepts = true;
+            
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.add('active');
+            });
+            
+            document.querySelectorAll('tr[data-answer]').forEach(row => {
+                row.classList.remove('hidden-by-filter');
+            });
+            
+            document.querySelectorAll('[data-na-dept="true"]').forEach(dept => {
+                dept.classList.remove('dept-hidden');
+            });
+            
+            document.querySelectorAll('.section-block').forEach(section => {
+                section.classList.remove('section-hidden');
+            });
+        }
+    </script>
 </body>
 </html>`;
     }
@@ -453,7 +644,7 @@ class OHSReportGenerator {
                 
                 // Department header
                 html += `
-                <div style="margin-bottom: 2rem;">
+                <div style="margin-bottom: 2rem;" data-na-dept="${dept.isNA ? 'true' : 'false'}">
                     <div style="background: linear-gradient(135deg, rgba(225, 112, 85, 0.15) 0%, rgba(214, 48, 49, 0.1) 100%); 
                                 border: 1px solid rgba(225, 112, 85, 0.3); border-radius: 12px; padding: 1rem 1.5rem; margin-bottom: 1rem;
                                 display: flex; justify-content: space-between; align-items: center; ${dept.isNA ? 'opacity: 0.5;' : ''}">
@@ -499,8 +690,11 @@ class OHSReportGenerator {
                                     const answerClass = item.selectedChoice === 'Yes' ? 'answer-yes' :
                                                        item.selectedChoice === 'Partially' ? 'answer-partial' :
                                                        item.selectedChoice === 'No' ? 'answer-no' : 'answer-na';
+                                    const answerType = item.selectedChoice === 'Yes' ? 'Yes' :
+                                                      item.selectedChoice === 'Partially' ? 'Partially' :
+                                                      item.selectedChoice === 'No' ? 'No' : 'NA';
                                     return `
-                                    <tr>
+                                    <tr data-answer="${answerType}">
                                         <td>${item.referenceValue || '-'}</td>
                                         <td>${item.title || '-'}</td>
                                         <td class="${answerClass}">${item.selectedChoice || '-'}</td>
@@ -549,8 +743,11 @@ class OHSReportGenerator {
                                     const answerClass = item.selectedChoice === 'Yes' ? 'answer-yes' :
                                                        item.selectedChoice === 'Partially' ? 'answer-partial' :
                                                        item.selectedChoice === 'No' ? 'answer-no' : 'answer-na';
+                                    const answerType = item.selectedChoice === 'Yes' ? 'Yes' :
+                                                      item.selectedChoice === 'Partially' ? 'Partially' :
+                                                      item.selectedChoice === 'No' ? 'No' : 'NA';
                                     return `
-                                    <tr>
+                                    <tr data-answer="${answerType}">
                                         <td>${item.referenceValue || '-'}</td>
                                         <td>${item.title || '-'}</td>
                                         <td class="${answerClass}">${item.selectedChoice || '-'}</td>
@@ -597,8 +794,11 @@ class OHSReportGenerator {
                                 const answerClass = item.selectedChoice === 'Yes' ? 'answer-yes' :
                                                    item.selectedChoice === 'Partially' ? 'answer-partial' :
                                                    item.selectedChoice === 'No' ? 'answer-no' : 'answer-na';
+                                const answerType = item.selectedChoice === 'Yes' ? 'Yes' :
+                                                  item.selectedChoice === 'Partially' ? 'Partially' :
+                                                  item.selectedChoice === 'No' ? 'No' : 'NA';
                                 return `
-                                <tr>
+                                <tr data-answer="${answerType}">
                                     <td>${item.referenceValue || '-'}</td>
                                     <td>${item.title || '-'}</td>
                                     <td class="${answerClass}">${item.selectedChoice || '-'}</td>

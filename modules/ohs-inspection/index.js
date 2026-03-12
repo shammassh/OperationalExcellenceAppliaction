@@ -2700,7 +2700,61 @@ function generateOHSReportHTML(data) {
             .chart-simple { max-height: none !important; overflow: visible !important; }
             .header { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
             .lightbox { display: none !important; }
+            .filter-toolbar { display: none !important; }
         }
+        
+        /* Filter Toolbar Styles */
+        .filter-toolbar {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            position: sticky;
+            top: 80px;
+            z-index: 100;
+        }
+        .filter-toolbar-title {
+            font-weight: 600;
+            color: #475569;
+            font-size: 14px;
+        }
+        .filter-group {
+            display: flex;
+            gap: 8px;
+        }
+        .filter-btn {
+            padding: 6px 14px;
+            border: 2px solid #cbd5e1;
+            border-radius: 20px;
+            background: white;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .filter-btn:hover { background: #f1f5f9; }
+        .filter-btn.active { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
+        .filter-btn.filter-yes.active { border-color: #10b981; background: #ecfdf5; color: #059669; }
+        .filter-btn.filter-partial.active { border-color: #f59e0b; background: #fffbeb; color: #d97706; }
+        .filter-btn.filter-no.active { border-color: #ef4444; background: #fef2f2; color: #dc2626; }
+        .filter-btn.filter-na.active { border-color: #64748b; background: #f1f5f9; color: #475569; }
+        .filter-divider {
+            width: 1px;
+            height: 30px;
+            background: #cbd5e1;
+        }
+        .hidden-by-filter { display: none !important; }
+        .dept-hidden { display: none !important; }
+        .section-hidden { display: none !important; }
     </style>
 </head>
 <body>
@@ -2734,6 +2788,40 @@ function generateOHSReportHTML(data) {
         }
     </script>
     <div class="container">
+        <!-- Filter Toolbar -->
+        <div class="filter-toolbar">
+            <span class="filter-toolbar-title">🔍 Filter:</span>
+            <div class="filter-group">
+                <button class="filter-btn filter-yes active" onclick="toggleFilter('yes', this)" title="Show/Hide Yes answers">
+                    ✓ Yes
+                </button>
+                <button class="filter-btn filter-partial active" onclick="toggleFilter('partial', this)" title="Show/Hide Partially answers">
+                    ◐ Partially
+                </button>
+                <button class="filter-btn filter-no active" onclick="toggleFilter('no', this)" title="Show/Hide No answers">
+                    ✗ No
+                </button>
+                <button class="filter-btn filter-na active" onclick="toggleFilter('na', this)" title="Show/Hide N/A answers">
+                    — N/A
+                </button>
+            </div>
+            <div class="filter-divider"></div>
+            <div class="filter-group">
+                <button class="filter-btn filter-na-dept active" onclick="toggleNADepartments(this)" title="Show/Hide N/A Departments">
+                    🏬 N/A Departments
+                </button>
+            </div>
+            <div class="filter-divider"></div>
+            <div class="filter-group">
+                <button class="filter-btn" onclick="showOnlyFindings()" title="Show only items with findings">
+                    ⚠️ Findings Only
+                </button>
+                <button class="filter-btn" onclick="resetFilters()" title="Reset all filters">
+                    🔄 Reset
+                </button>
+            </div>
+        </div>
+        
         <div class="header">
             <h1>🦺 OHS Inspection Report</h1>
             <div class="header-info">
@@ -2839,7 +2927,7 @@ function generateOHSReportHTML(data) {
         </div>
         
         ${departments.map((dept, deptIdx) => `
-        <div class="department-card">
+        <div class="department-card" ${dept.IsNA ? 'data-na-dept="true"' : ''}>
             <div class="department-header ${dept.IsNA ? 'na' : ''}" onclick="toggleDepartment(${deptIdx})">
                 <div class="department-title">
                     <span class="collapse-icon" id="icon-${deptIdx}">▼</span>
@@ -2880,8 +2968,9 @@ function generateOHSReportHTML(data) {
                             ${(section.items || []).map(item => {
                                 const itemPics = pictures[item.Id] || [];
                                 const goodPics = itemPics.filter(p => p.pictureType === 'Good');
+                                const answerType = item.Answer === 'Yes' ? 'Yes' : item.Answer === 'No' ? 'No' : item.Answer === 'Partially' ? 'Partially' : 'NA';
                                 return `
-                            <tr>
+                            <tr data-answer="${answerType}">
                                 <td>${item.ReferenceValue || '-'}</td>
                                 <td>${item.Question || '-'}</td>
                                 <td class="${item.Answer === 'Yes' ? 'choice-yes' : item.Answer === 'No' ? 'choice-no' : item.Answer === 'Partially' ? 'choice-partial' : 'choice-na'}">${item.Answer || '-'}</td>
@@ -3039,6 +3128,84 @@ function generateOHSReportHTML(data) {
         function collapseAll() {
             document.querySelectorAll('.department-sections').forEach(el => el.classList.add('collapsed'));
             document.querySelectorAll('.collapse-icon').forEach(el => el.classList.add('collapsed'));
+        }
+        
+        // Filter functionality
+        const filters = { yes: true, partial: true, no: true, na: true, naDepts: true };
+        
+        function toggleFilter(type, btn) {
+            filters[type] = !filters[type];
+            btn.classList.toggle('active', filters[type]);
+            applyFilters();
+        }
+        
+        function toggleNADepartments(btn) {
+            filters.naDepts = !filters.naDepts;
+            btn.classList.toggle('active', filters.naDepts);
+            
+            document.querySelectorAll('[data-na-dept="true"]').forEach(dept => {
+                dept.classList.toggle('dept-hidden', !filters.naDepts);
+            });
+        }
+        
+        function applyFilters() {
+            document.querySelectorAll('tr[data-answer]').forEach(row => {
+                const answer = row.dataset.answer;
+                let show = false;
+                
+                if (answer === 'Yes' && filters.yes) show = true;
+                if (answer === 'Partially' && filters.partial) show = true;
+                if (answer === 'No' && filters.no) show = true;
+                if (answer === 'NA' && filters.na) show = true;
+                
+                row.classList.toggle('hidden-by-filter', !show);
+            });
+            
+            // Hide sections that have no visible rows
+            document.querySelectorAll('.section-block').forEach(section => {
+                const visibleRows = section.querySelectorAll('tr[data-answer]:not(.hidden-by-filter)');
+                section.classList.toggle('section-hidden', visibleRows.length === 0);
+            });
+        }
+        
+        function showOnlyFindings() {
+            filters.yes = false;
+            filters.na = false;
+            filters.partial = true;
+            filters.no = true;
+            
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                if (btn.classList.contains('filter-yes')) btn.classList.remove('active');
+                if (btn.classList.contains('filter-na')) btn.classList.remove('active');
+                if (btn.classList.contains('filter-partial')) btn.classList.add('active');
+                if (btn.classList.contains('filter-no')) btn.classList.add('active');
+            });
+            
+            applyFilters();
+        }
+        
+        function resetFilters() {
+            filters.yes = true;
+            filters.partial = true;
+            filters.no = true;
+            filters.na = true;
+            filters.naDepts = true;
+            
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.add('active');
+            });
+            
+            document.querySelectorAll('tr[data-answer]').forEach(row => {
+                row.classList.remove('hidden-by-filter');
+            });
+            
+            document.querySelectorAll('[data-na-dept="true"]').forEach(dept => {
+                dept.classList.remove('dept-hidden');
+            });
+            
+            document.querySelectorAll('.section-block').forEach(section => {
+                section.classList.remove('section-hidden');
+            });
         }
         
         async function openEmailModal(reportType) {
