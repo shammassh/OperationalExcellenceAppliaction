@@ -97,6 +97,17 @@ function matchUrlToForm(url, formMappings) {
 function getRequiredAction(method, url) {
     const lowerUrl = url.toLowerCase();
     
+    // Special cases: deleting sub-items (pictures, attachments) is an "edit" action, not "delete"
+    // The user is editing the parent record, not deleting it entirely
+    if (lowerUrl.includes('/pictures/') || lowerUrl.includes('/attachments/') || lowerUrl.includes('/upload')) {
+        if (method.toUpperCase() === 'DELETE') {
+            return 'edit'; // Deleting a picture from an inspection = editing the inspection
+        }
+        if (method.toUpperCase() === 'POST') {
+            return 'edit'; // Uploading a picture to an inspection = editing the inspection
+        }
+    }
+    
     // Check URL patterns for action hints
     if (lowerUrl.includes('/delete') || lowerUrl.includes('/remove')) {
         return 'delete';
