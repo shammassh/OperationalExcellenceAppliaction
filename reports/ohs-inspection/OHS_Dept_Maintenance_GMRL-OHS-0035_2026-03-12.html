@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Department Report - Maintenance - GMRL-OHS-0035</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f5f5f5; color: #333; line-height: 1.6; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 15px 20px; border-radius: 10px; margin-bottom: 15px; }
+        .header h1 { font-size: 20px; margin-bottom: 5px; }
+        .header-subtitle { font-size: 14px; opacity: 0.9; }
+        .header-info { display: flex; flex-wrap: wrap; gap: 15px; margin-top: 12px; }
+        .header-item { background: rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 6px; }
+        .header-item label { font-size: 10px; opacity: 0.8; display: block; }
+        .header-item span { font-size: 13px; font-weight: 600; }
+        .summary-card { background: white; border-radius: 10px; padding: 15px 20px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; align-items: center; gap: 20px; }
+        .summary-count { font-size: 36px; font-weight: bold; color: #ef4444; }
+        .summary-label { font-size: 14px; color: #6b7280; }
+        .section-card { background: white; border-radius: 10px; margin-bottom: 15px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .section-header { background: #f8fafc; padding: 12px 15px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #374151; }
+        .finding-item { padding: 15px; border-bottom: 1px solid #f3f4f6; }
+        .finding-item:last-child { border-bottom: none; }
+        .finding-ref { display: inline-block; font-weight: 600; color: #e17055; font-size: 12px; margin-right: 8px; }
+        .finding-badge { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+        .finding-badge.repetitive { background: #fef3c7; color: #92400e; }
+        .finding-badge.first-time { background: #dbeafe; color: #1e40af; }
+        .finding-question { font-size: 14px; margin: 8px 0; color: #1f2937; }
+        .finding-detail { font-size: 13px; color: #6b7280; margin-bottom: 8px; }
+        .finding-detail strong { color: #374151; }
+        .choice-no { color: #ef4444; }
+        .choice-partial { color: #f59e0b; }
+        .finding-cr { background: #ecfdf5; border-left: 3px solid #10b981; padding: 8px 12px; border-radius: 4px; font-size: 13px; color: #065f46; margin-top: 8px; }
+        .finding-pictures { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+        .finding-pictures img { max-width: 80px; max-height: 60px; border-radius: 4px; cursor: pointer; border: 2px solid #e2e8f0; object-fit: cover; }
+        .footer { text-align: center; padding: 20px; color: #64748b; font-size: 13px; }
+        .action-bar { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 1000; }
+        .action-bar button { padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+        .btn-back { background: #64748b; color: white; }
+        .btn-print { background: #3b82f6; color: white; }
+        .lightbox { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; justify-content: center; align-items: center; }
+        .lightbox.active { display: flex; }
+        .lightbox img { max-width: 90%; max-height: 90%; border-radius: 8px; }
+        .lightbox-close { position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; cursor: pointer; }
+        @media print { 
+            @page { size: A4; margin: 15mm; }
+            .action-bar { display: none !important; } 
+            .lightbox { display: none !important; }
+            .finding-item { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+    <div class="action-bar">
+        <button class="btn-back" onclick="history.back()">← Back</button>
+        <button class="btn-print" onclick="window.print()">🖨️ Print</button>
+    </div>
+    
+    <div class="container">
+        <div class="header">
+            <h1>🏢 Department Report: Maintenance</h1>
+            <div class="header-subtitle">Action items assigned to Maintenance department</div>
+            <div class="header-info">
+                <div class="header-item"><label>Document #</label><span>GMRL-OHS-0035</span></div>
+                <div class="header-item"><label>Store</label><span>Spinneys Hazmieh,Spinneys Hazmieh</span></div>
+                <div class="header-item"><label>Brand</label><span>Spinneys</span></div>
+                <div class="header-item"><label>Inspection Date</label><span>3/11/2026</span></div>
+            </div>
+        </div>
+        
+        <div class="summary-card">
+            <div class="summary-count">1</div>
+            <div class="summary-label">Action Items for Maintenance</div>
+        </div>
+        
+        
+        <div class="section-card">
+            <div class="section-header">📋 Cheese & Deli - Slip, Trip, Fall (STF)</div>
+            
+            <div class="finding-item">
+                <span class="finding-ref">[1.5]</span>
+                <span class="finding-badge repetitive">🔁 Repetitive</span>
+                <div class="finding-question">Walkways are clearly defined and unobstructed</div>
+                <div class="finding-detail">
+                    Answer: <strong class="choice-partial">Partially</strong> 
+                    | Finding: N/A
+                </div>
+                
+                
+                <div class="finding-pictures">
+                    <img src="/uploads/ohs-inspection/ohs-1773274549508-7180751.png" alt="FS report.png" onclick="openLightbox(this.src)">
+                </div>
+                
+            </div>
+                
+        </div>
+        
+        
+        <div class="footer">
+            Report generated on 3/12/2026, 2:16:08 AM | OHS Inspection System - Maintenance Department
+        </div>
+    </div>
+    
+    <div id="lightbox" class="lightbox" onclick="closeLightbox()">
+        <span class="lightbox-close">&times;</span>
+        <img id="lightbox-img" src="" alt="Enlarged">
+    </div>
+    
+    <script>
+        function openLightbox(src) {
+            document.getElementById('lightbox-img').src = src;
+            document.getElementById('lightbox').classList.add('active');
+        }
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.remove('active');
+        }
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+    </script>
+</body>
+</html>

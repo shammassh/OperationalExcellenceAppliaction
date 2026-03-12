@@ -257,6 +257,20 @@
             white-space: nowrap;
         }
 
+        .dept-col {
+            white-space: nowrap;
+        }
+
+        .dept-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
         .section-badge {
             display: inline-block;
             padding: 4px 10px;
@@ -666,9 +680,6 @@
                 <button class="save-btn" onclick="saveActionPlan()">
                     💾 Save
                 </button>
-                <button onclick="generateFullReport()" style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);">
-                    📄 Generate Report
-                </button>
                 <button onclick="sendToStoreManager()" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);" title="Send Action Plan to Store Manager">
                     📧 Send Report
                 </button>
@@ -729,9 +740,15 @@
         <!-- Filters -->
         <div class="filter-section">
             <div class="filter-group">
-                <label>Section</label>
+                <label>Department</label>
+                <select id="departmentFilter" onchange="applyFilters()">
+                    <option value="">All Departments</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Category</label>
                 <select id="sectionFilter" onchange="applyFilters()">
-                    <option value="">All Sections</option>
+                    <option value="">All Categories</option>
                 </select>
             </div>
             <div class="filter-group">
@@ -842,9 +859,10 @@
                 const result = await response.json();
                 
                 if (result.success && result.actions) {
-                    // Index by referenceValue for easy lookup
+                    // Index by referenceValue + department for easy lookup
                     result.actions.forEach(action => {
-                        savedResponses[action.ReferenceValue] = action;
+                        const key = `${action.ReferenceValue}|${action.Department || ''}`;
+                        savedResponses[key] = action;
                     });
                     console.log('Loaded saved responses:', Object.keys(savedResponses).length);
                 }
@@ -860,8 +878,9 @@
                 for (const item of section.items) {
                     // Filter for No or Partially answers, or items with findings/escalation
                     if (item.selectedChoice === 'No' || item.selectedChoice === 'Partially' || item.finding || item.escalate) {
-                        // Check for saved response
-                        const saved = savedResponses[item.referenceValue] || {};
+                        // Check for saved response using referenceValue + department as key
+                        const savedKey = `${item.referenceValue}|${item.department || ''}`;
+                        const saved = savedResponses[savedKey] || {};
                         
                         // Parse pictures - could be in PicturesPaths or Pictures field
                         let pictures = [];
@@ -932,9 +951,19 @@
         }
 
         function populateFilters() {
-            const sections = [...new Set(actionItems.map(i => i.sectionName))];
+            // Populate departments
+            const departments = [...new Set(actionItems.map(i => i.department).filter(d => d))].sort();
+            const deptSelect = document.getElementById('departmentFilter');
+            departments.forEach(dept => {
+                const option = document.createElement('option');
+                option.value = dept;
+                option.textContent = dept;
+                deptSelect.appendChild(option);
+            });
+
+            // Populate sections/categories
+            const sections = [...new Set(actionItems.map(i => i.sectionName))].sort();
             const sectionSelect = document.getElementById('sectionFilter');
-            
             sections.forEach(section => {
                 const option = document.createElement('option');
                 option.value = section;
@@ -944,6 +973,7 @@
         }
 
         function applyFilters() {
+            const department = document.getElementById('departmentFilter').value;
             const section = document.getElementById('sectionFilter').value;
             const answer = document.getElementById('answerFilter').value;
             const priority = document.getElementById('priorityFilter').value;
@@ -951,6 +981,7 @@
             const escalate = document.getElementById('escalateFilter').value;
 
             filteredItems = actionItems.filter(item => {
+                if (department && item.department !== department) return false;
                 if (section && item.sectionName !== section) return false;
                 if (answer && item.selectedChoice !== answer) return false;
                 if (priority && item.priority !== priority) return false;
@@ -981,7 +1012,8 @@
                     <thead>
                         <tr>
                             <th style="width:60px;">Ref#</th>
-                            <th>Section</th>
+                            <th>Department</th>
+                            <th>Category</th>
                             <th>Answer</th>
                             <th>Finding / Question</th>
                             <th>Priority</th>
@@ -1004,6 +1036,9 @@
                 html += `
                     <tr data-index="${index}">
                         <td class="ref-col">${item.referenceValue}</td>
+                        <td class="dept-col">
+                            <span class="dept-badge">${item.department || '-'}</span>
+                        </td>
                         <td class="section-col">
                             <span class="section-badge">${item.sectionName}</span>
                         </td>
@@ -1013,7 +1048,7 @@
                         <td class="finding-col">
                             <div class="question-title">${item.title}</div>
                             ${item.finding ? `<div class="finding-text">${item.finding}</div>` : ''}
-                            ${item.escalate ? `<span class="escalate-badge">📋 Assigned${item.department ? ` to ${item.department}` : ''}</span>` : ''}
+                            ${item.escalate ? `<span class="escalate-badge">📋 Escalated</span>` : ''}
                         </td>
                         <td>
                             <span class="priority-badge ${priorityClass}">${item.priority || 'Medium'}</span>
@@ -1078,17 +1113,30 @@
 
             // Add event listeners for input changes
             container.querySelectorAll('.action-input, .deadline-input, .person-input, .status-select').forEach(input => {
-                input.addEventListener('change', (e) => {
+                const updateHandler = (e) => {
                     const index = parseInt(e.target.dataset.index);
                     const field = e.target.dataset.field;
-                    filteredItems[index][field] = e.target.value;
+                    const value = e.target.value;
                     
-                    // Also update in main actionItems array
-                    const mainIndex = actionItems.findIndex(ai => ai.responseId === filteredItems[index].responseId);
-                    if (mainIndex >= 0) {
-                        actionItems[mainIndex][field] = e.target.value;
+                    // Update filtered items
+                    if (filteredItems[index]) {
+                        filteredItems[index][field] = value;
                     }
-                });
+                    
+                    // Also update in main actionItems array by referenceValue + department
+                    const refValue = filteredItems[index]?.referenceValue;
+                    const dept = filteredItems[index]?.department;
+                    if (refValue) {
+                        const mainItem = actionItems.find(ai => ai.referenceValue === refValue && ai.department === dept);
+                        if (mainItem) {
+                            mainItem[field] = value;
+                        }
+                    }
+                };
+                
+                // Use both input and change events for textareas
+                input.addEventListener('input', updateHandler);
+                input.addEventListener('change', updateHandler);
             });
         }
 
@@ -1107,10 +1155,18 @@
             select.className = 'status-select status-' + select.value.toLowerCase().replace(' ', '-');
         }
 
+        let uploadingPicture = false;
         async function handlePictureUpload(input) {
             const index = parseInt(input.dataset.index);
             const file = input.files[0];
             if (!file) return;
+            
+            // Prevent double uploads
+            if (uploadingPicture) {
+                input.value = '';
+                return;
+            }
+            uploadingPicture = true;
 
             try {
                 // Upload to server with compression
@@ -1125,19 +1181,18 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    // Store file URL instead of base64
+                    // Store file URL - update filteredItems
                     if (!filteredItems[index].pictures) {
                         filteredItems[index].pictures = [];
                     }
                     filteredItems[index].pictures.push(result.url);
                     
-                    // Also update in main array
-                    const mainIndex = actionItems.findIndex(ai => ai.responseId === filteredItems[index].responseId);
-                    if (mainIndex >= 0) {
-                        if (!actionItems[mainIndex].pictures) {
-                            actionItems[mainIndex].pictures = [];
-                        }
-                        actionItems[mainIndex].pictures.push(result.url);
+                    // Also update in main array using referenceValue + department
+                    const refValue = filteredItems[index].referenceValue;
+                    const dept = filteredItems[index].department;
+                    const mainItem = actionItems.find(ai => ai.referenceValue === refValue && ai.department === dept);
+                    if (mainItem && mainItem !== filteredItems[index]) {
+                        mainItem.pictures = [...filteredItems[index].pictures];
                     }
                     
                     // Update preview
@@ -1149,19 +1204,22 @@
             } catch (error) {
                 console.error('Error uploading picture:', error);
                 alert('Error uploading picture');
+            } finally {
+                // Clear input and reset flag
+                input.value = '';
+                uploadingPicture = false;
             }
-            
-            // Clear input
-            input.value = '';
         }
 
         function removePicture(itemIndex, picIndex) {
             filteredItems[itemIndex].pictures.splice(picIndex, 1);
             
-            // Also update in main array
-            const mainIndex = actionItems.findIndex(ai => ai.responseId === filteredItems[itemIndex].responseId);
-            if (mainIndex >= 0) {
-                actionItems[mainIndex].pictures = [...filteredItems[itemIndex].pictures];
+            // Also update in main array using referenceValue + department
+            const refValue = filteredItems[itemIndex].referenceValue;
+            const dept = filteredItems[itemIndex].department;
+            const mainItem = actionItems.find(ai => ai.referenceValue === refValue && ai.department === dept);
+            if (mainItem && mainItem !== filteredItems[itemIndex]) {
+                mainItem.pictures = [...filteredItems[itemIndex].pictures];
             }
             
             document.getElementById(`preview-${itemIndex}`).innerHTML = renderPictures(filteredItems[itemIndex].pictures, itemIndex);
@@ -1181,6 +1239,7 @@
                 const actions = actionItems.map(item => ({
                     documentNumber: auditData.documentNumber,
                     referenceValue: item.referenceValue,
+                    department: item.department,
                     sectionName: item.sectionName,
                     question: item.title,
                     finding: item.finding,

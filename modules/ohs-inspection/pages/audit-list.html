@@ -83,6 +83,104 @@
             box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
         }
 
+        .btn-dept-report {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            font-size: 12px;
+        }
+
+        .btn-dept-report:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.active { display: flex; }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            width: 400px;
+            max-width: 90%;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .dept-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .dept-btn {
+            padding: 15px 20px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            background: white;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s;
+        }
+
+        .dept-btn:hover {
+            border-color: #10b981;
+            background: #ecfdf5;
+        }
+
+        .dept-btn .count {
+            margin-left: auto;
+            background: #f3f4f6;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .dept-btn:hover .count {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .modal-close {
+            width: 100%;
+            padding: 12px;
+            background: #f3f4f6;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .modal-close:hover { background: #e5e7eb; }
+
         .container {
             max-width: 1400px;
             margin: 30px auto;
@@ -392,9 +490,21 @@
         </div>
     </div>
 
+    <!-- Department Report Modal -->
+    <div class="modal-overlay" id="deptModal">
+        <div class="modal-content">
+            <div class="modal-title">🏢 Select Department</div>
+            <div class="dept-list" id="deptList">
+                <!-- Departments will be loaded here -->
+            </div>
+            <button class="modal-close" onclick="closeDeptModal()">Cancel</button>
+        </div>
+    </div>
+
     <script>
         let allAudits = [];
         let passingGrade = 80;
+        let selectedAuditId = null;
 
         async function loadAudits() {
             try {
@@ -494,6 +604,9 @@
                                 </button>
                                 <button class="btn btn-report" onclick="event.stopPropagation(); generateReport(${audit.AuditID})" title="Generate Report">
                                     📄 Report
+                                </button>
+                                <button class="btn btn-dept-report" onclick="event.stopPropagation(); openDeptModal(${audit.AuditID})" title="Department Report">
+                                    🏢 Dept
                                 </button>` : ''}
                                 <button class="btn btn-secondary" onclick="event.stopPropagation(); deleteAudit(${audit.AuditID})">
                                     🗑️
@@ -591,6 +704,69 @@
                 alert('Error deleting inspection');
             }
         }
+
+        // Department Report Modal
+        async function openDeptModal(auditId) {
+            selectedAuditId = auditId;
+            const deptList = document.getElementById('deptList');
+            deptList.innerHTML = '<div style="text-align:center;padding:20px;">Loading departments...</div>';
+            document.getElementById('deptModal').classList.add('active');
+            
+            try {
+                const response = await fetch(`/ohs-inspection/api/audits/${auditId}/departments`);
+                const data = await response.json();
+                
+                if (data.success && data.departments.length > 0) {
+                    deptList.innerHTML = data.departments.map(dept => `
+                        <button class="dept-btn" onclick="generateDeptReport('${dept.Department}')">
+                            📁 ${dept.Department}
+                            <span class="count">${dept.ItemCount} items</span>
+                        </button>
+                    `).join('');
+                } else {
+                    deptList.innerHTML = '<div style="text-align:center;padding:20px;color:#6b7280;">No departments assigned to findings</div>';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                deptList.innerHTML = '<div style="text-align:center;padding:20px;color:#ef4444;">Error loading departments</div>';
+            }
+        }
+
+        function closeDeptModal() {
+            document.getElementById('deptModal').classList.remove('active');
+            selectedAuditId = null;
+        }
+
+        async function generateDeptReport(department) {
+            const deptList = document.getElementById('deptList');
+            deptList.innerHTML = '<div style="text-align:center;padding:20px;">⏳ Generating report...</div>';
+            
+            try {
+                const response = await fetch(`/ohs-inspection/api/audits/${selectedAuditId}/generate-department-report`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ department })
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    closeDeptModal();
+                    window.open(`/ohs-inspection/reports/${result.fileName}`, '_blank');
+                } else {
+                    alert('Error generating report: ' + result.error);
+                    closeDeptModal();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error generating report');
+                closeDeptModal();
+            }
+        }
+
+        // Close modal on overlay click
+        document.getElementById('deptModal').addEventListener('click', function(e) {
+            if (e.target === this) closeDeptModal();
+        });
 
         // Load on page load
         loadAudits();
