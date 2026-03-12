@@ -155,6 +155,23 @@
             font-size: 12px;
         }
 
+        .cycle-badge {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+        }
+        
+        .cycle-badge.pending {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        }
+        
+        .cycle-badge.completed {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+
         /* Buttons */
         .btn {
             padding: 16px 32px;
@@ -329,6 +346,10 @@
                                 <span class="label">Template:</span>
                                 <span class="schema-badge" id="storeSchema">-</span>
                             </div>
+                            <div class="store-info-item" id="cycleInfoRow" style="display: none;">
+                                <span class="label">Current Cycle:</span>
+                                <span class="cycle-badge" id="storeCycle">-</span>
+                            </div>
                         </div>
                     </div>
 
@@ -345,28 +366,6 @@
                         <div class="form-group">
                             <label>Time Out</label>
                             <input type="time" id="timeOut">
-                        </div>
-                    </div>
-
-                    <!-- Cycle and Year -->
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Cycle <span class="required">*</span></label>
-                            <select id="auditCycle" required>
-                                <option value="">Select cycle...</option>
-                                <option value="C1">C1 (Jan/Feb)</option>
-                                <option value="C2">C2 (March/April)</option>
-                                <option value="C3">C3 (May/June)</option>
-                                <option value="C4">C4 (July/August)</option>
-                                <option value="C5">C5 (Sept/Oct)</option>
-                                <option value="C6">C6 (Nov/Dec)</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Year <span class="required">*</span></label>
-                            <select id="auditYear" required>
-                                <option value="">Select year...</option>
-                            </select>
                         </div>
                     </div>
 
@@ -405,7 +404,6 @@
         document.addEventListener('DOMContentLoaded', () => {
             loadStores();
             setDefaultValues();
-            populateYears();
         });
 
         // Toast notification
@@ -433,33 +431,6 @@
             const hours = String(now.getHours()).padStart(2, '0');
             const minutes = String(now.getMinutes()).padStart(2, '0');
             document.getElementById('timeIn').value = `${hours}:${minutes}`;
-            
-            // Set current cycle based on month
-            const month = now.getMonth() + 1; // 1-12
-            let cycle = 'C1';
-            if (month <= 2) cycle = 'C1';
-            else if (month <= 4) cycle = 'C2';
-            else if (month <= 6) cycle = 'C3';
-            else if (month <= 8) cycle = 'C4';
-            else if (month <= 10) cycle = 'C5';
-            else cycle = 'C6';
-            document.getElementById('auditCycle').value = cycle;
-        }
-
-        // Populate years dropdown
-        function populateYears() {
-            const yearSelect = document.getElementById('auditYear');
-            const currentYear = new Date().getFullYear();
-            
-            for (let year = currentYear; year >= currentYear - 2; year--) {
-                const option = document.createElement('option');
-                option.value = year;
-                option.textContent = year;
-                yearSelect.appendChild(option);
-            }
-            
-            // Set current year as default
-            yearSelect.value = currentYear;
         }
 
         // Load stores from API
@@ -488,9 +459,10 @@
         }
 
         // Handle store selection change
-        function onStoreChange() {
+        async function onStoreChange() {
             const storeId = parseInt(document.getElementById('storeSelect').value);
             const storeInfo = document.getElementById('storeInfo');
+            const cycleInfoRow = document.getElementById('cycleInfoRow');
             
             if (storeId) {
                 selectedStore = stores.find(s => s.storeId === storeId);
@@ -499,10 +471,32 @@
                     document.getElementById('storeLocation').textContent = selectedStore.location || 'N/A';
                     document.getElementById('storeSchema').textContent = selectedStore.templateName || 'Not assigned';
                     storeInfo.classList.add('show');
+                    
+                    // Fetch cycle info for this store
+                    try {
+                        const cycleResponse = await fetch(`/oe-inspection/api/cycle/store/${storeId}`);
+                        const cycleResult = await cycleResponse.json();
+                        
+                        if (cycleResult.success) {
+                            const data = cycleResult.data;
+                            const cycleText = `Cycle ${data.currentCycle}`;
+                            const statusText = data.isPendingInCurrentCycle ? ' (Pending)' : ' (Done)';
+                            const auditCountText = ` - ${data.storeAuditCount} audit${data.storeAuditCount !== 1 ? 's' : ''} completed`;
+                            
+                            const cycleBadge = document.getElementById('storeCycle');
+                            cycleBadge.textContent = cycleText + statusText + auditCountText;
+                            cycleBadge.className = 'cycle-badge ' + (data.isPendingInCurrentCycle ? 'pending' : 'completed');
+                            cycleInfoRow.style.display = 'flex';
+                        }
+                    } catch (error) {
+                        console.error('Error fetching cycle info:', error);
+                        cycleInfoRow.style.display = 'none';
+                    }
                 }
             } else {
                 selectedStore = null;
                 storeInfo.classList.remove('show');
+                cycleInfoRow.style.display = 'none';
             }
         }
 
@@ -524,8 +518,6 @@
                 auditDate: document.getElementById('auditDate').value,
                 timeIn: document.getElementById('timeIn').value,
                 timeOut: document.getElementById('timeOut').value || null,
-                cycle: document.getElementById('auditCycle').value,
-                year: document.getElementById('auditYear').value,
                 auditors: document.getElementById('auditors').value,
                 accompaniedBy: document.getElementById('accompaniedBy').value
             };

@@ -1,0 +1,2193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OE Inspection Report - GMRL-OEI-0050</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f5f5f5; color: #333; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white; padding: 15px 20px; border-radius: 10px; margin-bottom: 15px; }
+        .header h1 { font-size: 20px; margin-bottom: 8px; }
+        .header-info { display: flex; flex-wrap: wrap; gap: 10px; }
+        .header-item { background: rgba(255,255,255,0.1); padding: 6px 12px; border-radius: 6px; }
+        .header-item label { font-size: 10px; opacity: 0.8; display: block; }
+        .header-item span { font-size: 13px; font-weight: 600; }
+        .score-card { background: white; border-radius: 10px; padding: 12px 25px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; align-items: center; justify-content: center; gap: 20px; }
+        .score-value { font-size: 36px; font-weight: bold; }
+        .score-value.pass { color: #10b981; }
+        .score-value.fail { color: #ef4444; }
+        .score-label { font-size: 18px; font-weight: 600; }
+        .score-label.pass { color: #10b981; }
+        .score-label.fail { color: #ef4444; }
+        .score-threshold { color: #64748b; font-size: 14px; border-left: 1px solid #e2e8f0; padding-left: 20px; }
+        
+        /* Summary Section */
+        .summary-section { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 25px; overflow: hidden; }
+        .summary-title { background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white; margin: 0; padding: 15px 20px; font-size: 18px; font-weight: 600; }
+        .summary-table { width: 100%; border-collapse: collapse; }
+        .summary-table th, .summary-table td { padding: 10px 15px; }
+        .summary-table th { background: #64748b; color: white; text-align: left; font-size: 12px; text-transform: uppercase; font-weight: 600; border-bottom: 2px solid #475569; }
+        .summary-table td { border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+        .summary-table tr:hover { background: #f8fafc; }
+        .score-pass { color: #10b981; font-weight: 600; }
+        .score-fail { color: #ef4444; font-weight: 600; }
+        
+        /* Chart Styles */
+        .chart-section { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 25px; overflow: hidden; }
+        .chart-title { background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white; margin: 0; padding: 15px 20px; font-size: 18px; font-weight: 600; }
+        .chart-simple { padding: 20px; }
+        .chart-row { display: flex; align-items: center; margin-bottom: 8px; gap: 10px; }
+        .chart-row-label { width: 200px; font-size: 12px; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+        .chart-row-bar-container { flex: 1; height: 20px; background: #e2e8f0; border-radius: 4px; position: relative; overflow: visible; }
+        .chart-row-bar { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+        .chart-row-bar.bar-pass { background: linear-gradient(90deg, #10b981 0%, #059669 100%); }
+        .chart-row-bar.bar-fail { background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%); }
+        .chart-row-threshold { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #f59e0b; }
+        .chart-row-value { width: 50px; font-size: 13px; font-weight: 700; text-align: right; }
+        .chart-row-value.bar-pass { color: #10b981; }
+        .chart-row-value.bar-fail { color: #ef4444; }
+        .chart-legend { display: flex; gap: 20px; justify-content: center; padding: 15px; border-top: 1px solid #e2e8f0; background: #f8fafc; }
+        .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #475569; }
+        .legend-color { width: 14px; height: 14px; border-radius: 3px; }
+        .legend-color.pass { background: #10b981; }
+        .legend-color.fail { background: #ef4444; }
+        .legend-line { width: 20px; height: 2px; background: #f59e0b; }
+        
+        /* Toggle controls */
+        .toggle-controls { display: flex; gap: 10px; margin-bottom: 20px; justify-content: flex-end; }
+        .toggle-btn { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: background 0.2s; }
+        .toggle-btn:hover { background: #1d4ed8; }
+        
+        /* Section Styles */
+        .section-card { background: white; border-radius: 12px; margin-bottom: 20px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .section-header { background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+        .section-header:hover { filter: brightness(1.05); }
+        .section-title { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .section-score { font-size: 20px; font-weight: bold; display: flex; align-items: center; gap: 10px; }
+        .collapse-icon { font-size: 20px; transition: transform 0.3s ease; }
+        .collapse-icon.collapsed { transform: rotate(-90deg); }
+        .section-content { padding: 0; transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease; overflow: hidden; }
+        .section-content.collapsed { max-height: 0 !important; padding: 0; opacity: 0; }
+        
+        /* Table Styles */
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+        th { background: #f8fafc; font-weight: 600; font-size: 11px; text-transform: uppercase; color: #64748b; }
+        tr:hover { background: #f8fafc; }
+        .choice-yes { color: #10b981; font-weight: 600; }
+        .choice-no { color: #ef4444; font-weight: 600; }
+        .choice-partial { color: #f59e0b; font-weight: 600; }
+        .choice-na { color: #94a3b8; }
+        
+        /* Section Findings */
+        .section-findings { background: #fef2f2; border-top: 2px solid #fecaca; padding: 12px 15px; }
+        .section-findings-title { color: #dc2626; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+        .finding-item { background: white; border-radius: 8px; padding: 12px; margin-bottom: 8px; border-left: 4px solid #ef4444; }
+        .finding-ref { font-weight: 600; color: #1e40af; font-size: 12px; }
+        .finding-question { margin: 5px 0; font-size: 14px; }
+        .finding-detail { color: #64748b; font-size: 13px; }
+        .finding-cr { background: #ecfdf5; border-left: 4px solid #10b981; padding: 10px; margin-top: 8px; border-radius: 4px; font-size: 13px; color: #065f46; }
+        .finding-pictures { margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0; }
+        .pictures-wrapper { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px; }
+        
+        /* Fridge Readings */
+        .fridge-section { background: white; border-radius: 12px; margin-bottom: 20px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .fridge-header { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); color: white; padding: 15px 20px; }
+        .fridge-title { font-size: 18px; font-weight: 600; }
+        
+        /* Gallery Styles */
+        .gallery-section { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 25px; overflow: hidden; }
+        .gallery-title { margin: 0; padding: 15px 20px; font-size: 18px; font-weight: 600; color: white; }
+        .gallery-title.good { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .gallery-title.findings { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+        .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; padding: 20px; }
+        .gallery-card { background: #f8fafc; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; transition: transform 0.2s, box-shadow 0.2s; }
+        .gallery-card:hover { transform: translateY(-3px); box-shadow: 0 4px 15px rgba(0,0,0,0.15); }
+        .gallery-card.good { border-left: 4px solid #10b981; }
+        .gallery-card.finding { border-left: 4px solid #ef4444; }
+        .gallery-img { width: 100%; height: 180px; object-fit: cover; cursor: pointer; background: #e2e8f0; }
+        .gallery-info { padding: 12px; }
+        .gallery-ref { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+        .gallery-ref.good { color: #059669; }
+        .gallery-ref.finding { color: #dc2626; }
+        .gallery-section-name { font-size: 12px; color: #64748b; margin-bottom: 4px; }
+        .gallery-type { font-size: 11px; padding: 2px 8px; border-radius: 10px; display: inline-block; }
+        .gallery-type.good { background: #d1fae5; color: #065f46; }
+        .gallery-type.issue { background: #fee2e2; color: #991b1b; }
+        .gallery-type.corrective { background: #d1fae5; color: #065f46; }
+        .gallery-empty { text-align: center; padding: 40px 20px; color: #94a3b8; font-size: 16px; }
+        
+        /* Lightbox */
+        .lightbox { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; justify-content: center; align-items: center; }
+        .lightbox.active { display: flex; }
+        .lightbox img { max-width: 90%; max-height: 90%; border-radius: 8px; box-shadow: 0 4px 30px rgba(0,0,0,0.5); }
+        .lightbox-close { position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; font-weight: bold; cursor: pointer; transition: color 0.2s; }
+        .lightbox-close:hover { color: #3b82f6; }
+        
+        /* Filter Toolbar */
+        .filter-toolbar {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            position: sticky;
+            top: 80px;
+            z-index: 100;
+        }
+        .filter-toolbar-title { font-weight: 600; color: #475569; font-size: 14px; }
+        .filter-group { display: flex; gap: 8px; }
+        .filter-btn {
+            padding: 6px 14px;
+            border: 2px solid #cbd5e1;
+            border-radius: 20px;
+            background: white;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .filter-btn:hover { background: #f1f5f9; }
+        .filter-btn.active { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
+        .filter-btn.filter-yes.active { border-color: #10b981; background: #ecfdf5; color: #059669; }
+        .filter-btn.filter-partial.active { border-color: #f59e0b; background: #fffbeb; color: #d97706; }
+        .filter-btn.filter-no.active { border-color: #ef4444; background: #fef2f2; color: #dc2626; }
+        .filter-btn.filter-na.active { border-color: #64748b; background: #f1f5f9; color: #475569; }
+        .filter-divider { width: 1px; height: 30px; background: #cbd5e1; }
+        .hidden-by-filter { display: none !important; }
+        .section-hidden { display: none !important; }
+        
+        /* Action Bar */
+        .action-bar { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 1000; }
+        .action-bar button { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); transition: transform 0.2s, box-shadow 0.2s; }
+        .action-bar button:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .btn-email { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; }
+        .btn-print { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; }
+        .btn-pdf { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; }
+        .btn-back { background: linear-gradient(135deg, #64748b 0%, #475569 100%); color: white; }
+        
+        .footer { text-align: center; padding: 20px; color: #64748b; font-size: 14px; }
+        
+        @media print { 
+            @page { size: landscape; margin: 10mm; }
+            body { background: white; font-size: 11px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .container { max-width: 100%; padding: 0; }
+            .action-bar { display: none !important; }
+            .filter-toolbar { display: none !important; }
+            .section-card { break-inside: avoid; page-break-inside: avoid; }
+            .gallery-section { break-before: page; }
+            .lightbox { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="action-bar">
+        <button class="btn-back" onclick="goBack()">← Back</button>
+        <button class="btn-pdf" onclick="exportToPDF()">📄 PDF</button>
+        <button class="btn-email" onclick="openEmailModal('full')">📧 Send Report</button>
+        <button class="btn-print" onclick="window.print()">🖨️ Print</button>
+    </div>
+    
+    <!-- Lightbox for images -->
+    <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+        <span class="lightbox-close">&times;</span>
+        <img id="lightbox-img" src="" alt="Full size image">
+    </div>
+    
+    <script>
+        function goBack() {
+            if (document.referrer && document.referrer.includes(window.location.hostname)) {
+                history.back();
+            } else {
+                window.location.href = '/oe-inspection/reports';
+            }
+        }
+        
+        function exportToPDF() {
+            const overlay = document.createElement('div');
+            overlay.innerHTML = '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:10000;"><div style="background:white;padding:30px 50px;border-radius:12px;text-align:center;"><h3 style="margin:0 0 15px 0;">📄 Export to PDF</h3><p style="margin:0 0 20px 0;color:#666;">In the print dialog, select <strong>"Save as PDF"</strong> as the destination.</p></div></div>';
+            document.body.appendChild(overlay);
+            setTimeout(() => { overlay.remove(); window.print(); }, 2000);
+        }
+        
+        function openLightbox(src) {
+            document.getElementById('lightbox-img').src = src;
+            document.getElementById('lightbox').classList.add('active');
+        }
+        
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.remove('active');
+        }
+    </script>
+    
+    <div class="container">
+        <!-- Filter Toolbar -->
+        <div class="filter-toolbar">
+            <span class="filter-toolbar-title">🔍 Filter:</span>
+            <div class="filter-group">
+                <button class="filter-btn filter-yes active" onclick="toggleFilter('yes', this)" title="Show/Hide Yes answers">✓ Yes</button>
+                <button class="filter-btn filter-partial active" onclick="toggleFilter('partial', this)" title="Show/Hide Partially answers">◐ Partially</button>
+                <button class="filter-btn filter-no active" onclick="toggleFilter('no', this)" title="Show/Hide No answers">✗ No</button>
+                <button class="filter-btn filter-na active" onclick="toggleFilter('na', this)" title="Show/Hide N/A answers">— N/A</button>
+            </div>
+            <div class="filter-divider"></div>
+            <div class="filter-group">
+                <button class="filter-btn" onclick="showOnlyFindings()" title="Show only items with findings">⚠️ Findings Only</button>
+                <button class="filter-btn" onclick="resetFilters()" title="Reset all filters">🔄 Reset</button>
+            </div>
+        </div>
+        
+        <div class="header">
+            <h1>📋 OE Inspection Report</h1>
+            <div class="header-info">
+                <div class="header-item"><label>Document #</label><span>GMRL-OEI-0050</span></div>
+                <div class="header-item"><label>Store</label><span>Hamra Idris</span></div>
+                <div class="header-item"><label>Date</label><span>3/12/2026</span></div>
+                <div class="header-item"><label>Inspectors</label><span>sdsd</span></div>
+                <div class="header-item"><label>Accompanied By</label><span>N/A</span></div>
+                <div class="header-item"><label>Status</label><span>Completed</span></div>
+            </div>
+        </div>
+        
+        <div class="score-card">
+            <div class="score-value fail">0%</div>
+            <div class="score-label fail">FAIL ❌</div>
+            <div class="score-threshold">Threshold: 80%</div>
+        </div>
+        
+        <!-- Summary Table -->
+        <div class="summary-section">
+            <h2 class="summary-title">📊 Audit Summary</h2>
+            <table class="summary-table">
+                <thead>
+                    <tr>
+                        <th>Section</th>
+                        <th style="text-align:right;">Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                        <tr>
+                            <td><strong>Butchery</strong></td>
+                            <td style="text-align:right;"><strong class="score-fail">0%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Delicatessen</strong></td>
+                            <td style="text-align:right;"><strong class="score-fail">0%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Fresh Seafood</strong></td>
+                            <td style="text-align:right;"><strong class="score-fail">0%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Frozen & Chilled</strong></td>
+                            <td style="text-align:right;"><strong class="score-fail">0%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Fruits & Vegetables</strong></td>
+                            <td style="text-align:right;"><strong class="score-fail">0%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>FMCG</strong></td>
+                            <td style="text-align:right;"><strong class="score-fail">0%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>General Merchandise</strong></td>
+                            <td style="text-align:right;"><strong class="score-fail">0%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Store Entrance</strong></td>
+                            <td style="text-align:right;"><strong class="score-fail">0%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Car Park</strong></td>
+                            <td style="text-align:right;"><strong class="score-fail">0%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Customers & Employees WC</strong></td>
+                            <td style="text-align:right;"><strong class="score-fail">0%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Maintenance</strong></td>
+                            <td style="text-align:right;"><strong class="score-fail">0%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Offices</strong></td>
+                            <td style="text-align:right;"><strong class="score-fail">0%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Receiving & Backdoor</strong></td>
+                            <td style="text-align:right;"><strong class="score-fail">0%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Security</strong></td>
+                            <td style="text-align:right;"><strong class="score-fail">0%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Staff Lockers & Room</strong></td>
+                            <td style="text-align:right;"><strong class="score-fail">0%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Forms & Documents</strong></td>
+                            <td style="text-align:right;"><strong class="score-fail">0%</strong></td>
+                        </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Chart -->
+        <div class="chart-section">
+            <h2 class="chart-title">📊 Section Scores Overview</h2>
+            <div class="chart-simple">
+                
+                    <div class="chart-row">
+                        <div class="chart-row-label">Butchery</div>
+                        <div class="chart-row-bar-container">
+                            <div class="chart-row-bar bar-fail" style="width: 0%;"></div>
+                            <div class="chart-row-threshold" style="left: 80%;"></div>
+                        </div>
+                        <div class="chart-row-value bar-fail">0%</div>
+                    </div>
+                    
+                    <div class="chart-row">
+                        <div class="chart-row-label">Delicatessen</div>
+                        <div class="chart-row-bar-container">
+                            <div class="chart-row-bar bar-fail" style="width: 0%;"></div>
+                            <div class="chart-row-threshold" style="left: 80%;"></div>
+                        </div>
+                        <div class="chart-row-value bar-fail">0%</div>
+                    </div>
+                    
+                    <div class="chart-row">
+                        <div class="chart-row-label">Fresh Seafood</div>
+                        <div class="chart-row-bar-container">
+                            <div class="chart-row-bar bar-fail" style="width: 0%;"></div>
+                            <div class="chart-row-threshold" style="left: 80%;"></div>
+                        </div>
+                        <div class="chart-row-value bar-fail">0%</div>
+                    </div>
+                    
+                    <div class="chart-row">
+                        <div class="chart-row-label">Frozen & Chilled</div>
+                        <div class="chart-row-bar-container">
+                            <div class="chart-row-bar bar-fail" style="width: 0%;"></div>
+                            <div class="chart-row-threshold" style="left: 80%;"></div>
+                        </div>
+                        <div class="chart-row-value bar-fail">0%</div>
+                    </div>
+                    
+                    <div class="chart-row">
+                        <div class="chart-row-label">Fruits & Vegetables</div>
+                        <div class="chart-row-bar-container">
+                            <div class="chart-row-bar bar-fail" style="width: 0%;"></div>
+                            <div class="chart-row-threshold" style="left: 80%;"></div>
+                        </div>
+                        <div class="chart-row-value bar-fail">0%</div>
+                    </div>
+                    
+                    <div class="chart-row">
+                        <div class="chart-row-label">FMCG</div>
+                        <div class="chart-row-bar-container">
+                            <div class="chart-row-bar bar-fail" style="width: 0%;"></div>
+                            <div class="chart-row-threshold" style="left: 80%;"></div>
+                        </div>
+                        <div class="chart-row-value bar-fail">0%</div>
+                    </div>
+                    
+                    <div class="chart-row">
+                        <div class="chart-row-label">General Merchandise</div>
+                        <div class="chart-row-bar-container">
+                            <div class="chart-row-bar bar-fail" style="width: 0%;"></div>
+                            <div class="chart-row-threshold" style="left: 80%;"></div>
+                        </div>
+                        <div class="chart-row-value bar-fail">0%</div>
+                    </div>
+                    
+                    <div class="chart-row">
+                        <div class="chart-row-label">Store Entrance</div>
+                        <div class="chart-row-bar-container">
+                            <div class="chart-row-bar bar-fail" style="width: 0%;"></div>
+                            <div class="chart-row-threshold" style="left: 80%;"></div>
+                        </div>
+                        <div class="chart-row-value bar-fail">0%</div>
+                    </div>
+                    
+                    <div class="chart-row">
+                        <div class="chart-row-label">Car Park</div>
+                        <div class="chart-row-bar-container">
+                            <div class="chart-row-bar bar-fail" style="width: 0%;"></div>
+                            <div class="chart-row-threshold" style="left: 80%;"></div>
+                        </div>
+                        <div class="chart-row-value bar-fail">0%</div>
+                    </div>
+                    
+                    <div class="chart-row">
+                        <div class="chart-row-label">Customers & Employees WC</div>
+                        <div class="chart-row-bar-container">
+                            <div class="chart-row-bar bar-fail" style="width: 0%;"></div>
+                            <div class="chart-row-threshold" style="left: 80%;"></div>
+                        </div>
+                        <div class="chart-row-value bar-fail">0%</div>
+                    </div>
+                    
+                    <div class="chart-row">
+                        <div class="chart-row-label">Maintenance</div>
+                        <div class="chart-row-bar-container">
+                            <div class="chart-row-bar bar-fail" style="width: 0%;"></div>
+                            <div class="chart-row-threshold" style="left: 80%;"></div>
+                        </div>
+                        <div class="chart-row-value bar-fail">0%</div>
+                    </div>
+                    
+                    <div class="chart-row">
+                        <div class="chart-row-label">Offices</div>
+                        <div class="chart-row-bar-container">
+                            <div class="chart-row-bar bar-fail" style="width: 0%;"></div>
+                            <div class="chart-row-threshold" style="left: 80%;"></div>
+                        </div>
+                        <div class="chart-row-value bar-fail">0%</div>
+                    </div>
+                    
+                    <div class="chart-row">
+                        <div class="chart-row-label">Receiving & Backdoor</div>
+                        <div class="chart-row-bar-container">
+                            <div class="chart-row-bar bar-fail" style="width: 0%;"></div>
+                            <div class="chart-row-threshold" style="left: 80%;"></div>
+                        </div>
+                        <div class="chart-row-value bar-fail">0%</div>
+                    </div>
+                    
+                    <div class="chart-row">
+                        <div class="chart-row-label">Security</div>
+                        <div class="chart-row-bar-container">
+                            <div class="chart-row-bar bar-fail" style="width: 0%;"></div>
+                            <div class="chart-row-threshold" style="left: 80%;"></div>
+                        </div>
+                        <div class="chart-row-value bar-fail">0%</div>
+                    </div>
+                    
+                    <div class="chart-row">
+                        <div class="chart-row-label">Staff Lockers & Room</div>
+                        <div class="chart-row-bar-container">
+                            <div class="chart-row-bar bar-fail" style="width: 0%;"></div>
+                            <div class="chart-row-threshold" style="left: 80%;"></div>
+                        </div>
+                        <div class="chart-row-value bar-fail">0%</div>
+                    </div>
+                    
+                    <div class="chart-row">
+                        <div class="chart-row-label">Forms & Documents</div>
+                        <div class="chart-row-bar-container">
+                            <div class="chart-row-bar bar-fail" style="width: 0%;"></div>
+                            <div class="chart-row-threshold" style="left: 80%;"></div>
+                        </div>
+                        <div class="chart-row-value bar-fail">0%</div>
+                    </div>
+                    
+            </div>
+            <div class="chart-legend">
+                <span class="legend-item"><span class="legend-color pass"></span> Pass (≥threshold)</span>
+                <span class="legend-item"><span class="legend-color fail"></span> Fail (&lt;threshold)</span>
+                <span class="legend-item"><span class="legend-line"></span> Section Threshold</span>
+            </div>
+        </div>
+        
+        <div class="toggle-controls">
+            <button class="toggle-btn" onclick="expandAll()">📂 Expand All</button>
+            <button class="toggle-btn" onclick="collapseAll()">📁 Collapse All</button>
+        </div>
+        
+        
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection(0)">
+                <div class="section-title">
+                    <span class="collapse-icon" id="icon-0">▼</span>
+                    Butchery
+                </div>
+                <div class="section-score">0%</div>
+            </div>
+            <div class="section-content" id="section-0">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:60px">#</th>
+                            <th>Question</th>
+                            <th style="width:80px">Answer</th>
+                            <th style="width:80px">Score</th>
+                            <th style="width:90px">Observation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                        <tr data-answer="No">
+                            <td>1.1</td>
+                            <td>Is the display full for the day? Is the quality of displayed items appealing? Would I buy them?</td>
+                            <td class="choice-no">No</td>
+                            <td>0 / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>1.2</td>
+                            <td>Is Clean as you Go� implemented especially from customer point of view</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>1.3</td>
+                            <td>Is the display fridge clean, organized, stock well rotated and temperature controlled?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>1.4</td>
+                            <td>Do all items have price tags?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>1.5</td>
+                            <td>Are butchery related forms filled (refer to the list of operation forms)? Policies displayed?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 2</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>1.6</td>
+                            <td>Are temperature logs being filled accurately and on time?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>1.7</td>
+                            <td>Are all scales and machines clean and operational?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>1.8</td>
+                            <td>Are stored items properly labelled with batch number and expiry dates? Organized? Is there any expired item?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 8</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>1.9</td>
+                            <td>Are displayed items properly labelled with production, expiry and opening date?  Is there any expired item?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 8</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>1.10</td>
+                            <td>Are the safety tools properly installed in the machines?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 8</td>
+                            <td>-</td>
+                        </tr>
+                        
+                    </tbody>
+                </table>
+                
+                <div class="section-findings">
+                    <div class="section-findings-title">⚠️ Findings (1)</div>
+                    
+                    <div class="finding-item">
+                        <div class="finding-ref">[1.1]</div>
+                        <div class="finding-question">Is the display full for the day? Is the quality of displayed items appealing? Would I buy them?</div>
+                        <div class="finding-detail">Answer: <strong class="choice-no">No</strong> | Finding: N/A</div>
+                        
+                        
+                    </div>
+                    
+                </div>
+                
+            </div>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection(1)">
+                <div class="section-title">
+                    <span class="collapse-icon" id="icon-1">▼</span>
+                    Delicatessen
+                </div>
+                <div class="section-score">0%</div>
+            </div>
+            <div class="section-content" id="section-1">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:60px">#</th>
+                            <th>Question</th>
+                            <th style="width:80px">Answer</th>
+                            <th style="width:80px">Score</th>
+                            <th style="width:90px">Observation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                        <tr data-answer="NA">
+                            <td>2.1</td>
+                            <td>Is the display full for the day? Is the quality of displayed items appealing? Would I buy them?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>2.2</td>
+                            <td>Is Clean as you Go� implemented especially from customer point of view</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>2.3</td>
+                            <td>Is the display fridge clean, organized, stock well rotated and temperature controlled?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>2.4</td>
+                            <td>Do all items have price tags?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>2.5</td>
+                            <td>Are Delicatessen related forms filled (refer to the list of operation forms)? Policies displayed?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 2</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>2.6</td>
+                            <td>Are temperature logs being filled accurately and on time?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>2.7</td>
+                            <td>Are all scales and machines clean and operational?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>2.8</td>
+                            <td>Are stored items properly labelled with batch number and expiry dates? Is there any expired item?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 8</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>2.9</td>
+                            <td>Are displayed items properly labelled with production, expiry and opening date? Is there any expired item?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 8</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>2.10</td>
+                            <td>Are the safety tools properly installed on the slicer machines?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 8</td>
+                            <td>-</td>
+                        </tr>
+                        
+                    </tbody>
+                </table>
+                
+            </div>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection(2)">
+                <div class="section-title">
+                    <span class="collapse-icon" id="icon-2">▼</span>
+                    Fresh Seafood
+                </div>
+                <div class="section-score">0%</div>
+            </div>
+            <div class="section-content" id="section-2">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:60px">#</th>
+                            <th>Question</th>
+                            <th style="width:80px">Answer</th>
+                            <th style="width:80px">Score</th>
+                            <th style="width:90px">Observation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                        <tr data-answer="NA">
+                            <td>3.1</td>
+                            <td>Is the display full for the day? Is the quality of displayed items appealing? Would I buy them?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 8</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>3.2</td>
+                            <td>Is Clean as you Go� implemented especially from customer point of view</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>3.3</td>
+                            <td>Is the display fridge clean, organized, stock well rotated and temperature controlled?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>3.4</td>
+                            <td>Do all items have price tags?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>3.5</td>
+                            <td>Are Fresh Seafood related forms filled (refer to the list of operation forms)? Policies displayed?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 2</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>3.6</td>
+                            <td>Are temperature logs being filled accurately and on time?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>3.7</td>
+                            <td>Are scales and machines clean and operational?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>3.8</td>
+                            <td>Are stored items properly labelled with batch number, opening and expiry dates? Is there any expired item?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 8</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>3.9</td>
+                            <td>Is the smell of fish at the counter acceptable?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                    </tbody>
+                </table>
+                
+            </div>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection(3)">
+                <div class="section-title">
+                    <span class="collapse-icon" id="icon-3">▼</span>
+                    Frozen & Chilled
+                </div>
+                <div class="section-score">0%</div>
+            </div>
+            <div class="section-content" id="section-3">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:60px">#</th>
+                            <th>Question</th>
+                            <th style="width:80px">Answer</th>
+                            <th style="width:80px">Score</th>
+                            <th style="width:90px">Observation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                        <tr data-answer="NA">
+                            <td>4.1</td>
+                            <td>Is the display full for the day?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>4.2</td>
+                            <td>Is the quality of displayed items appealing? Would I buy them?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>4.3</td>
+                            <td>Are the chillers and freezers clean and organized? Is stock being rotated properly? Temperature?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>4.4</td>
+                            <td>Do all items have SEL's?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>4.5</td>
+                            <td>Is the personal hygiene respected? Are employees and merchandisers wearing work clothes and name tags?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>4.6</td>
+                            <td>Are stored items properly labelled with batch number and expiry dates?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>4.7</td>
+                            <td>Is the expiry cycle available and abided by?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 8</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>4.8</td>
+                            <td>Are temperature logs being filled accurately and on time?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>4.9</td>
+                            <td>Is the 20 minutes chill chain rule followed?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>4.10</td>
+                            <td>Are frozen and chilled related forms filled (refer to the list of operation forms)?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 2</td>
+                            <td>-</td>
+                        </tr>
+                        
+                    </tbody>
+                </table>
+                
+            </div>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection(4)">
+                <div class="section-title">
+                    <span class="collapse-icon" id="icon-4">▼</span>
+                    Fruits & Vegetables
+                </div>
+                <div class="section-score">0%</div>
+            </div>
+            <div class="section-content" id="section-4">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:60px">#</th>
+                            <th>Question</th>
+                            <th style="width:80px">Answer</th>
+                            <th style="width:80px">Score</th>
+                            <th style="width:90px">Observation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                        <tr data-answer="NA">
+                            <td>5.1</td>
+                            <td>Is the display full for the day?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>5.2</td>
+                            <td>Is the quality of displayed items appealing? Would I buy them?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>5.3</td>
+                            <td>Is Clean as you Go� implemented especially from customer point of view</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>5.4</td>
+                            <td>Is the display fridge clean, organized, stock well rotated and temperature controlled?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>5.5</td>
+                            <td>Do all items have price tags?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>5.6</td>
+                            <td>Are fruits and vegetables related forms filled (refer to the list of operation forms)? Policies displayed?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 2</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>5.7</td>
+                            <td>Are temperature logs being filled accurately and on time?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>5.8</td>
+                            <td>Are scales clean and operational?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>5.9</td>
+                            <td>Are pre-pack items properly labelled with expiry dates?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 8</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>5.10</td>
+                            <td>Are produce bags available?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                    </tbody>
+                </table>
+                
+            </div>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection(5)">
+                <div class="section-title">
+                    <span class="collapse-icon" id="icon-5">▼</span>
+                    FMCG
+                </div>
+                <div class="section-score">0%</div>
+            </div>
+            <div class="section-content" id="section-5">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:60px">#</th>
+                            <th>Question</th>
+                            <th style="width:80px">Answer</th>
+                            <th style="width:80px">Score</th>
+                            <th style="width:90px">Observation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                        <tr data-answer="NA">
+                            <td>6.1</td>
+                            <td>Is the area from floor to shelves clean?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>6.2</td>
+                            <td>Is the area under the shelves clean?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>6.3</td>
+                            <td>Are shelves full for the day?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>6.4</td>
+                            <td>Is the quality of displayed items appealing? Would I buy them?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>6.5</td>
+                            <td>Do all items have SEL?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>6.6</td>
+                            <td>Is the personal hygiene respected? Are employees and merchandisers wearing work clothes and name tags?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>6.7</td>
+                            <td>Is "Clean as you Go" implemented?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>6.8</td>
+                            <td>Are shelf strips available?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>6.9</td>
+                            <td>Are high value items empty on shelves?(>150$) is the signage "available at CSD" available on shelves instead?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>6.10</td>
+                            <td>Inspect area while making sure that no hazard is presented to customers and employees.</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>6.11</td>
+                            <td>Is the facing implemented? Stock rotation properly applied? Wrong SELs?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>6.12</td>
+                            <td>Is the expiry checking cycle followed? Any expired products on shelves?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 8</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>6.13</td>
+                            <td>Is the price checking cycle followed?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>6.14</td>
+                            <td>Is FEFO being strictly followed?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>6.15</td>
+                            <td>Is the excess inventory report being sent on a weekly basis?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 2</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>6.16</td>
+                            <td>Are FMCG and PFM related forms filled (refer to the list of operation forms)?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 2</td>
+                            <td>-</td>
+                        </tr>
+                        
+                    </tbody>
+                </table>
+                
+            </div>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection(6)">
+                <div class="section-title">
+                    <span class="collapse-icon" id="icon-6">▼</span>
+                    General Merchandise
+                </div>
+                <div class="section-score">0%</div>
+            </div>
+            <div class="section-content" id="section-6">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:60px">#</th>
+                            <th>Question</th>
+                            <th style="width:80px">Answer</th>
+                            <th style="width:80px">Score</th>
+                            <th style="width:90px">Observation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                        <tr data-answer="NA">
+                            <td>7.1</td>
+                            <td>Is the area from floor to shelves clean? Is the area under the shelves clean?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>7.2</td>
+                            <td>Is the area under the shelves clean?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>7.3</td>
+                            <td>Are shelves full for the day?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>7.4</td>
+                            <td>Is the quality of displayed items appealing? Would I buy them?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>7.5</td>
+                            <td>Do all items have price tag?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>7.6</td>
+                            <td>Is the personal hygiene respected? Are employees and merchandisers wearing work clothes and name tags?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>7.7</td>
+                            <td>Is "Clean as you Go" implemented?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>7.8</td>
+                            <td>Are shelf strips available?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>7.9</td>
+                            <td>Inspect area while making sure that no hazard is presented to customers and employees.</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>7.10</td>
+                            <td>Is the facing implemented? Wrong SELs?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>7.11</td>
+                            <td>Are GM related forms filled (refer to the list of operation forms)?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 2</td>
+                            <td>-</td>
+                        </tr>
+                        
+                    </tbody>
+                </table>
+                
+            </div>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection(7)">
+                <div class="section-title">
+                    <span class="collapse-icon" id="icon-7">▼</span>
+                    Store Entrance
+                </div>
+                <div class="section-score">0%</div>
+            </div>
+            <div class="section-content" id="section-7">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:60px">#</th>
+                            <th>Question</th>
+                            <th style="width:80px">Answer</th>
+                            <th style="width:80px">Score</th>
+                            <th style="width:90px">Observation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                        <tr data-answer="NA">
+                            <td>8.1</td>
+                            <td>Is the store entrance clean? (including floor mats, windows, glass, floor,�)</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>8.2</td>
+                            <td>Is the screen functional and reflecting the daily USD rate?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 2</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>8.3</td>
+                            <td>Are the entrance/exit signs clean and well visible?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 2</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>8.4</td>
+                            <td>Are trolleys and baskets available and clean?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 8</td>
+                            <td>-</td>
+                        </tr>
+                        
+                    </tbody>
+                </table>
+                
+            </div>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection(8)">
+                <div class="section-title">
+                    <span class="collapse-icon" id="icon-8">▼</span>
+                    Car Park
+                </div>
+                <div class="section-score">0%</div>
+            </div>
+            <div class="section-content" id="section-8">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:60px">#</th>
+                            <th>Question</th>
+                            <th style="width:80px">Answer</th>
+                            <th style="width:80px">Score</th>
+                            <th style="width:90px">Observation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                        <tr data-answer="NA">
+                            <td>9.1</td>
+                            <td>Is the car parking including trash bins and gardening areas clean?  Are sidewalks maintained?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>9.2</td>
+                            <td>Is Happy signage clean?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>9.3</td>
+                            <td>Are store façade and tent clean?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>9.4</td>
+                            <td>Are the road-arrow signs indiquating the traffic flow, available and well visible?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>9.5</td>
+                            <td>Are the parking lights on at 7:30PM(Summer) / 4:30PM(Winter)?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                    </tbody>
+                </table>
+                
+            </div>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection(9)">
+                <div class="section-title">
+                    <span class="collapse-icon" id="icon-9">▼</span>
+                    Customers & Employees WC
+                </div>
+                <div class="section-score">0%</div>
+            </div>
+            <div class="section-content" id="section-9">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:60px">#</th>
+                            <th>Question</th>
+                            <th style="width:80px">Answer</th>
+                            <th style="width:80px">Score</th>
+                            <th style="width:90px">Observation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                        <tr data-answer="NA">
+                            <td>10.1</td>
+                            <td>Are garbage bins clean and empty?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>10.2</td>
+                            <td>Are toilets (including floor, sinks, mats, glass,�) clean and tidy?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>10.3</td>
+                            <td>Are toilets well replenished in terms of toilet paper, paper tissue, soap, sanitizer,�?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>10.4</td>
+                            <td>Are customers and employees WC related forms filled (refer to the list of operation forms)? Policies displayed?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 2</td>
+                            <td>-</td>
+                        </tr>
+                        
+                    </tbody>
+                </table>
+                
+            </div>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection(10)">
+                <div class="section-title">
+                    <span class="collapse-icon" id="icon-10">▼</span>
+                    Maintenance
+                </div>
+                <div class="section-score">0%</div>
+            </div>
+            <div class="section-content" id="section-10">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:60px">#</th>
+                            <th>Question</th>
+                            <th style="width:80px">Answer</th>
+                            <th style="width:80px">Score</th>
+                            <th style="width:90px">Observation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                        <tr data-answer="NA">
+                            <td>11.1</td>
+                            <td>Are the head of department, maintenance assistant and security checking the receiving of fuel?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>11.2</td>
+                            <td>Is the paint condition all over the store in good condition?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>11.3</td>
+                            <td>Are the fuel tanks keys stored in the store manager office's safe?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>11.4</td>
+                            <td>Are all the lights fully operational inside and outside the premises?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>11.5</td>
+                            <td>Is the server room clean and organized?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>11.6</td>
+                            <td>Is the AC in the server room operational?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>11.7</td>
+                            <td>Is the roof clean,organized,(assets, grass,�.)</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>11.8</td>
+                            <td>Are the lift cleaned and well maintained?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>11.9</td>
+                            <td>Are all the tiles in the sales floor in good condition? Anything damaged?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>11.10</td>
+                            <td>Are mechanical rooms clean and tidy?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>11.11</td>
+                            <td>Are the unused assets organized and stored in their respective spaces?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>11.12</td>
+                            <td>Is the ventilation system functioning properly eliminating all smell?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>11.13</td>
+                            <td>Are all sections being inspected by the maintenance team?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>11.14</td>
+                            <td>Are maintenance related forms filled (refer to the list of operation forms)? Policies displayed?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 2</td>
+                            <td>-</td>
+                        </tr>
+                        
+                    </tbody>
+                </table>
+                
+            </div>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection(11)">
+                <div class="section-title">
+                    <span class="collapse-icon" id="icon-11">▼</span>
+                    Offices
+                </div>
+                <div class="section-score">0%</div>
+            </div>
+            <div class="section-content" id="section-11">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:60px">#</th>
+                            <th>Question</th>
+                            <th style="width:80px">Answer</th>
+                            <th style="width:80px">Score</th>
+                            <th style="width:90px">Observation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                        <tr data-answer="NA">
+                            <td>12.1</td>
+                            <td>Is the floor clean and tidy?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>12.2</td>
+                            <td>Are the garbage bins emptied regularly?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>12.3</td>
+                            <td>Are the desks clean and tidy?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>12.4</td>
+                            <td>Is the general atmosphere well and smell free?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                    </tbody>
+                </table>
+                
+            </div>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection(12)">
+                <div class="section-title">
+                    <span class="collapse-icon" id="icon-12">▼</span>
+                    Receiving & Backdoor
+                </div>
+                <div class="section-score">0%</div>
+            </div>
+            <div class="section-content" id="section-12">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:60px">#</th>
+                            <th>Question</th>
+                            <th style="width:80px">Answer</th>
+                            <th style="width:80px">Score</th>
+                            <th style="width:90px">Observation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                        <tr data-answer="NA">
+                            <td>13.1</td>
+                            <td>All suppliers are registered at The Security Log ?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>13.2</td>
+                            <td>Is all the area clean? (Including common areas, damages room, lifts,�.)</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>13.3</td>
+                            <td>Is th receiving yard clean ,organized ? (garbage,cartons,old plastic assets,�.)</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>13.4</td>
+                            <td>Is stock well organized? Is there a place for everything and everything is in its place? Are there any customer trolleys being used?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>13.5</td>
+                            <td>Security staff are spot checking Returns and registering them on Security Log?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>13.6</td>
+                            <td>Is the procedure for receiving high value products followed?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>13.7</td>
+                            <td>Is the temperature for chilled and frozen deliveries monitored? Is the 20 minutes chill chain rule followed? Is the starting time being recorded on the bottom of the case?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 8</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>13.8</td>
+                            <td>Fresh Food Products received using Fresh Food Receiving Form?  quality  of items is  checked by the Designated Department</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>13.9</td>
+                            <td>SAS procedure is properly implemented and receivers are using properly The Warehouse Receipt?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>13.10</td>
+                            <td>Receivers are checking the expiry date of all direct deliveries based on the Company Expiry Rule? (3 Months For The Dry , 6 Months For Frozen, And the Dairies As Per Their Shelf life)</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>13.11</td>
+                            <td>Express receiving operational?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>13.12</td>
+                            <td>Scale Calibration Form filled and updated daily (Using a standard Weight)?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>13.13</td>
+                            <td>Damage Room clean and organized? All Returns properly segregated and labeled with Return Number?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>13.14</td>
+                            <td>Administrator Office Closed And Access Controlled?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>13.15</td>
+                            <td>Is the receiving supervisor spot checking the administration duties?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>13.16</td>
+                            <td>Is the personal hygiene respected? Are employees and merchandisers wearing work clothes and name tags?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>13.17</td>
+                            <td>Are receving related forms filled (refer to the list of operation forms)? Policies displayed?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                    </tbody>
+                </table>
+                
+            </div>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection(13)">
+                <div class="section-title">
+                    <span class="collapse-icon" id="icon-13">▼</span>
+                    Security
+                </div>
+                <div class="section-score">0%</div>
+            </div>
+            <div class="section-content" id="section-13">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:60px">#</th>
+                            <th>Question</th>
+                            <th style="width:80px">Answer</th>
+                            <th style="width:80px">Score</th>
+                            <th style="width:90px">Observation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                        <tr data-answer="NA">
+                            <td>14.1</td>
+                            <td>Are the stores related keys kept in a sealed box at night?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>14.2</td>
+                            <td>Are the purchases made by employees checked and signed by the security guard?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 8</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>14.3</td>
+                            <td>Is the security guard checking personal belongings and conducting a body search of employees punching out for the day?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>14.4</td>
+                            <td>Is the personal hygiene respected? Are employees  wearing work clothes and name tags?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>14.5</td>
+                            <td>Are the emergency exit doors, fire hose reels, and extinguishers operational, clear and visible?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>14.6</td>
+                            <td>Is the CCTV room clean and organized? Is there a security guard checking the zones?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>14.7</td>
+                            <td>Are the employees not smoking in the store?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>14.8</td>
+                            <td>Are security related forms filled (refer to the list of operation forms)? Policies displayed?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                    </tbody>
+                </table>
+                
+            </div>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection(14)">
+                <div class="section-title">
+                    <span class="collapse-icon" id="icon-14">▼</span>
+                    Staff Lockers & Room
+                </div>
+                <div class="section-score">0%</div>
+            </div>
+            <div class="section-content" id="section-14">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:60px">#</th>
+                            <th>Question</th>
+                            <th style="width:80px">Answer</th>
+                            <th style="width:80px">Score</th>
+                            <th style="width:90px">Observation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                        <tr data-answer="NA">
+                            <td>15.1</td>
+                            <td>Is the staff room clean and tidy? (including floor, tables, chairs, sink, fridge, garbage bins,�.)</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>15.2</td>
+                            <td>is "Clean as you Go" signage in place?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                        <tr data-answer="NA">
+                            <td>15.3</td>
+                            <td>Are lockers properly maintained?</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 4</td>
+                            <td>-</td>
+                        </tr>
+                        
+                    </tbody>
+                </table>
+                
+            </div>
+        </div>
+        
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection(15)">
+                <div class="section-title">
+                    <span class="collapse-icon" id="icon-15">▼</span>
+                    Forms & Documents
+                </div>
+                <div class="section-score">0%</div>
+            </div>
+            <div class="section-content" id="section-15">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:60px">#</th>
+                            <th>Question</th>
+                            <th style="width:80px">Answer</th>
+                            <th style="width:80px">Score</th>
+                            <th style="width:90px">Observation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                        <tr data-answer="NA">
+                            <td>16.1</td>
+                            <td>Are Management forms filled and updated? (26)</td>
+                            <td class="choice-na">-</td>
+                            <td>- / 6</td>
+                            <td>-</td>
+                        </tr>
+                        
+                    </tbody>
+                </table>
+                
+            </div>
+        </div>
+        
+        
+        
+        
+        <!-- Good Observations Gallery -->
+        <div class="gallery-section">
+            <h2 class="gallery-title good">✅ Good Observations Gallery (0)</h2>
+            <div class="gallery-empty">No good observations captured</div>
+        </div>
+        
+        <!-- Findings Gallery -->
+        <div class="gallery-section">
+            <h2 class="gallery-title findings">⚠️ Findings Gallery (0)</h2>
+            <div class="gallery-empty">No finding photos captured</div>
+        </div>
+        
+        <div class="footer">
+            Report generated on 3/12/2026, 10:47:56 PM | OE Inspection System
+        </div>
+    </div>
+    
+    <script>
+        const auditId = 59;
+        
+        // Section collapse/expand
+        function toggleSection(index) {
+            const content = document.getElementById('section-' + index);
+            const icon = document.getElementById('icon-' + index);
+            
+            if (content.classList.contains('collapsed')) {
+                content.classList.remove('collapsed');
+                icon.classList.remove('collapsed');
+            } else {
+                content.classList.add('collapsed');
+                icon.classList.add('collapsed');
+            }
+        }
+        
+        function expandAll() {
+            document.querySelectorAll('.section-content').forEach(el => el.classList.remove('collapsed'));
+            document.querySelectorAll('.collapse-icon').forEach(el => el.classList.remove('collapsed'));
+        }
+        
+        function collapseAll() {
+            document.querySelectorAll('.section-content').forEach(el => el.classList.add('collapsed'));
+            document.querySelectorAll('.collapse-icon').forEach(el => el.classList.add('collapsed'));
+        }
+        
+        // Filter functionality
+        const filters = { yes: true, partial: true, no: true, na: true };
+        
+        function toggleFilter(type, btn) {
+            filters[type] = !filters[type];
+            btn.classList.toggle('active', filters[type]);
+            applyFilters();
+        }
+        
+        function applyFilters() {
+            document.querySelectorAll('tr[data-answer]').forEach(row => {
+                const answer = row.dataset.answer;
+                let show = false;
+                
+                if (answer === 'Yes' && filters.yes) show = true;
+                if (answer === 'Partially' && filters.partial) show = true;
+                if (answer === 'No' && filters.no) show = true;
+                if (answer === 'NA' && filters.na) show = true;
+                
+                row.classList.toggle('hidden-by-filter', !show);
+            });
+            
+            // Hide sections that have no visible rows
+            document.querySelectorAll('.section-card').forEach(section => {
+                const visibleRows = section.querySelectorAll('tr[data-answer]:not(.hidden-by-filter)');
+                section.classList.toggle('section-hidden', visibleRows.length === 0);
+            });
+        }
+        
+        function showOnlyFindings() {
+            filters.yes = false;
+            filters.na = false;
+            filters.partial = true;
+            filters.no = true;
+            
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                if (btn.classList.contains('filter-yes')) btn.classList.remove('active');
+                if (btn.classList.contains('filter-na')) btn.classList.remove('active');
+                if (btn.classList.contains('filter-partial')) btn.classList.add('active');
+                if (btn.classList.contains('filter-no')) btn.classList.add('active');
+            });
+            
+            applyFilters();
+        }
+        
+        function resetFilters() {
+            filters.yes = true;
+            filters.partial = true;
+            filters.no = true;
+            filters.na = true;
+            
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.add('active'));
+            document.querySelectorAll('tr[data-answer]').forEach(row => row.classList.remove('hidden-by-filter'));
+            document.querySelectorAll('.section-card').forEach(section => section.classList.remove('section-hidden'));
+        }
+        
+        async function openEmailModal(reportType) {
+            try {
+                const btn = document.querySelector('.btn-email');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '⏳ Loading...';
+                btn.disabled = true;
+                
+                const recipientsRes = await fetch('/oe-inspection/api/audits/' + auditId + '/email-recipients?reportType=' + reportType);
+                const recipientsData = await recipientsRes.json();
+                
+                if (!recipientsData.success) {
+                    throw new Error(recipientsData.error || 'Failed to load recipients');
+                }
+                
+                const previewRes = await fetch('/oe-inspection/api/audits/' + auditId + '/email-preview?reportType=' + reportType);
+                const previewData = await previewRes.json();
+                
+                if (!previewData.success) {
+                    throw new Error(previewData.error || 'Failed to generate preview');
+                }
+                
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                
+                EmailModal.show({
+                    module: 'OE',
+                    from: recipientsData.from,
+                    to: recipientsData.to,
+                    ccSuggestions: recipientsData.ccSuggestions,
+                    subject: previewData.subject,
+                    bodyHtml: previewData.bodyHtml,
+                    reportType: reportType,
+                    auditId: auditId,
+                    sendUrl: '/oe-inspection/api/audits/' + auditId + '/send-report-email',
+                    searchEndpoint: '/operational-excellence/api/users'
+                });
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error preparing email: ' + error.message);
+                const btn = document.querySelector('.btn-email');
+                if (btn) { btn.innerHTML = '📧 Send Report'; btn.disabled = false; }
+            }
+        }
+    </script>
+    <script src="/js/email-modal.js"></script>
+</body>
+</html>

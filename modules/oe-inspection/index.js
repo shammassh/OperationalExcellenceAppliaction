@@ -331,6 +331,12 @@ router.get('/', async (req, res) => {
                             <div class="card-title">Implementation Verification</div>
                             <div class="card-desc">Verify completed action plans submitted by store managers.</div>
                         </a>
+                        
+                        <a href="/oe-inspection/cycle-dashboard" class="card">
+                            <div class="card-icon">🔄</div>
+                            <div class="card-title">Cycle Dashboard</div>
+                            <div class="card-desc">Track inspection progress per brand and cycle. View pending stores.</div>
+                        </a>
                     </div>
                 </div>
             </body>
@@ -407,6 +413,11 @@ router.get('/implementation-verification', (req, res) => {
 // Implementation Verification Form Page
 router.get('/implementation-verification/:inspectionId', (req, res) => {
     res.sendFile(path.join(__dirname, 'pages', 'verification-form.html'));
+});
+
+// Cycle Dashboard Page
+router.get('/cycle-dashboard', (req, res) => {
+    res.sendFile(path.join(__dirname, 'pages', 'cycle-dashboard.html'));
 });
 
 // ==========================================
@@ -4866,6 +4877,438 @@ router.post('/api/audits/:auditId/send-report-email', async (req, res) => {
         }
     } catch (error) {
         console.error('Error sending report email:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ==========================================
+// Cycle Dashboard API Routes
+// ==========================================
+
+// Get cycle progress per brand
+router.get('/api/cycle/progress', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        // Get all brands with their store counts (including stores WITH brands assigned)
+        const brandsResult = await pool.request().query(`
+            SELECT b.Id as BrandId, b.BrandName, b.BrandCode,
+                   COUNT(DISTINCT s.Id) as TotalStores
+            FROM Brands b
+            LEFT JOIN Stores s ON b.Id = s.BrandId AND s.IsActive = 1
+            WHERE b.IsActive = 1
+            GROUP BY b.Id, b.BrandName, b.BrandCode
+            ORDER BY b.BrandName
+        `);
+        
+        // Also get count of stores WITHOUT a brand (NULL BrandId)
+        const unassignedResult = await pool.request().query(`
+            SELECT COUNT(*) as TotalStores
+            FROM Stores s
+            WHERE s.BrandId IS NULL AND s.IsActive = 1
+        `);
+        const unassignedCount = unassignedResult.recordset[0].TotalStores;
+        
+        // For each brand, calculate current cycle based on completed audits
+        // Cycle = minimum number of times any store has been audited + 1 (current working cycle)
+        // Stores with audits = min are "pending", stores with audits > min are "done for current cycle"
+        const progress = [];
+        
+        for (const brand of brandsResult.recordset) {
+            if (brand.TotalStores === 0) {
+                progress.push({
+                    brandId: brand.BrandId,
+                    brandName: brand.BrandName,
+                    brandCode: brand.BrandCode,
+                    totalStores: 0,
+                    auditedStores: 0,
+                    pendingStores: 0,
+                    currentCycle: 1,
+                    completedCycles: 0,
+                    percentage: 0
+                });
+                continue;
+            }
+            
+            // Count completed audits per store for this brand
+            const storeAuditsResult = await pool.request()
+                .input('brandId', sql.Int, brand.BrandId)
+                .query(`
+                    SELECT s.Id as StoreId, s.StoreName,
+                           COUNT(i.Id) as AuditCount
+                    FROM Stores s
+                    LEFT JOIN OE_Inspections i ON s.Id = i.StoreId AND i.Status = 'Completed'
+                    WHERE s.BrandId = @brandId AND s.IsActive = 1
+                    GROUP BY s.Id, s.StoreName
+                `);
+            
+            const storeAudits = storeAuditsResult.recordset;
+            
+            // Find minimum audit count across all stores (completed cycles)
+            const minAudits = Math.min(...storeAudits.map(s => s.AuditCount));
+            const currentCycle = minAudits + 1;
+            
+            // Count stores that have been audited in the current cycle
+            // (stores with AuditCount > minAudits are done for current cycle)
+            const auditedInCurrentCycle = storeAudits.filter(s => s.AuditCount > minAudits).length;
+            const pendingInCurrentCycle = brand.TotalStores - auditedInCurrentCycle;
+            
+            const percentage = brand.TotalStores > 0 
+                ? Math.round(auditedInCurrentCycle / brand.TotalStores * 100) 
+                : 0;
+            
+            progress.push({
+                brandId: brand.BrandId,
+                brandName: brand.BrandName,
+                brandCode: brand.BrandCode,
+                totalStores: brand.TotalStores,
+                auditedStores: auditedInCurrentCycle,
+                pendingStores: pendingInCurrentCycle,
+                currentCycle: currentCycle,
+                completedCycles: minAudits,
+                percentage: percentage
+            });
+        }
+        
+        // Add "Unassigned" category for stores without a brand
+        if (unassignedCount > 0) {
+            const unassignedAuditsResult = await pool.request().query(`
+                SELECT s.Id as StoreId, s.StoreName,
+                       COUNT(i.Id) as AuditCount
+                FROM Stores s
+                LEFT JOIN OE_Inspections i ON s.Id = i.StoreId AND i.Status = 'Completed'
+                WHERE s.BrandId IS NULL AND s.IsActive = 1
+                GROUP BY s.Id, s.StoreName
+            `);
+            
+            const unassignedAudits = unassignedAuditsResult.recordset;
+            const minUnassignedAudits = unassignedAudits.length > 0 
+                ? Math.min(...unassignedAudits.map(s => s.AuditCount)) 
+                : 0;
+            const unassignedCurrentCycle = minUnassignedAudits + 1;
+            const unassignedAuditedInCycle = unassignedAudits.filter(s => s.AuditCount > minUnassignedAudits).length;
+            const unassignedPending = unassignedCount - unassignedAuditedInCycle;
+            
+            progress.push({
+                brandId: 0,  // Special ID for unassigned
+                brandName: '⚠️ Unassigned Stores',
+                brandCode: 'UNASSIGNED',
+                totalStores: unassignedCount,
+                auditedStores: unassignedAuditedInCycle,
+                pendingStores: unassignedPending,
+                currentCycle: unassignedCurrentCycle,
+                completedCycles: minUnassignedAudits,
+                percentage: unassignedCount > 0 ? Math.round(unassignedAuditedInCycle / unassignedCount * 100) : 0
+            });
+        }
+        
+        // Calculate overall stats
+        const totalStores = progress.reduce((sum, b) => sum + b.totalStores, 0);
+        const totalAudited = progress.reduce((sum, b) => sum + b.auditedStores, 0);
+        const totalPending = progress.reduce((sum, b) => sum + b.pendingStores, 0);
+        const overallPercentage = totalStores > 0 ? Math.round(totalAudited / totalStores * 100) : 0;
+        
+        res.json({
+            success: true,
+            data: {
+                brands: progress,
+                overall: {
+                    totalStores,
+                    auditedStores: totalAudited,
+                    pendingStores: totalPending,
+                    percentage: overallPercentage
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error getting cycle progress:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get pending stores for a brand's current cycle
+router.get('/api/cycle/pending-stores', async (req, res) => {
+    try {
+        const { brandId } = req.query;
+        const pool = await sql.connect(dbConfig);
+        
+        if (brandId === undefined || brandId === '') {
+            return res.status(400).json({ success: false, error: 'brandId is required' });
+        }
+        
+        const brandIdInt = parseInt(brandId);
+        const isUnassigned = brandIdInt === 0;
+        
+        // Get all stores for this brand (or unassigned) with their audit counts
+        let storeAuditsResult;
+        if (isUnassigned) {
+            storeAuditsResult = await pool.request().query(`
+                SELECT s.Id as StoreId, s.StoreName, s.StoreCode, s.Location,
+                       'Unassigned' as BrandName, 'N/A' as BrandCode, 0 as BrandId,
+                       COUNT(i.Id) as AuditCount
+                FROM Stores s
+                LEFT JOIN OE_Inspections i ON s.Id = i.StoreId AND i.Status = 'Completed'
+                WHERE s.BrandId IS NULL AND s.IsActive = 1
+                GROUP BY s.Id, s.StoreName, s.StoreCode, s.Location
+            `);
+        } else {
+            storeAuditsResult = await pool.request()
+                .input('brandId', sql.Int, brandIdInt)
+                .query(`
+                    SELECT s.Id as StoreId, s.StoreName, s.StoreCode, s.Location,
+                           b.BrandName, b.BrandCode, b.Id as BrandId,
+                           COUNT(i.Id) as AuditCount
+                    FROM Stores s
+                    INNER JOIN Brands b ON s.BrandId = b.Id
+                    LEFT JOIN OE_Inspections i ON s.Id = i.StoreId AND i.Status = 'Completed'
+                    WHERE s.BrandId = @brandId AND s.IsActive = 1 AND b.IsActive = 1
+                    GROUP BY s.Id, s.StoreName, s.StoreCode, s.Location, b.BrandName, b.BrandCode, b.Id
+                `);
+        }
+        
+        const storeAudits = storeAuditsResult.recordset;
+        
+        if (storeAudits.length === 0) {
+            return res.json({
+                success: true,
+                data: {
+                    currentCycle: 1,
+                    pendingStores: []
+                }
+            });
+        }
+        
+        // Find minimum audit count (completed cycles)
+        const minAudits = Math.min(...storeAudits.map(s => s.AuditCount));
+        const currentCycle = minAudits + 1;
+        
+        // Pending stores are those with AuditCount = minAudits (not yet audited in current cycle)
+        const pendingStores = storeAudits
+            .filter(s => s.AuditCount === minAudits)
+            .map(s => ({
+                StoreId: s.StoreId,
+                StoreName: s.StoreName,
+                StoreCode: s.StoreCode,
+                Location: s.Location,
+                BrandName: s.BrandName,
+                BrandCode: s.BrandCode,
+                BrandId: s.BrandId,
+                TotalAudits: s.AuditCount
+            }));
+        
+        res.json({
+            success: true,
+            data: {
+                currentCycle: currentCycle,
+                pendingStores: pendingStores
+            }
+        });
+    } catch (error) {
+        console.error('Error getting pending stores:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get audited stores for a brand's current cycle
+router.get('/api/cycle/audited-stores', async (req, res) => {
+    try {
+        const { brandId } = req.query;
+        const pool = await sql.connect(dbConfig);
+        
+        if (brandId === undefined || brandId === '') {
+            return res.status(400).json({ success: false, error: 'brandId is required' });
+        }
+        
+        const brandIdInt = parseInt(brandId);
+        const isUnassigned = brandIdInt === 0;
+        
+        // First, find the current cycle for this brand
+        let storeAuditsResult;
+        if (isUnassigned) {
+            storeAuditsResult = await pool.request().query(`
+                SELECT s.Id as StoreId, COUNT(i.Id) as AuditCount
+                FROM Stores s
+                LEFT JOIN OE_Inspections i ON s.Id = i.StoreId AND i.Status = 'Completed'
+                WHERE s.BrandId IS NULL AND s.IsActive = 1
+                GROUP BY s.Id
+            `);
+        } else {
+            storeAuditsResult = await pool.request()
+                .input('brandId', sql.Int, brandIdInt)
+                .query(`
+                    SELECT s.Id as StoreId, COUNT(i.Id) as AuditCount
+                    FROM Stores s
+                    LEFT JOIN OE_Inspections i ON s.Id = i.StoreId AND i.Status = 'Completed'
+                    WHERE s.BrandId = @brandId AND s.IsActive = 1
+                    GROUP BY s.Id
+                `);
+        }
+        
+        const storeAudits = storeAuditsResult.recordset;
+        
+        if (storeAudits.length === 0) {
+            return res.json({
+                success: true,
+                data: {
+                    currentCycle: 1,
+                    auditedStores: []
+                }
+            });
+        }
+        
+        // Find minimum audit count (completed cycles)
+        const minAudits = Math.min(...storeAudits.map(s => s.AuditCount));
+        const currentCycle = minAudits + 1;
+        
+        // Get stores that have been audited in current cycle (AuditCount > minAudits)
+        // We need to get the LAST audit for each store that pushed them into current cycle completion
+        let auditedResult;
+        if (isUnassigned) {
+            auditedResult = await pool.request()
+                .input('minAudits', sql.Int, minAudits)
+                .query(`
+                    WITH StoreAuditCounts AS (
+                        SELECT s.Id as StoreId, COUNT(i.Id) as AuditCount
+                        FROM Stores s
+                        LEFT JOIN OE_Inspections i ON s.Id = i.StoreId AND i.Status = 'Completed'
+                        WHERE s.BrandId IS NULL AND s.IsActive = 1
+                        GROUP BY s.Id
+                        HAVING COUNT(i.Id) > @minAudits
+                    ),
+                    LatestAudits AS (
+                        SELECT i.*, ROW_NUMBER() OVER (PARTITION BY i.StoreId ORDER BY i.CompletedAt DESC, i.Id DESC) as rn
+                        FROM OE_Inspections i
+                        INNER JOIN StoreAuditCounts sac ON i.StoreId = sac.StoreId
+                        WHERE i.Status = 'Completed'
+                    )
+                    SELECT la.Id as InspectionId, la.DocumentNumber, la.StoreId, la.StoreName,
+                           la.InspectionDate, la.Score, la.Inspectors, la.CompletedAt,
+                           s.StoreCode, s.Location,
+                           'Unassigned' as BrandName, 'N/A' as BrandCode, 0 as BrandId
+                    FROM LatestAudits la
+                    INNER JOIN Stores s ON la.StoreId = s.Id
+                    WHERE la.rn = 1
+                    ORDER BY la.CompletedAt DESC, la.InspectionDate DESC
+                `);
+        } else {
+            auditedResult = await pool.request()
+                .input('brandId', sql.Int, brandIdInt)
+                .input('minAudits', sql.Int, minAudits)
+                .query(`
+                    WITH StoreAuditCounts AS (
+                        SELECT s.Id as StoreId, COUNT(i.Id) as AuditCount
+                        FROM Stores s
+                        LEFT JOIN OE_Inspections i ON s.Id = i.StoreId AND i.Status = 'Completed'
+                        WHERE s.BrandId = @brandId AND s.IsActive = 1
+                        GROUP BY s.Id
+                        HAVING COUNT(i.Id) > @minAudits
+                    ),
+                    LatestAudits AS (
+                        SELECT i.*, ROW_NUMBER() OVER (PARTITION BY i.StoreId ORDER BY i.CompletedAt DESC, i.Id DESC) as rn
+                        FROM OE_Inspections i
+                        INNER JOIN StoreAuditCounts sac ON i.StoreId = sac.StoreId
+                        WHERE i.Status = 'Completed'
+                    )
+                    SELECT la.Id as InspectionId, la.DocumentNumber, la.StoreId, la.StoreName,
+                           la.InspectionDate, la.Score, la.Inspectors, la.CompletedAt,
+                           s.StoreCode, s.Location,
+                           b.BrandName, b.BrandCode, b.Id as BrandId
+                    FROM LatestAudits la
+                    INNER JOIN Stores s ON la.StoreId = s.Id
+                    INNER JOIN Brands b ON s.BrandId = b.Id
+                    WHERE la.rn = 1
+                    ORDER BY la.CompletedAt DESC, la.InspectionDate DESC
+                `);
+        }
+        
+        res.json({
+            success: true,
+            data: {
+                currentCycle: currentCycle,
+                auditedStores: auditedResult.recordset
+            }
+        });
+    } catch (error) {
+        console.error('Error getting audited stores:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get current cycle info for a specific store
+router.get('/api/cycle/store/:storeId', async (req, res) => {
+    try {
+        const { storeId } = req.params;
+        const pool = await sql.connect(dbConfig);
+        
+        // Get the store's brand
+        const storeResult = await pool.request()
+            .input('storeId', sql.Int, storeId)
+            .query(`
+                SELECT s.Id as StoreId, s.StoreName, s.BrandId, b.BrandName
+                FROM Stores s
+                INNER JOIN Brands b ON s.BrandId = b.Id
+                WHERE s.Id = @storeId
+            `);
+        
+        if (storeResult.recordset.length === 0) {
+            return res.status(404).json({ success: false, error: 'Store not found' });
+        }
+        
+        const store = storeResult.recordset[0];
+        
+        // Get audit counts for all stores in this brand
+        const storeAuditsResult = await pool.request()
+            .input('brandId', sql.Int, store.BrandId)
+            .query(`
+                SELECT s.Id as StoreId, COUNT(i.Id) as AuditCount
+                FROM Stores s
+                LEFT JOIN OE_Inspections i ON s.Id = i.StoreId AND i.Status = 'Completed'
+                WHERE s.BrandId = @brandId AND s.IsActive = 1
+                GROUP BY s.Id
+            `);
+        
+        const storeAudits = storeAuditsResult.recordset;
+        
+        if (storeAudits.length === 0) {
+            return res.json({
+                success: true,
+                data: {
+                    storeId: parseInt(storeId),
+                    storeName: store.StoreName,
+                    brandName: store.BrandName,
+                    currentCycle: 1,
+                    completedCycles: 0,
+                    storeAuditCount: 0,
+                    isPendingInCurrentCycle: true
+                }
+            });
+        }
+        
+        // Find minimum audit count (completed cycles for the brand)
+        const minAudits = Math.min(...storeAudits.map(s => s.AuditCount));
+        const currentCycle = minAudits + 1;
+        
+        // Get this specific store's audit count
+        const thisStoreAudits = storeAudits.find(s => s.StoreId === parseInt(storeId));
+        const storeAuditCount = thisStoreAudits ? thisStoreAudits.AuditCount : 0;
+        
+        // Is this store pending in current cycle?
+        const isPendingInCurrentCycle = storeAuditCount === minAudits;
+        
+        res.json({
+            success: true,
+            data: {
+                storeId: parseInt(storeId),
+                storeName: store.StoreName,
+                brandName: store.BrandName,
+                currentCycle: currentCycle,
+                completedCycles: minAudits,
+                storeAuditCount: storeAuditCount,
+                isPendingInCurrentCycle: isPendingInCurrentCycle
+            }
+        });
+    } catch (error) {
+        console.error('Error getting store cycle info:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
