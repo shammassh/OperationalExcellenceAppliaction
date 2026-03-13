@@ -6,6 +6,28 @@
 const fs = require('fs');
 const path = require('path');
 
+/**
+ * Sort reference values numerically (e.g., 4.1, 4.2, ..., 4.10 instead of 4.1, 4.10, 4.2)
+ * Handles formats like "4.1", "4.10", "10.1.2", etc.
+ */
+function sortByReferenceValue(a, b) {
+    const refA = (a.referenceValue || a.ReferenceValue || '').toString();
+    const refB = (b.referenceValue || b.ReferenceValue || '').toString();
+    
+    const partsA = refA.split('.').map(p => parseInt(p) || 0);
+    const partsB = refB.split('.').map(p => parseInt(p) || 0);
+    
+    const maxLen = Math.max(partsA.length, partsB.length);
+    for (let i = 0; i < maxLen; i++) {
+        const numA = partsA[i] || 0;
+        const numB = partsB[i] || 0;
+        if (numA !== numB) {
+            return numA - numB;
+        }
+    }
+    return 0;
+}
+
 class OHSReportGenerator {
     constructor(reportsDir) {
         this.reportsDir = reportsDir || path.join(__dirname, '../../reports/ohs-inspection');
@@ -686,7 +708,7 @@ class OHSReportGenerator {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${(section.items || []).map(item => {
+                                ${(section.items || []).slice().sort(sortByReferenceValue).map(item => {
                                     const answerClass = item.selectedChoice === 'Yes' ? 'answer-yes' :
                                                        item.selectedChoice === 'Partially' ? 'answer-partial' :
                                                        item.selectedChoice === 'No' ? 'answer-no' : 'answer-na';
@@ -739,7 +761,7 @@ class OHSReportGenerator {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${(section.items || []).map(item => {
+                                ${(section.items || []).slice().sort(sortByReferenceValue).map(item => {
                                     const answerClass = item.selectedChoice === 'Yes' ? 'answer-yes' :
                                                        item.selectedChoice === 'Partially' ? 'answer-partial' :
                                                        item.selectedChoice === 'No' ? 'answer-no' : 'answer-na';
@@ -790,7 +812,7 @@ class OHSReportGenerator {
                             </tr>
                         </thead>
                         <tbody>
-                            ${(section.items || []).map(item => {
+                            ${(section.items || []).slice().sort(sortByReferenceValue).map(item => {
                                 const answerClass = item.selectedChoice === 'Yes' ? 'answer-yes' :
                                                    item.selectedChoice === 'Partially' ? 'answer-partial' :
                                                    item.selectedChoice === 'No' ? 'answer-no' : 'answer-na';

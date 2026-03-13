@@ -182,6 +182,7 @@ app.get('/dashboard', requireAuth, async (req, res) => {
         // OHS module (main OHS incidents)
         'OHS_DASHBOARD': 'ohs', 'OHS_INCIDENT': 'ohs', 'OHS_SETTINGS': 'ohs',
         'OHS_FIRE_EQUIPMENT': 'fire-equipment', 'OHS_FIRE_EQUIPMENT_ADMIN': 'fire-equipment',
+        'OHS_ORA': 'ora', 'OHS_ORA_ADMIN': 'ora',
         
         // OHS Inspection module
         'OHS_INSPECTION': 'ohs-inspection', 'OHS_INSPECTION_START': 'ohs-inspection', 

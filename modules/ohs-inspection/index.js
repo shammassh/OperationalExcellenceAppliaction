@@ -12,6 +12,27 @@ const fs = require('fs');
 const multer = require('multer');
 const sharp = require('sharp');
 
+/**
+ * Sort reference values numerically (e.g., 4.1, 4.2, ..., 4.10 instead of 4.1, 4.10, 4.2)
+ */
+function sortByReferenceValue(a, b) {
+    const refA = (a.referenceValue || a.ReferenceValue || '').toString();
+    const refB = (b.referenceValue || b.ReferenceValue || '').toString();
+    
+    const partsA = refA.split('.').map(p => parseInt(p) || 0);
+    const partsB = refB.split('.').map(p => parseInt(p) || 0);
+    
+    const maxLen = Math.max(partsA.length, partsB.length);
+    for (let i = 0; i < maxLen; i++) {
+        const numA = partsA[i] || 0;
+        const numB = partsB[i] || 0;
+        if (numA !== numB) {
+            return numA - numB;
+        }
+    }
+    return 0;
+}
+
 // Configure multer for OHS inspection photo uploads
 const ohsUploadDir = path.join(__dirname, '..', '..', 'uploads', 'ohs-inspection');
 if (!fs.existsSync(ohsUploadDir)) {
@@ -3151,7 +3172,7 @@ function generateOHSReportHTML(data) {
                             </tr>
                         </thead>
                         <tbody>
-                            ${(section.items || []).map(item => {
+                            ${(section.items || []).slice().sort(sortByReferenceValue).map(item => {
                                 const itemPics = pictures[item.Id] || [];
                                 const goodPics = itemPics.filter(p => p.pictureType === 'Good');
                                 const answerType = item.Answer === 'Yes' ? 'Yes' : item.Answer === 'No' ? 'No' : item.Answer === 'Partially' ? 'Partially' : 'NA';
@@ -3169,7 +3190,7 @@ function generateOHSReportHTML(data) {
                     ${sectionFindings.length > 0 ? `
                     <div class="section-findings">
                         <div class="section-findings-title">⚠️ Findings (${sectionFindings.length})</div>
-                        ${sectionFindings.map(f => {
+                        ${sectionFindings.slice().sort(sortByReferenceValue).map(f => {
                             const itemPics = pictures[f.Id] || [];
                             return `
                         <div class="finding-item">
