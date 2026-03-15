@@ -62,6 +62,7 @@ class SessionManager {
                     u.AzureOid AS azure_user_id,
                     u.Email AS email,
                     u.DisplayName AS display_name,
+                    u.Department AS department,
                     r.RoleName AS role,
                     u.IsActive AS is_active,
                     u.IsApproved AS is_approved,

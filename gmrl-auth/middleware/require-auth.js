@@ -51,6 +51,7 @@ async function requireAuth(req, res, next) {
             azureUserId: session.azure_user_id,
             email: session.email,
             displayName: session.display_name,
+            department: session.department,  // User's assigned department
             role: roleNames.length > 0 ? roleNames.join(', ') : session.role,  // Show all roles or legacy role
             roleId: session.role_id,  // Legacy role ID for backward compatibility
             roles: session.roles || [],  // All assigned roles

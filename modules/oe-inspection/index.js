@@ -5432,13 +5432,25 @@ router.get('/escalation', (req, res) => {
 router.get('/api/department-escalations', async (req, res) => {
     try {
         const pool = await sql.connect(dbConfig);
-        const result = await pool.request().query(`
-            SELECT * FROM DepartmentEscalations 
-            WHERE Module = 'OE'
-            ORDER BY EscalatedAt DESC
-        `);
+        const isAdmin = req.currentUser?.hasRole?.('System Administrator') || 
+                        req.currentUser?.hasRole?.('Head of Operational Excellence');
+        const userDept = req.currentUser?.department;
         
-        res.json({ success: true, data: result.recordset });
+        let query = `SELECT * FROM DepartmentEscalations WHERE Module = 'OE'`;
+        
+        // If not admin and has department, filter by department
+        if (!isAdmin && userDept) {
+            query += ` AND Department = @department`;
+        }
+        query += ` ORDER BY EscalatedAt DESC`;
+        
+        const request = pool.request();
+        if (!isAdmin && userDept) {
+            request.input('department', sql.NVarChar, userDept);
+        }
+        
+        const result = await request.query(query);
+        res.json({ success: true, data: result.recordset, userDepartment: userDept, isAdmin });
     } catch (error) {
         console.error('Error getting OE department escalations:', error);
         res.status(500).json({ success: false, error: error.message });
@@ -5449,17 +5461,31 @@ router.get('/api/department-escalations', async (req, res) => {
 router.get('/api/department-escalations/stats', async (req, res) => {
     try {
         const pool = await sql.connect(dbConfig);
-        const result = await pool.request().query(`
+        const isAdmin = req.currentUser?.hasRole?.('System Administrator') || 
+                        req.currentUser?.hasRole?.('Head of Operational Excellence');
+        const userDept = req.currentUser?.department;
+        
+        let whereClause = `WHERE Module = 'OE'`;
+        if (!isAdmin && userDept) {
+            whereClause += ` AND Department = @department`;
+        }
+        
+        const request = pool.request();
+        if (!isAdmin && userDept) {
+            request.input('department', sql.NVarChar, userDept);
+        }
+        
+        const result = await request.query(`
             SELECT 
                 SUM(CASE WHEN Status = 'Pending' THEN 1 ELSE 0 END) as pending,
                 SUM(CASE WHEN Status = 'Pending' AND Deadline < GETDATE() THEN 1 ELSE 0 END) as overdue,
                 SUM(CASE WHEN Status = 'InProgress' OR Status = 'Acknowledged' THEN 1 ELSE 0 END) as inProgress,
                 SUM(CASE WHEN Status = 'Resolved' THEN 1 ELSE 0 END) as resolved
             FROM DepartmentEscalations
-            WHERE Module = 'OE'
+            ${whereClause}
         `);
         
-        res.json({ success: true, stats: result.recordset[0] });
+        res.json({ success: true, stats: result.recordset[0], userDepartment: userDept, isAdmin });
     } catch (error) {
         console.error('Error getting OE escalation stats:', error);
         res.status(500).json({ success: false, error: error.message });

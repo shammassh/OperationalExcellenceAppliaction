@@ -1426,7 +1426,7 @@ router.get('/users', async (req, res) => {
         
         // Get users with their assigned roles (supports multiple roles)
         const users = await pool.request().query(`
-            SELECT u.Id, u.Email, u.DisplayName, u.IsActive, u.IsApproved, u.CreatedAt,
+            SELECT u.Id, u.Email, u.DisplayName, u.Department, u.IsActive, u.IsApproved, u.CreatedAt,
                    (SELECT COUNT(*) FROM UserFormAccess WHERE UserId = u.Id) as FormCount,
                    (SELECT STRING_AGG(r.RoleName, ', ') FROM UserRoleAssignments ura 
                     JOIN UserRoles r ON ura.RoleId = r.Id WHERE ura.UserId = u.Id) as RoleNames,
@@ -1435,6 +1435,17 @@ router.get('/users', async (req, res) => {
             FROM Users u
             ORDER BY u.DisplayName
         `);
+        
+        // Get available departments
+        const depts = await pool.request().query(`
+            SELECT DISTINCT Department FROM (
+                SELECT Department FROM DepartmentContacts WHERE Department IS NOT NULL
+                UNION
+                SELECT Department FROM Users WHERE Department IS NOT NULL AND Department != ''
+            ) AS depts
+            ORDER BY Department
+        `);
+        const departments = depts.recordset.map(r => r.Department);
         
         const roles = await pool.request().query(`
             SELECT r.Id, r.RoleName, r.CategoryId, c.CategoryName, c.AccessLevel,
@@ -1450,10 +1461,16 @@ router.get('/users', async (req, res) => {
         // Helper to escape strings for JS
         const escapeJs = (str) => (str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, ' ').replace(/\r/g, '');
         
+        const departmentsJson = JSON.stringify(departments);
+        
         let userRows = users.recordset.map(u => {
             const roleDisplay = u.RoleNames ? u.RoleNames.split(', ').map(r => 
                 `<span class="role-badge">${r}</span>`
             ).join(' ') : '<span class="role-badge no-role">No Role</span>';
+            
+            const deptDisplay = u.Department 
+                ? `<span class="dept-badge">${u.Department}</span>`
+                : '<span class="dept-badge no-dept">No Dept</span>';
             
             const approvalBadge = u.IsApproved 
                 ? '' 
@@ -1464,10 +1481,11 @@ router.get('/users', async (req, res) => {
                 : `<button class="btn btn-sm btn-warning" onclick="approveUser(${u.Id}, '${escapeJs(u.DisplayName)}')">✓ Approve</button>`;
             
             return `
-            <tr data-user-id="${u.Id}" data-approved="${u.IsApproved ? '1' : '0'}">
+            <tr data-user-id="${u.Id}" data-approved="${u.IsApproved ? '1' : '0'}" data-department="${u.Department || ''}">
                 <td>${escapeJs(u.DisplayName) || 'N/A'} ${approvalBadge}</td>
                 <td>${u.Email}</td>
                 <td class="roles-cell">${roleDisplay}</td>
+                <td class="dept-cell" onclick="editDepartment(${u.Id}, '${escapeJs(u.Department || '')}', '${escapeJs(u.DisplayName)}')" style="cursor:pointer;">${deptDisplay}</td>
                 <td><span class="form-count">${u.FormCount} forms</span></td>
                 <td><span class="status-badge ${u.IsActive ? 'active' : 'inactive'}">${u.IsActive ? 'Active' : 'Inactive'}</span></td>
                 <td class="actions-cell">
@@ -1556,6 +1574,20 @@ router.get('/users', async (req, res) => {
                     .role-badge.no-role {
                         background: #f5f5f5;
                         color: #999;
+                    }
+                    .dept-badge {
+                        background: #e8f5e9;
+                        color: #2e7d32;
+                        padding: 4px 10px;
+                        border-radius: 15px;
+                        font-size: 11px;
+                    }
+                    .dept-badge.no-dept {
+                        background: #f5f5f5;
+                        color: #999;
+                    }
+                    .dept-cell:hover .dept-badge {
+                        background: #c8e6c9;
                     }
                     .form-count {
                         background: #f3e5f5;
@@ -1705,13 +1737,14 @@ router.get('/users', async (req, res) => {
                                     <th>Name</th>
                                     <th>Email</th>
                                     <th>Role</th>
+                                    <th>Department</th>
                                     <th>Forms Assigned</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${userRows || '<tr><td colspan="6" style="text-align:center;color:#666;">No users found</td></tr>'}
+                                ${userRows || '<tr><td colspan="7" style="text-align:center;color:#666;">No users found</td></tr>'}
                             </tbody>
                         </table>
                     </div>
@@ -1737,6 +1770,28 @@ router.get('/users', async (req, res) => {
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Department Change Modal -->
+                <div class="modal" id="deptModal">
+                    <div class="modal-content" style="width:400px;">
+                        <div class="modal-title" style="display:flex;justify-content:space-between;align-items:center;">
+                            <span>🏢 Set Department</span>
+                            <button onclick="closeDeptModal()" style="background:none;border:none;font-size:24px;cursor:pointer;">×</button>
+                        </div>
+                        <input type="hidden" id="deptUserId">
+                        <div class="form-group">
+                            <label id="deptUserNameLabel" style="font-weight:600;font-size:16px;color:#0078d4;margin-bottom:15px;display:block;">User</label>
+                            <label style="margin-bottom:8px;display:block;">Department:</label>
+                            <select id="departmentSelect" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:14px;" onchange="handleDeptChange(this)">
+                            </select>
+                            <input type="text" id="customDeptInput" placeholder="Enter new department name" style="display:none;width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-top:10px;">
+                        </div>
+                        <div class="modal-actions" style="margin-top:20px;">
+                            <button type="button" class="btn btn-secondary" onclick="closeDeptModal()">Cancel</button>
+                            <button type="button" class="btn btn-success" onclick="saveDepartment()">💾 Save Department</button>
                         </div>
                     </div>
                 </div>
@@ -1858,6 +1913,83 @@ router.get('/users', async (req, res) => {
                         if (query) {
                             document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('selected'));
                         }
+                    }
+                    
+                    const departments = ${departmentsJson};
+                    
+                    function editDepartment(userId, currentDept, userName) {
+                        document.getElementById('deptUserId').value = userId;
+                        document.getElementById('deptUserNameLabel').textContent = '👤 ' + userName;
+                        
+                        // Build department select options
+                        let options = '<option value="">-- No Department --</option>';
+                        departments.forEach(d => {
+                            const selected = d === currentDept ? 'selected' : '';
+                            options += '<option value="' + d + '" ' + selected + '>' + d + '</option>';
+                        });
+                        // Add option for custom entry
+                        options += '<option value="__custom__">+ Add New Department</option>';
+                        
+                        document.getElementById('departmentSelect').innerHTML = options;
+                        document.getElementById('departmentSelect').value = currentDept || '';
+                        document.getElementById('customDeptInput').style.display = 'none';
+                        document.getElementById('deptModal').classList.add('show');
+                    }
+                    
+                    function handleDeptChange(select) {
+                        const customInput = document.getElementById('customDeptInput');
+                        if (select.value === '__custom__') {
+                            customInput.style.display = 'block';
+                            customInput.focus();
+                        } else {
+                            customInput.style.display = 'none';
+                        }
+                    }
+                    
+                    async function saveDepartment() {
+                        const userId = document.getElementById('deptUserId').value;
+                        const select = document.getElementById('departmentSelect');
+                        let department = select.value;
+                        
+                        if (department === '__custom__') {
+                            department = document.getElementById('customDeptInput').value.trim();
+                            if (!department) {
+                                alert('Please enter a department name');
+                                return;
+                            }
+                        }
+                        
+                        try {
+                            const response = await fetch('/admin/users/' + userId + '/department', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ department })
+                            });
+                            const data = await response.json();
+                            
+                            if (data.success) {
+                                // Update the table row
+                                const row = document.querySelector('tr[data-user-id="' + userId + '"]');
+                                if (row) {
+                                    const deptCell = row.querySelector('.dept-cell');
+                                    if (department) {
+                                        deptCell.innerHTML = '<span class="dept-badge">' + department + '</span>';
+                                    } else {
+                                        deptCell.innerHTML = '<span class="dept-badge no-dept">No Dept</span>';
+                                    }
+                                    row.setAttribute('data-department', department);
+                                }
+                                closeDeptModal();
+                            } else {
+                                alert('Error: ' + data.error);
+                            }
+                        } catch (err) {
+                            alert('Error: ' + err.message);
+                        }
+                    }
+                    
+                    function closeDeptModal() {
+                        document.getElementById('deptModal').classList.remove('show');
                     }
                     
                     function editRoles(userId, currentRoleIds, userName) {
@@ -2664,6 +2796,52 @@ router.post('/users/:userId/approve', async (req, res) => {
         res.json({ success: true, message: 'User approved successfully' });
     } catch (err) {
         console.error('Error approving user:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Update user department
+router.post('/users/:userId/department', async (req, res) => {
+    try {
+        const userId = parseInt(req.params.userId);
+        const { department } = req.body;
+        const pool = await sql.connect(dbConfig);
+        
+        await pool.request()
+            .input('userId', sql.Int, userId)
+            .input('department', sql.NVarChar, department || null)
+            .query('UPDATE Users SET Department = @department WHERE Id = @userId');
+        
+        await pool.close();
+        
+        console.log(`✅ User ${userId} department updated to: ${department || 'None'}`);
+        res.json({ success: true, message: 'Department updated successfully' });
+    } catch (err) {
+        console.error('Error updating user department:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Get available departments
+router.get('/departments', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        
+        // Get departments from DepartmentContacts + existing user departments
+        const result = await pool.request().query(`
+            SELECT DISTINCT Department FROM (
+                SELECT Department FROM DepartmentContacts WHERE Department IS NOT NULL
+                UNION
+                SELECT Department FROM Users WHERE Department IS NOT NULL AND Department != ''
+            ) AS depts
+            ORDER BY Department
+        `);
+        
+        await pool.close();
+        
+        res.json({ success: true, departments: result.recordset.map(r => r.Department) });
+    } catch (err) {
+        console.error('Error getting departments:', err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
