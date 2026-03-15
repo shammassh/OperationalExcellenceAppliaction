@@ -1424,28 +1424,49 @@ router.get('/users', async (req, res) => {
     try {
         const pool = await sql.connect(dbConfig);
         
+        // Check if Department column exists
+        const colCheck = await pool.request().query(`
+            SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE TABLE_NAME = 'Users' AND COLUMN_NAME = 'Department'
+        `);
+        const hasDeptColumn = colCheck.recordset.length > 0;
+        
         // Get users with their assigned roles (supports multiple roles)
-        const users = await pool.request().query(`
-            SELECT u.Id, u.Email, u.DisplayName, u.Department, u.IsActive, u.IsApproved, u.CreatedAt,
+        const usersQuery = hasDeptColumn 
+            ? `SELECT u.Id, u.Email, u.DisplayName, u.Department, u.IsActive, u.IsApproved, u.CreatedAt,
                    (SELECT COUNT(*) FROM UserFormAccess WHERE UserId = u.Id) as FormCount,
                    (SELECT STRING_AGG(r.RoleName, ', ') FROM UserRoleAssignments ura 
                     JOIN UserRoles r ON ura.RoleId = r.Id WHERE ura.UserId = u.Id) as RoleNames,
                    (SELECT STRING_AGG(CAST(ura.RoleId AS VARCHAR), ',') FROM UserRoleAssignments ura 
                     WHERE ura.UserId = u.Id) as RoleIds
-            FROM Users u
-            ORDER BY u.DisplayName
-        `);
+               FROM Users u
+               ORDER BY u.DisplayName`
+            : `SELECT u.Id, u.Email, u.DisplayName, NULL as Department, u.IsActive, u.IsApproved, u.CreatedAt,
+                   (SELECT COUNT(*) FROM UserFormAccess WHERE UserId = u.Id) as FormCount,
+                   (SELECT STRING_AGG(r.RoleName, ', ') FROM UserRoleAssignments ura 
+                    JOIN UserRoles r ON ura.RoleId = r.Id WHERE ura.UserId = u.Id) as RoleNames,
+                   (SELECT STRING_AGG(CAST(ura.RoleId AS VARCHAR), ',') FROM UserRoleAssignments ura 
+                    WHERE ura.UserId = u.Id) as RoleIds
+               FROM Users u
+               ORDER BY u.DisplayName`;
         
-        // Get available departments
-        const depts = await pool.request().query(`
-            SELECT DISTINCT Department FROM (
-                SELECT Department FROM DepartmentContacts WHERE Department IS NOT NULL
-                UNION
-                SELECT Department FROM Users WHERE Department IS NOT NULL AND Department != ''
-            ) AS depts
-            ORDER BY Department
-        `);
-        const departments = depts.recordset.map(r => r.Department);
+        const users = await pool.request().query(usersQuery);
+        
+        // Get available departments (defensive - check if columns exist)
+        let departments = [];
+        try {
+            const depts = await pool.request().query(`
+                SELECT DISTINCT Department FROM (
+                    SELECT Department FROM DepartmentContacts WHERE Department IS NOT NULL
+                    UNION
+                    SELECT Department FROM Users WHERE Department IS NOT NULL AND Department != ''
+                ) AS depts
+                ORDER BY Department
+            `);
+            departments = depts.recordset.map(r => r.Department);
+        } catch (deptErr) {
+            console.log('Department query failed, using empty list:', deptErr.message);
+        }
         
         const roles = await pool.request().query(`
             SELECT r.Id, r.RoleName, r.CategoryId, c.CategoryName, c.AccessLevel,
